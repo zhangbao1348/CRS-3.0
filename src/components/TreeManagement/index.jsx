@@ -18,8 +18,13 @@ const { TextArea } = Input
  * @param {string} props.title - 页面标题
  * @param {Array} props.initialData - 初始树状数据
  * @param {string} props.codeName - 编码名称（如"市场码"、"渠道码"、"来源码"）
+ * @param {Object} props.customMethods - 自定义方法（可选）
+ * @param {Function} props.customMethods.addNode - 新增节点方法
+ * @param {Function} props.customMethods.updateNode - 更新节点方法
+ * @param {Function} props.customMethods.deleteNode - 删除节点方法
+ * @param {Function} props.customMethods.checkCodeUnique - 检查CODE是否唯一方法
  */
-const TreeManagement = ({ title, initialData = [], codeName = '编码' }) => {
+const TreeManagement = ({ title, initialData = [], codeName = '编码', customMethods = {} }) => {
   // 状态管理
   const [treeData, setTreeData] = useState(initialData)
   const [selectedKeys, setSelectedKeys] = useState([])
@@ -132,54 +137,95 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码' }) => {
   const validateCodeUnique = async (rule, value) => {
     if (!value) return Promise.resolve()
     
-    let isUnique = true
-    const checkCode = (nodes) => {
-      for (const node of nodes) {
-        if (node.code === value && node.key !== (modalType === 'edit' ? selectedNode?.key : null)) {
-          isUnique = false
-          return
+    try {
+      if (customMethods.checkCodeUnique) {
+        // 使用自定义方法检查唯一性
+        const isUnique = await customMethods.checkCodeUnique(value, modalType === 'edit' ? selectedNode?.key : null)
+        if (!isUnique) {
+          return Promise.reject(`${codeName}已存在`)
         }
-        if (node.children) {
-          checkCode(node.children)
+      } else {
+        // 默认本地检查
+        let isUnique = true
+        const checkCode = (nodes) => {
+          for (const node of nodes) {
+            if (node.code === value && node.key !== (modalType === 'edit' ? selectedNode?.key : null)) {
+              isUnique = false
+              return
+            }
+            if (node.children) {
+              checkCode(node.children)
+            }
+          }
+        }
+        checkCode(treeData)
+        
+        if (!isUnique) {
+          return Promise.reject(`${codeName}已存在`)
         }
       }
+      return Promise.resolve()
+    } catch (error) {
+      console.error('验证CODE唯一性失败:', error)
+      return Promise.reject('验证失败，请稍后重试')
     }
-    checkCode(treeData)
-    
-    if (!isUnique) {
-      return Promise.reject(`${codeName}已存在`)
-    }
-    return Promise.resolve()
   }
 
   // 表单提交处理
   const handleOk = () => {
     form.validateFields()
-      .then(values => {
+      .then(async values => {
         setIsLoading(true)
         
-        setTimeout(() => {
+        try {
           let newTreeData = [...treeData]
           
           if (modalType === 'add') {
             // 新增节点
-            const newNode = {
-              key: generateKey(),
-              title: values.title,
-              code: values.code
-            }
-            
-            if (selectedKeys.length > 0) {
-              // 在选中节点下新增子节点
-              newTreeData = addChildNode(newTreeData, selectedKeys[0], newNode)
+            if (customMethods.addNode) {
+              // 使用自定义方法新增节点
+              const parentKey = selectedKeys.length > 0 ? selectedKeys[0] : null
+              const newNode = await customMethods.addNode(parentKey, {
+                title: values.title,
+                code: values.code
+              })
+              
+              if (selectedKeys.length > 0) {
+                // 在选中节点下新增子节点
+                newTreeData = addChildNode(newTreeData, selectedKeys[0], newNode)
+              } else {
+                // 新增根节点
+                newTreeData.push(newNode)
+              }
             } else {
-              // 新增根节点
-              newTreeData.push(newNode)
+              // 默认本地新增
+              const newNode = {
+                key: generateKey(),
+                title: values.title,
+                code: values.code
+              }
+              
+              if (selectedKeys.length > 0) {
+                // 在选中节点下新增子节点
+                newTreeData = addChildNode(newTreeData, selectedKeys[0], newNode)
+              } else {
+                // 新增根节点
+                newTreeData.push(newNode)
+              }
             }
             message.success('新增成功')
           } else {
             // 编辑节点
             if (selectedNode) {
+              if (customMethods.updateNode) {
+                // 使用自定义方法更新节点
+                await customMethods.updateNode(selectedNode.key, {
+                  title: values.title,
+                  code: values.code
+                })
+              }
+              
+              // 更新本地状态
               newTreeData = updateNode(newTreeData, selectedNode.key, {
                 title: values.title,
                 code: values.code
@@ -190,9 +236,13 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码' }) => {
           
           setTreeData(newTreeData)
           setIsModalVisible(false)
-          setIsLoading(false)
           form.resetFields()
-        }, 500)
+        } catch (error) {
+          console.error('提交失败:', error)
+          message.error(error.message || '操作失败，请稍后重试')
+        } finally {
+          setIsLoading(false)
+        }
       })
       .catch(errorInfo => {
         console.log('表单验证失败:', errorInfo)
@@ -213,16 +263,26 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码' }) => {
       okText: '确定',
       okType: 'danger',
       cancelText: '取消',
-      onOk() {
+      onOk: async () => {
         setIsLoading(true)
-        setTimeout(() => {
+        try {
+          if (customMethods.deleteNode) {
+            // 使用自定义方法删除节点
+            await customMethods.deleteNode(selectedNode.key)
+          }
+          
+          // 更新本地状态
           const newTreeData = deleteNode(treeData, selectedNode.key)
           setTreeData(newTreeData)
           setSelectedKeys([])
           setSelectedNode(null)
           message.success('删除成功')
+        } catch (error) {
+          console.error('删除失败:', error)
+          message.error(error.message || '删除失败，请稍后重试')
+        } finally {
           setIsLoading(false)
-        }, 500)
+        }
       }
     })
   }
