@@ -1,5 +1,6 @@
 package com.crs.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -35,8 +36,7 @@ public class GroupRateCode {
     private String description;
     
     @Column(name = "status", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    private Status status = Status.active;
+    private String status = "active";
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
@@ -47,14 +47,10 @@ public class GroupRateCode {
     private Date updatedAt = new Date();
     
     // 关联关系
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", insertable = false, updatable = false)
+    @JoinColumn(name = "group_id", referencedColumnName = "id", insertable = false, updatable = false)
     private Group group;
-    
-    // 状态枚举
-    public enum Status {
-        active, inactive
-    }
     
     @PreUpdate
     public void preUpdate() {
