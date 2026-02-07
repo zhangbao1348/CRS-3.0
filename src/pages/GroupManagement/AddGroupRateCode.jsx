@@ -1,10 +1,16 @@
-import React, { useState } from 'react'
-import { Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tabs, Tag, Radio, Table, Switch } from 'antd'
-import { PlusOutlined, CloseOutlined } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tabs, Tag, Radio, Table, Switch, message, Spin } from 'antd'
+import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { useNavigate, useLocation } from 'react-router-dom'
+import axios from 'axios'
 
 const { Option } = Select
 
 const AddGroupRateCode = () => {
+  // 路由管理
+  const navigate = useNavigate()
+  const location = useLocation()
+  
   // 状态管理
   const [form] = Form.useForm()
   const [includedPackages, setIncludedPackages] = useState([])
@@ -36,6 +42,10 @@ const AddGroupRateCode = () => {
   const [promotionRule, setPromotionRule] = useState('unlimited')
   // 当前选择的房价码类型
   const [rateType, setRateType] = useState('basic')
+  // API 调用状态
+  const [loading, setLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentId, setCurrentId] = useState(null)
 
   // 包价/早餐选项
   const packageOptions = [
@@ -43,6 +53,26 @@ const AddGroupRateCode = () => {
     { id: 2, code: 'lunch0915', name: '午餐0915' },
     { id: 3, code: 'TEST', name: '含早餐' }
   ]
+  
+  // 获取路由参数中的编辑数据
+  useEffect(() => {
+    const record = location.state?.record
+    if (record) {
+      setIsEditing(true)
+      setCurrentId(record.id)
+      // 填充表单数据
+      form.setFieldsValue({
+        rateName: record.name,
+        rateCode: record.code,
+        rateCategory: record.rateCategory,
+        marketCode: record.marketCode,
+        sourceCode: record.sourceCode,
+        rateType: record.type === '基础房价码' ? 'basic' : 'derivative',
+        status: record.status === '启用' ? 'active' : 'inactive'
+      })
+      setRateType(record.type === '基础房价码' ? 'basic' : 'derivative')
+    }
+  }, [location.state, form])
 
   // 处理包价选择
   const handlePackageChange = (value) => {
@@ -56,13 +86,43 @@ const AddGroupRateCode = () => {
   }
 
   // 保存并下一步
-  const handleSave = () => {
-    form.validateFields().then(values => {
+  // 处理保存
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+      const values = await form.validateFields()
       console.log('表单数据:', values)
-      // 处理保存逻辑
-    }).catch(errorInfo => {
-      console.log('表单验证失败:', errorInfo)
-    })
+      
+      // 准备提交数据
+      const submitData = {
+        rateCode: values.rateCode,
+        rateName: values.rateName,
+        description: values.description || '',
+        status: values.status === 'active' ? 'active' : 'inactive',
+        groupId: 1 // 默认集团ID，可以根据实际情况调整
+      }
+      
+      // 调用后端API
+      if (isEditing && currentId) {
+        // 编辑模式
+        const response = await axios.put(`http://localhost:8080/api/group-rate-codes/${currentId}`, submitData)
+        message.success('房价码更新成功')
+      } else {
+        // 创建模式
+        const response = await axios.post('http://localhost:8080/api/group-rate-codes', submitData)
+        message.success('房价码创建成功')
+      }
+      
+      // 保存成功后返回列表页面
+      setTimeout(() => {
+        navigate('/group-management/group-rate-code')
+      }, 1000)
+    } catch (error) {
+      console.error('保存失败:', error)
+      message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
+    } finally {
+      setLoading(false)
+    }
   }
 
   // 处理Switch开关变化
@@ -535,7 +595,17 @@ const AddGroupRateCode = () => {
 
   return (
     <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh', overflow: 'auto' }}>
-      <h1 className="page-title">新增编辑集团房价码</h1>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 className="page-title">
+          {isEditing ? '编辑集团房价码' : '新增集团房价码'}
+        </h1>
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={() => navigate('/group-management/group-rate-code')}
+        >
+          返回列表
+        </Button>
+      </div>
       
       <Tabs defaultActiveKey="1" items={tabItems} />
     </div>
