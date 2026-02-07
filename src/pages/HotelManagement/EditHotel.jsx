@@ -13,6 +13,24 @@ const EditHotel = () => {
   const [hotelId, setHotelId] = useState(null)
   const [loading, setLoading] = useState(true)
   
+  // 设施数据状态
+  const [facilities, setFacilities] = useState({
+    transportationServices: [],
+    diningServices: [],
+    cleaningServices: []
+  })
+  
+  // 酒店图片状态
+  const [hotelImages, setHotelImages] = useState({
+    logo: [],
+    external: [],
+    restaurant: [],
+    lobby: []
+  })
+  
+  // 表单数据状态
+  const [formData, setFormData] = useState({})
+  
   // 房型数据状态
   const [roomTypeData, setRoomTypeData] = useState([
     { key: '1', roomType: '高级大床房', allocated: false, roomInfoEditable: false },
@@ -52,6 +70,30 @@ const EditHotel = () => {
     }
   }
   
+  // 根据设施代码获取设施名称
+  const getFacilityName = (code) => {
+    const facilityMap = {
+      // 交通服务
+      paidParking: '收费停车场',
+      freeParking: '免费停车场',
+      freeShuttle: '免费接送机',
+      paidShuttle: '收费接送机',
+      // 餐饮服务
+      buffetRestaurant: '自助早餐厅',
+      cafe: '咖啡厅',
+      chineseRestaurant: '中餐厅',
+      westernRestaurant: '西餐厅',
+      // 清洁服务
+      laundryService: '外送洗衣服务',
+      dryer: '干衣机',
+      iron: '熨斗/挂烫机',
+      laundryRoom: '洗衣房',
+      valetService: '熨衣服务',
+      washingService: '洗衣服务'
+    }
+    return facilityMap[code] || code
+  }
+  
   // 从URL获取酒店ID并加载数据
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -64,6 +106,23 @@ const EditHotel = () => {
       message.error('未找到酒店ID')
     }
   }, [])
+  
+  // 当设施数据变化时，更新表单
+  useEffect(() => {
+    if (form && !loading) {
+      console.log('Updating form with facilities:', facilities)
+      try {
+        form.setFieldsValue({
+          transportationServices: facilities.transportationServices,
+          diningServices: facilities.diningServices,
+          cleaningServices: facilities.cleaningServices
+        })
+        console.log('Facilities updated in form via useEffect')
+      } catch (error) {
+        console.error('Error updating form with facilities:', error)
+      }
+    }
+  }, [facilities, form, loading])
   
   // 加载酒店数据
   const loadHotelData = async (id) => {
@@ -101,6 +160,94 @@ const EditHotel = () => {
           hotelIntroduction: hotel.introduction,
           hotelTotalRooms: hotel.totalRooms || 0
         })
+      
+      // 加载酒店设施
+      try {
+        const facilitiesResponse = await axios.get(`http://localhost:8080/api/hotel-facilities/hotel/${id}`)
+        const hotelFacilities = facilitiesResponse.data
+        
+        // 分类设施
+        const transportationServices = []
+        const diningServices = []
+        const cleaningServices = []
+        
+        // 处理返回的设施数据
+        if (Array.isArray(hotelFacilities)) {
+          hotelFacilities.forEach(facility => {
+            if (facility.facilityCode) {
+              const facilityCode = facility.facilityCode
+              
+              // 根据代码分类
+              if (['paidParking', 'freeParking', 'freeShuttle', 'paidShuttle'].includes(facilityCode)) {
+                transportationServices.push(facilityCode)
+              } else if (['buffetRestaurant', 'cafe', 'chineseRestaurant', 'westernRestaurant'].includes(facilityCode)) {
+                diningServices.push(facilityCode)
+              } else if (['laundryService', 'dryer', 'iron', 'laundryRoom', 'valetService', 'washingService'].includes(facilityCode)) {
+                cleaningServices.push(facilityCode)
+              }
+            }
+          })
+        }
+        
+        // 更新设施状态
+        setFacilities({
+          transportationServices,
+          diningServices,
+          cleaningServices
+        })
+      } catch (facilityError) {
+        console.error('加载酒店设施失败:', facilityError)
+        // 设施加载失败不影响酒店基本信息的显示
+      }
+      
+      // 加载酒店图片
+      try {
+        const imagesResponse = await axios.get(`http://localhost:8080/api/hotel-images/hotel/${id}`)
+        const images = imagesResponse.data
+        
+        if (Array.isArray(images)) {
+          // 分类图片
+          const logoImages = []
+          const externalImages = []
+          const restaurantImages = []
+          const lobbyImages = []
+          
+          images.forEach(image => {
+            const imageItem = {
+              uid: image.id,
+              name: image.imageName,
+              status: 'done',
+              url: `http://localhost:8080/api/hotel-images/view/${image.id}`
+            }
+            
+            switch (image.imageType) {
+              case 'logo':
+                logoImages.push(imageItem)
+                break
+              case 'external':
+                externalImages.push(imageItem)
+                break
+              case 'restaurant':
+                restaurantImages.push(imageItem)
+                break
+              case 'lobby':
+                lobbyImages.push(imageItem)
+                break
+            }
+          })
+          
+          // 更新图片状态
+          setHotelImages({
+            logo: logoImages,
+            external: externalImages,
+            restaurant: restaurantImages,
+            lobby: lobbyImages
+          })
+        }
+      } catch (imageError) {
+        console.error('加载酒店图片失败:', imageError)
+        // 图片加载失败不影响酒店基本信息的显示
+      }
       
       setLoading(false)
     } catch (error) {
@@ -149,8 +296,69 @@ const EditHotel = () => {
       // 调用后端API更新酒店
       const response = await axios.put(`http://localhost:8080/api/hotels/${hotelId}`, hotelData)
       
-      message.success('保存成功！')
       console.log('酒店更新成功:', response.data)
+      
+      // 保存酒店设施
+      try {
+        // 收集所有选中的设施
+        const selectedFacilities = [];
+        
+        // 交通服务
+        if (values.transportationServices && Array.isArray(values.transportationServices)) {
+          values.transportationServices.forEach(service => {
+            selectedFacilities.push({
+              facilityName: getFacilityName(service),
+              facilityCode: service,
+              facilityType: '交通服务'
+            });
+          });
+        }
+        
+        // 餐饮服务
+        if (values.diningServices && Array.isArray(values.diningServices)) {
+          values.diningServices.forEach(service => {
+            selectedFacilities.push({
+              facilityName: getFacilityName(service),
+              facilityCode: service,
+              facilityType: '餐饮服务'
+            });
+          });
+        }
+        
+        // 清洁服务
+        if (values.cleaningServices && Array.isArray(values.cleaningServices)) {
+          values.cleaningServices.forEach(service => {
+            selectedFacilities.push({
+              facilityName: getFacilityName(service),
+              facilityCode: service,
+              facilityType: '清洁服务'
+            });
+          });
+        }
+        
+        // 先删除酒店原有的所有设施
+        await axios.delete(`http://localhost:8080/api/hotel-facilities/hotel/${hotelId}`);
+        
+        // 保存新的设施
+        if (selectedFacilities.length > 0) {
+          for (const facility of selectedFacilities) {
+            const facilityData = {
+              hotelId: hotelId,
+              facilityName: facility.facilityName,
+              facilityCode: facility.facilityCode,
+              facilityType: facility.facilityType
+            };
+            await axios.post('http://localhost:8080/api/hotel-facilities', facilityData);
+          }
+        }
+        
+        console.log('酒店设施保存成功');
+      } catch (facilityError) {
+        console.error('保存酒店设施失败:', facilityError);
+        // 设施保存失败不影响酒店基本信息的保存
+      }
+      
+      message.success('保存成功！')
       
       // 跳转到酒店列表页面
       window.location.href = '/group-management/hotel-management'
@@ -498,10 +706,33 @@ const EditHotel = () => {
               label="酒店店图"
             >
               <Upload
-                name="logo"
+                action="http://localhost:8080/api/hotel-images/upload"
+                name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
+                data={{ hotelId: parseInt(hotelId), imageType: 'logo' }}
+                fileList={hotelImages.logo}
+                onChange={(info) => {
+                  console.log('Upload info:', info);
+                  if (info.file.status === 'done') {
+                    message.success(`${info.file.name} 上传成功`);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: info.file.response.id,
+                      name: info.file.name,
+                      status: 'done',
+                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      logo: [newImage]
+                    }));
+                  } else if (info.file.status === 'error') {
+                    message.error(`${info.file.name} 上传失败`);
+                    console.error('Upload error:', info.file.error);
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />
@@ -516,10 +747,31 @@ const EditHotel = () => {
               label="外观图片"
             >
               <Upload
-                name="externalImages"
+                action="http://localhost:8080/api/hotel-images/upload"
+                name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
+                data={{ hotelId: parseInt(hotelId), imageType: 'external' }}
+                fileList={hotelImages.external}
+                onChange={(info) => {
+                  if (info.file.status === 'done') {
+                    message.success(`${info.file.name} 上传成功`);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: info.file.response.id,
+                      name: info.file.name,
+                      status: 'done',
+                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      external: [newImage]
+                    }));
+                  } else if (info.file.status === 'error') {
+                    message.error(`${info.file.name} 上传失败`);
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />
@@ -534,10 +786,31 @@ const EditHotel = () => {
               label="餐厅图片"
             >
               <Upload
-                name="restaurantImages"
+                action="http://localhost:8080/api/hotel-images/upload"
+                name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
+                data={{ hotelId: parseInt(hotelId), imageType: 'restaurant' }}
+                fileList={hotelImages.restaurant}
+                onChange={(info) => {
+                  if (info.file.status === 'done') {
+                    message.success(`${info.file.name} 上传成功`);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: info.file.response.id,
+                      name: info.file.name,
+                      status: 'done',
+                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      restaurant: [newImage]
+                    }));
+                  } else if (info.file.status === 'error') {
+                    message.error(`${info.file.name} 上传失败`);
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />
@@ -552,10 +825,31 @@ const EditHotel = () => {
               label="大堂图片"
             >
               <Upload
-                name="lobbyImages"
+                action="http://localhost:8080/api/hotel-images/upload"
+                name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
+                data={{ hotelId: parseInt(hotelId), imageType: 'lobby' }}
+                fileList={hotelImages.lobby}
+                onChange={(info) => {
+                  if (info.file.status === 'done') {
+                    message.success(`${info.file.name} 上传成功`);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: info.file.response.id,
+                      name: info.file.name,
+                      status: 'done',
+                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      lobby: [newImage]
+                    }));
+                  } else if (info.file.status === 'error') {
+                    message.error(`${info.file.name} 上传失败`);
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />

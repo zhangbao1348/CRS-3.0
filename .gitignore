@@ -90,3 +90,24 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+# Maven build output
+target/
+*.jar
+*.war
+
+# Gradle build output
+build/
+.gradle/
+
+# Spring Boot devtools
+.spring-boot-devtools.properties
+
+# IDEA
+.idea/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/

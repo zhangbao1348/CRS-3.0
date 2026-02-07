@@ -39,4 +39,8 @@ public class HotelImageService {
     public void deleteImagesByHotelId(Integer hotelId) {
         hotelImageRepository.deleteByHotelId(hotelId);
     }
+    
+    public HotelImage getImageById(Integer id) {
+        return hotelImageRepository.findById(id).orElse(null);
+    }
 }

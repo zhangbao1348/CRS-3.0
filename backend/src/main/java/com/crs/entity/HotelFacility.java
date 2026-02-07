@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * 酒店设施实体类
@@ -39,5 +40,6 @@ public class HotelFacility {
     // 关联关系
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Hotel hotel;
 }

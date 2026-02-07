@@ -1,0 +1,12 @@
+-- 创建酒店图片表
+CREATE TABLE IF NOT EXISTS hotel_images (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  hotel_id INT NOT NULL COMMENT '酒店ID',
+  image_type VARCHAR(50) NOT NULL COMMENT '图片类型',
+  image_path VARCHAR(255) NOT NULL COMMENT '图片路径',
+  image_name VARCHAR(100) NOT NULL COMMENT '图片名称',
+  description VARCHAR(200) COMMENT '图片描述',
+  sort_order INT NOT NULL DEFAULT 0 COMMENT '排序顺序',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='酒店图片表';

@@ -89,6 +89,70 @@ const AddHotel = () => {
       // 调用后端API创建酒店
       const response = await axios.post('http://localhost:8080/api/hotels', hotelData)
       
+      const hotelId = response.data.id;
+      console.log('酒店创建成功，ID:', hotelId)
+      
+      // 保存酒店设施
+      if (hotelId) {
+        // 收集设施数据
+        const facilities = [];
+        
+        // 交通服务
+        if (values.transportationServices) {
+          values.transportationServices.forEach(value => {
+            facilities.push({
+              hotelId: hotelId,
+              facilityType: 'transportation',
+              facilityCode: value,
+              facilityName: getFacilityName(value),
+              available: true
+            });
+          });
+        }
+        
+        // 餐饮服务
+        if (values.diningServices) {
+          values.diningServices.forEach(value => {
+            facilities.push({
+              hotelId: hotelId,
+              facilityType: 'dining',
+              facilityCode: value,
+              facilityName: getFacilityName(value),
+              available: true
+            });
+          });
+        }
+        
+        // 清洁服务
+        if (values.cleaningServices) {
+          values.cleaningServices.forEach(value => {
+            facilities.push({
+              hotelId: hotelId,
+              facilityType: 'cleaning',
+              facilityCode: value,
+              facilityName: getFacilityName(value),
+              available: true
+            });
+          });
+        }
+        
+        // 保存设施到后端
+        if (facilities.length > 0) {
+          // 先删除酒店的现有设施（如果有）
+          try {
+            await axios.delete(`http://localhost:8080/api/hotel-facilities/hotel/${hotelId}`);
+          } catch (error) {
+            console.log('删除现有设施失败（可能是首次添加）:', error.message);
+          }
+          
+          // 逐个创建新设施
+          for (const facility of facilities) {
+            await axios.post('http://localhost:8080/api/hotel-facilities', facility);
+          }
+          console.log('酒店设施保存成功，共保存', facilities.length, '个设施');
+        }
+      }
+      
       message.success('保存成功！')
       console.log('酒店创建成功:', response.data)
       
@@ -98,6 +162,30 @@ const AddHotel = () => {
       console.error('保存失败:', error)
       message.error('保存失败，请稍后重试')
     }
+  }
+  
+  // 获取设施名称
+  const getFacilityName = (code) => {
+    const facilityMap = {
+      // 交通服务
+      paidParking: '收费停车场',
+      freeParking: '免费停车场',
+      freeShuttle: '免费接送机',
+      paidShuttle: '收费接送机',
+      // 餐饮服务
+      buffetRestaurant: '自助早餐厅',
+      cafe: '咖啡厅',
+      chineseRestaurant: '中餐厅',
+      westernRestaurant: '西餐厅',
+      // 清洁服务
+      laundryService: '外送洗衣服务',
+      dryer: '干衣机',
+      iron: '熨斗/挂烫机',
+      laundryRoom: '洗衣房',
+      valetService: '熨衣服务',
+      washingService: '洗衣服务'
+    };
+    return facilityMap[code] || code;
   }
   
   // 处理房型分配Switch变化
