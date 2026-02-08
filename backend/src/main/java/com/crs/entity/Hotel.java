@@ -1,7 +1,6 @@
 package com.crs.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
@@ -13,7 +12,6 @@ import java.util.List;
  * 酒店实体类
  * 对应数据库hotels表
  */
-@Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
@@ -116,5 +114,217 @@ public class Hotel {
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = new Date();
+    }
+    
+    // Getter and Setter methods
+    public Integer getId() {
+        return id;
+    }
+    
+    public void setId(Integer id) {
+        this.id = id;
+    }
+    
+    public String getHotelCode() {
+        return hotelCode;
+    }
+    
+    public void setHotelCode(String hotelCode) {
+        this.hotelCode = hotelCode;
+    }
+    
+    public Integer getGroupId() {
+        return groupId;
+    }
+    
+    public void setGroupId(Integer groupId) {
+        this.groupId = groupId;
+    }
+    
+    public String getChineseName() {
+        return chineseName;
+    }
+    
+    public void setChineseName(String chineseName) {
+        this.chineseName = chineseName;
+    }
+    
+    public String getEnglishName() {
+        return englishName;
+    }
+    
+    public void setEnglishName(String englishName) {
+        this.englishName = englishName;
+    }
+    
+    public String getStarRating() {
+        return starRating;
+    }
+    
+    public void setStarRating(String starRating) {
+        this.starRating = starRating;
+    }
+    
+    public String getProvince() {
+        return province;
+    }
+    
+    public void setProvince(String province) {
+        this.province = province;
+    }
+    
+    public String getCity() {
+        return city;
+    }
+    
+    public void setCity(String city) {
+        this.city = city;
+    }
+    
+    public String getAddress() {
+        return address;
+    }
+    
+    public void setAddress(String address) {
+        this.address = address;
+    }
+    
+    public Double getLongitude() {
+        return longitude;
+    }
+    
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+    
+    public Double getLatitude() {
+        return latitude;
+    }
+    
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+    
+    public String getPhone() {
+        return phone;
+    }
+    
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+    
+    public String getEmail() {
+        return email;
+    }
+    
+    public void setEmail(String email) {
+        this.email = email;
+    }
+    
+    public String getIntroduction() {
+        return introduction;
+    }
+    
+    public void setIntroduction(String introduction) {
+        this.introduction = introduction;
+    }
+    
+    public Integer getTotalRooms() {
+        return totalRooms;
+    }
+    
+    public void setTotalRooms(Integer totalRooms) {
+        this.totalRooms = totalRooms;
+    }
+    
+    public Status getStatus() {
+        return status;
+    }
+    
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+    
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+    
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+    
+    public Date getUpdatedAt() {
+        return updatedAt;
+    }
+    
+    public void setUpdatedAt(Date updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+    
+    public Group getGroup() {
+        return group;
+    }
+    
+    public void setGroup(Group group) {
+        this.group = group;
+    }
+    
+    public List<RoomType> getRoomTypes() {
+        return roomTypes;
+    }
+    
+    public void setRoomTypes(List<RoomType> roomTypes) {
+        this.roomTypes = roomTypes;
+    }
+    
+    public List<RoomTypeDiffSystem> getRoomTypeDiffSystems() {
+        return roomTypeDiffSystems;
+    }
+    
+    public void setRoomTypeDiffSystems(List<RoomTypeDiffSystem> roomTypeDiffSystems) {
+        this.roomTypeDiffSystems = roomTypeDiffSystems;
+    }
+    
+    public List<PersonDiffSystem> getPersonDiffSystems() {
+        return personDiffSystems;
+    }
+    
+    public void setPersonDiffSystems(List<PersonDiffSystem> personDiffSystems) {
+        this.personDiffSystems = personDiffSystems;
+    }
+    
+    public List<RatePlan> getRatePlans() {
+        return ratePlans;
+    }
+    
+    public void setRatePlans(List<RatePlan> ratePlans) {
+        this.ratePlans = ratePlans;
+    }
+    
+    public List<BasePrice> getBasePrices() {
+        return basePrices;
+    }
+    
+    public void setBasePrices(List<BasePrice> basePrices) {
+        this.basePrices = basePrices;
+    }
+    
+    public List<Inventory> getInventories() {
+        return inventories;
+    }
+    
+    public void setInventories(List<Inventory> inventories) {
+        this.inventories = inventories;
+    }
+    
+    // toString method without associations
+    @Override
+    public String toString() {
+        return "Hotel{" +
+                "id=" + id +
+                ", hotelCode='" + hotelCode + '\'' +
+                ", chineseName='" + chineseName + '\'' +
+                ", status=" + status +
+                '}';
     }
 }

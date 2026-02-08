@@ -44,6 +44,36 @@ CREATE TABLE IF NOT EXISTS group_room_types (
   FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='集团房型表';
 
+-- 集团房型和酒店关联表
+CREATE TABLE IF NOT EXISTS group_room_type_hotel (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  group_room_type_id INT NOT NULL COMMENT '集团房型ID',
+  hotel_id INT NOT NULL COMMENT '酒店ID',
+  allocated BOOLEAN DEFAULT FALSE COMMENT '是否分配房型到酒店',
+  room_info_editable BOOLEAN DEFAULT FALSE COMMENT '房型信息酒店是否可以修改',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_group_room_type_hotel (group_room_type_id, hotel_id),
+  FOREIGN KEY (group_room_type_id) REFERENCES group_room_types(id) ON DELETE CASCADE,
+  FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='集团房型和酒店关联表';
+
+-- 酒店房型表
+CREATE TABLE IF NOT EXISTS hotel_room_types (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  hotel_id INT NOT NULL COMMENT '所属酒店ID',
+  group_room_type_id INT COMMENT '关联集团房型ID',
+  room_type_code VARCHAR(50) NOT NULL COMMENT '房型代码',
+  room_type_name VARCHAR(100) NOT NULL COMMENT '房型名称',
+  description TEXT COMMENT '房型描述',
+  status ENUM('active', 'inactive') DEFAULT 'active' COMMENT '状态',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY uk_hotel_room_code (hotel_id, room_type_code),
+  FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE,
+  FOREIGN KEY (group_room_type_id) REFERENCES group_room_types(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='酒店房型表';
+
 -- 集团房价码表
 CREATE TABLE IF NOT EXISTS group_rate_codes (
   id INT PRIMARY KEY AUTO_INCREMENT,
@@ -347,3 +377,16 @@ INSERT IGNORE INTO packages (code, name, description) VALUES
 ('BB', '含早', '包含早餐'),
 ('HB', '半餐', '包含早餐和晚餐'),
 ('FB', '全餐', '包含早餐、午餐和晚餐');
+
+-- 插入默认集团数据
+INSERT IGNORE INTO groups (group_code, group_name, description) VALUES 
+('TEST_GROUP', '测试集团', '用于测试的集团数据');
+
+-- 插入集团房型测试数据
+INSERT IGNORE INTO group_room_types (group_id, room_type_code, room_type_name, description, status) VALUES 
+(1, 'STD_ROOM', '标准间', '基础标准间，配备基本设施', 'active'),
+(1, 'DELUXE_ROOM', '豪华间', '豪华装修，配备高级设施', 'active'),
+(1, 'SUITE', '套房', '宽敞套房，配备独立客厅', 'active'),
+(1, 'FAMILY_ROOM', '家庭房', '适合家庭入住，配备多张床位', 'active'),
+(1, 'EXECUTIVE_ROOM', '行政房', '行政楼层房间，享受行政礼遇', 'active'),
+(1, 'PRESIDENTIAL_SUITE', '总统套房', '豪华总统套房，顶级配置', 'inactive');

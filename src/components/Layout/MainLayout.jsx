@@ -1,16 +1,18 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { Layout, Menu, Select } from 'antd'
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Link, useLocation } from 'react-router-dom'
 import { menuData } from '../../utils/menuData.jsx'
+import { useHotelContext } from '../../contexts/HotelContext.jsx'
 
 const { Option } = Select
 
 const { Header, Sider, Content } = Layout
 
 const MainLayout = ({ children }) => {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = React.useState(false)
   const location = useLocation()
+  const { hotels, selectedHotel, loading, changeHotel } = useHotelContext()
 
   const toggleCollapsed = () => {
     setCollapsed(!collapsed)
@@ -153,21 +155,28 @@ const MainLayout = ({ children }) => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px' }}>
           <Select
-            defaultValue="1"
+            value={selectedHotel}
+            onChange={changeHotel}
             style={{ width: 280, marginRight: 16 }}
             size="middle"
             placeholder="切换酒店"
             showSearch
             allowClear
+            loading={loading}
             filterOption={(input, option) =>
               (option?.children || '').toLowerCase().includes(input.toLowerCase()) ||
               (option?.props?.title || '').toLowerCase().includes(input.toLowerCase())
             }
           >
-            <Option value="1" title="北京王府井大酒店 (BJ-WFJC)">北京王府井大酒店 (BJ-WFJC)</Option>
-            <Option value="2" title="上海外滩华尔道夫酒店 (SH-BT-HWD)">上海外滩华尔道夫酒店 (SH-BT-HWD)</Option>
-            <Option value="3" title="广州天河希尔顿酒店 (GZ-TH-XED)">广州天河希尔顿酒店 (GZ-TH-XED)</Option>
-            <Option value="4" title="深圳福田香格里拉酒店 (SZ-FT-XGL)">深圳福田香格里拉酒店 (SZ-FT-XGL)</Option>
+            {hotels.map(hotel => (
+              <Option 
+                key={hotel.id} 
+                value={hotel.id} 
+                title={`${hotel.chineseName} (${hotel.hotelCode})`}
+              >
+                {hotel.chineseName} ({hotel.hotelCode})
+              </Option>
+            ))}
           </Select>
           <div>欢迎使用CRS系统</div>
         </div>

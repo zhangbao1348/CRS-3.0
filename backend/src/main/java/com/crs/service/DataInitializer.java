@@ -7,9 +7,12 @@ import com.crs.entity.GroupFacility;
 import com.crs.repository.HotelRepository;
 import com.crs.repository.UserRepository;
 import com.crs.repository.GroupFacilityRepository;
+import com.crs.repository.GroupRoomTypeRepository;
+import com.crs.entity.GroupRoomType;
 import com.crs.util.PasswordUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -27,22 +30,76 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordUtil passwordUtil;
     private final HotelRepository hotelRepository;
     private final GroupFacilityRepository groupFacilityRepository;
+    private final GroupRoomTypeRepository groupRoomTypeRepository;
+    private final JdbcTemplate jdbcTemplate;
     
-    public DataInitializer(UserRepository userRepository, PasswordUtil passwordUtil, HotelRepository hotelRepository, GroupFacilityRepository groupFacilityRepository) {
+    public DataInitializer(UserRepository userRepository, PasswordUtil passwordUtil, HotelRepository hotelRepository, GroupFacilityRepository groupFacilityRepository, GroupRoomTypeRepository groupRoomTypeRepository, JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
         this.passwordUtil = passwordUtil;
         this.hotelRepository = hotelRepository;
         this.groupFacilityRepository = groupFacilityRepository;
+        this.groupRoomTypeRepository = groupRoomTypeRepository;
+        this.jdbcTemplate = jdbcTemplate;
     }
     
     @Override
     public void run(String... args) throws Exception {
         log.info("开始数据初始化...");
+        // 初始化数据库表结构
+        initializeDatabaseSchema();
         // 初始化集团设施数据
         initializeGroupFacilityData();
         // 初始化酒店数据
         initializeHotelData();
         log.info("数据初始化完成");
+    }
+    
+    /**
+     * 初始化数据库表结构
+     */
+    private void initializeDatabaseSchema() {
+        log.info("开始初始化数据库表结构...");
+        
+        try {
+            // 创建集团房型和酒店关联表
+            String createGroupRoomTypeHotelTable = "CREATE TABLE IF NOT EXISTS group_room_type_hotel (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT," +
+                "group_room_type_id INT NOT NULL," +
+                "hotel_id INT NOT NULL," +
+                "allocated BOOLEAN DEFAULT FALSE," +
+                "room_info_editable BOOLEAN DEFAULT FALSE," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+                "UNIQUE KEY uk_group_room_type_hotel (group_room_type_id, hotel_id)," +
+                "FOREIGN KEY (group_room_type_id) REFERENCES group_room_types(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='集团房型和酒店关联表';";
+            
+            // 创建酒店房型表
+            String createHotelRoomTypesTable = "CREATE TABLE IF NOT EXISTS hotel_room_types (" +
+                "id INT PRIMARY KEY AUTO_INCREMENT," +
+                "hotel_id INT NOT NULL," +
+                "group_room_type_id INT," +
+                "room_type_code VARCHAR(50) NOT NULL," +
+                "room_type_name VARCHAR(100) NOT NULL," +
+                "description TEXT," +
+                "status ENUM('active', 'inactive') DEFAULT 'active'," +
+                "created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
+                "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
+                "UNIQUE KEY uk_hotel_room_code (hotel_id, room_type_code)," +
+                "FOREIGN KEY (hotel_id) REFERENCES hotels(id) ON DELETE CASCADE," +
+                "FOREIGN KEY (group_room_type_id) REFERENCES group_room_types(id) ON DELETE SET NULL" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='酒店房型表';";
+            
+            // 执行SQL语句
+            jdbcTemplate.execute(createGroupRoomTypeHotelTable);
+            jdbcTemplate.execute(createHotelRoomTypesTable);
+            
+            log.info("数据库表结构初始化完成");
+        } catch (Exception e) {
+            log.warn("数据库表结构初始化失败: {}", e.getMessage());
+            // 继续执行其他初始化操作，不中断应用程序启动
+        }
     }
     
     /**

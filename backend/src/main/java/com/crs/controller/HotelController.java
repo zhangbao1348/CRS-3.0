@@ -23,12 +23,12 @@ public class HotelController {
     }
     
     /**
-     * 获取酒店列表
+     * 获取酒店列表（只返回状态为active的酒店）
      * @return 酒店列表
      */
     @GetMapping
     public ResponseEntity<?> getHotels() {
-        List<Hotel> hotels = hotelService.getAllHotels();
+        List<Hotel> hotels = hotelService.getHotelsByStatus(Hotel.Status.active);
         return ResponseEntity.ok(hotels);
     }
     

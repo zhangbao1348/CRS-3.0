@@ -104,4 +104,34 @@ public class GroupRoomTypeController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    
+    /**
+     * 启用集团房型
+     * @param id 集团房型ID
+     * @return 启用后的集团房型信息
+     */
+    @PutMapping("/{id}/enable")
+    public ResponseEntity<?> enableGroupRoomType(@PathVariable Integer id) {
+        try {
+            var enabledGroupRoomType = groupRoomTypeService.enableGroupRoomType(id);
+            return ResponseEntity.ok(enabledGroupRoomType);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * 停用集团房型
+     * @param id 集团房型ID
+     * @return 停用后的集团房型信息
+     */
+    @PutMapping("/{id}/disable")
+    public ResponseEntity<?> disableGroupRoomType(@PathVariable Integer id) {
+        try {
+            var disabledGroupRoomType = groupRoomTypeService.disableGroupRoomType(id);
+            return ResponseEntity.ok(disabledGroupRoomType);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

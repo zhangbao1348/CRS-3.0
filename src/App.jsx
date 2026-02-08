@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { router } from './router'
+import { HotelProvider } from './contexts/HotelContext.jsx'
 
 // 自定义主题配置
 const themeConfig = {
@@ -44,7 +45,9 @@ function App() {
       locale={zhCN}
       theme={themeConfig}
     >
-      <RouterProvider router={router} />
+      <HotelProvider>
+        <RouterProvider router={router} />
+      </HotelProvider>
     </ConfigProvider>
   )
 }

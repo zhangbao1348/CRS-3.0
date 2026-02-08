@@ -94,6 +94,30 @@ public class GroupRoomTypeService {
     }
     
     /**
+     * 启用集团房型
+     * @param id 集团房型ID
+     * @return 启用后的集团房型信息
+     */
+    public GroupRoomType enableGroupRoomType(Integer id) {
+        GroupRoomType groupRoomType = groupRoomTypeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        groupRoomType.setStatus("active");
+        return groupRoomTypeRepository.save(groupRoomType);
+    }
+    
+    /**
+     * 停用集团房型
+     * @param id 集团房型ID
+     * @return 停用后的集团房型信息
+     */
+    public GroupRoomType disableGroupRoomType(Integer id) {
+        GroupRoomType groupRoomType = groupRoomTypeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        groupRoomType.setStatus("inactive");
+        return groupRoomTypeRepository.save(groupRoomType);
+    }
+    
+    /**
      * 删除集团房型
      * @param id 集团房型ID
      */
@@ -109,7 +133,7 @@ public class GroupRoomTypeService {
      * @param status 状态
      * @return 集团房型列表
      */
-    public List<GroupRoomType> getGroupRoomTypesByStatus(GroupRoomType.Status status) {
+    public List<GroupRoomType> getGroupRoomTypesByStatus(String status) {
         return groupRoomTypeRepository.findByStatus(status);
     }
 }

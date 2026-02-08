@@ -27,7 +27,7 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @param status 状态
      * @return 集团房型列表
      */
-    List<GroupRoomType> findByGroupIdAndStatus(Integer groupId, GroupRoomType.Status status);
+    List<GroupRoomType> findByGroupIdAndStatus(Integer groupId, String status);
     
     /**
      * 根据房型代码查询集团房型
@@ -56,7 +56,7 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @param status 状态
      * @return 集团房型列表
      */
-    List<GroupRoomType> findByStatus(GroupRoomType.Status status);
+    List<GroupRoomType> findByStatus(String status);
     
     /**
      * 检查房型代码是否存在

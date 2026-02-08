@@ -1,80 +1,61 @@
-import React, { useState } from 'react'
-import { Button, Input, Table, Modal, Form, Select, Upload, Space } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Button, Input, Table, Modal, Form, Select, Upload, Space, Spin, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined, UploadOutlined, SearchOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import { useHotelContext } from '../../contexts/HotelContext.jsx'
+import axios from 'axios'
 
 const { Search } = Input
 const { Option } = Select
 const { Dragger } = Upload
 
-// 模拟房型数据
-const mockRoomTypes = [
-  {
-    id: 1,
-    code: 'STD',
-    name: '标准间',
-    englishName: 'Standard Room',
-    roomQuantity: 10,
-    area: 25,
-    floor: '3-5',
-    windowType: '有窗',
-    maxAdults: 2,
-    maxChildren: 0,
-    bedType: '2张1.2米单人床',
-    image: 'https://via.placeholder.com/200x150'
-  },
-  {
-    id: 2,
-    code: 'DLX',
-    name: '豪华间',
-    englishName: 'Deluxe Room',
-    roomQuantity: 8,
-    area: 35,
-    floor: '6-8',
-    windowType: '有窗',
-    maxAdults: 2,
-    maxChildren: 1,
-    bedType: '1张1.8米大床',
-    image: 'https://via.placeholder.com/200x150'
-  },
-  {
-    id: 3,
-    code: 'SUT',
-    name: '套房',
-    englishName: 'Suite',
-    roomQuantity: 5,
-    area: 50,
-    floor: '9-10',
-    windowType: '有窗',
-    maxAdults: 3,
-    maxChildren: 1,
-    bedType: '1张2米大床+1张1.2米单人床',
-    image: 'https://via.placeholder.com/200x150'
-  },
-  {
-    id: 4,
-    code: 'TWN',
-    name: '双床间',
-    englishName: 'Twin Room',
-    roomQuantity: 12,
-    area: 28,
-    floor: '3-5',
-    windowType: '有窗',
-    maxAdults: 2,
-    maxChildren: 0,
-    bedType: '2张1.2米单人床',
-    image: 'https://via.placeholder.com/200x150'
-  }
-]
-
 const RoomType = () => {
   // 状态管理
-  const [roomTypes, setRoomTypes] = useState(mockRoomTypes)
-  const [filteredRoomTypes, setFilteredRoomTypes] = useState(mockRoomTypes)
+  const [roomTypes, setRoomTypes] = useState([])
+  const [filteredRoomTypes, setFilteredRoomTypes] = useState([])
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
   const [selectedRoomType, setSelectedRoomType] = useState(null)
+  
+  // 获取酒店上下文
+  const { selectedHotel } = useHotelContext()
+  
+  // 从API获取酒店房型数据
+  const fetchRoomTypes = async () => {
+    if (!selectedHotel) return
+    
+    try {
+      setLoading(true)
+      const response = await axios.get(`http://localhost:8080/api/hotel-room-types/hotel/${selectedHotel}`)
+      const data = response.data.map(item => ({
+        id: item.id,
+        code: item.roomTypeCode,
+        name: item.roomTypeName,
+        englishName: item.englishName || '',
+        roomQuantity: item.roomQuantity || 0,
+        area: item.area || 0,
+        floor: item.floor || '',
+        windowType: item.windowType || '',
+        maxAdults: item.maxAdults || 0,
+        maxChildren: item.maxChildren || 0,
+        bedType: item.bedType || '',
+        image: item.image || ''
+      }))
+      setRoomTypes(data)
+      setFilteredRoomTypes(data)
+    } catch (error) {
+      message.error('获取房型数据失败: ' + (error.message || '网络错误'))
+      console.error('获取房型数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // 当选择的酒店变化时，重新获取房型数据
+  useEffect(() => {
+    fetchRoomTypes()
+  }, [selectedHotel])
   
   // 搜索功能
   const handleSearch = (values) => {
@@ -115,37 +96,69 @@ const RoomType = () => {
       content: `确定要删除房型 ${record.code} - ${record.name} 吗？`,
       okText: '确定',
       cancelText: '取消',
-      onOk: () => {
-        setRoomTypes(roomTypes.filter(item => item.id !== record.id))
-        setFilteredRoomTypes(filteredRoomTypes.filter(item => item.id !== record.id))
+      onOk: async () => {
+        try {
+          await axios.delete(`http://localhost:8080/api/hotel-room-types/${record.id}`)
+          setRoomTypes(roomTypes.filter(item => item.id !== record.id))
+          setFilteredRoomTypes(filteredRoomTypes.filter(item => item.id !== record.id))
+          message.success('房型删除成功')
+        } catch (error) {
+          message.error('删除失败: ' + (error.response?.data?.error || error.message || '网络错误'))
+          console.error('删除房型失败:', error)
+        }
       }
     })
   }
   
   // 保存房型
-  const handleSave = () => {
-    form.validateFields().then(values => {
-      if (isEditMode) {
-        // 编辑模式
-        const updatedRoomTypes = roomTypes.map(item => {
-          if (item.id === selectedRoomType.id) {
-            return { ...item, ...values }
+  const handleSave = async () => {
+    form.validateFields().then(async (values) => {
+      try {
+        if (isEditMode) {
+          // 编辑模式
+          const response = await axios.put(`http://localhost:8080/api/hotel-room-types/${selectedRoomType.id}`, {
+            ...values,
+            roomTypeCode: values.code,
+            roomTypeName: values.name,
+            hotelId: selectedHotel
+          })
+          
+          const updatedRoomTypes = roomTypes.map(item => {
+            if (item.id === selectedRoomType.id) {
+              return {
+                ...item,
+                ...values
+              }
+            }
+            return item
+          })
+          setRoomTypes(updatedRoomTypes)
+          setFilteredRoomTypes(updatedRoomTypes)
+          message.success('房型编辑成功')
+        } else {
+          // 新增模式
+          const response = await axios.post('http://localhost:8080/api/hotel-room-types', {
+            ...values,
+            roomTypeCode: values.code,
+            roomTypeName: values.name,
+            hotelId: selectedHotel,
+            status: 'active'
+          })
+          
+          const newRoomType = {
+            id: response.data.id,
+            ...values
           }
-          return item
-        })
-        setRoomTypes(updatedRoomTypes)
-        setFilteredRoomTypes(updatedRoomTypes)
-      } else {
-        // 新增模式
-        const newRoomType = {
-          id: Date.now(),
-          ...values
+          setRoomTypes([...roomTypes, newRoomType])
+          setFilteredRoomTypes([...filteredRoomTypes, newRoomType])
+          message.success('房型新增成功')
         }
-        setRoomTypes([...roomTypes, newRoomType])
-        setFilteredRoomTypes([...filteredRoomTypes, newRoomType])
+        setIsModalVisible(false)
+        form.resetFields()
+      } catch (error) {
+        message.error('操作失败: ' + (error.response?.data?.error || error.message || '网络错误'))
+        console.error('保存房型失败:', error)
       }
-      setIsModalVisible(false)
-      form.resetFields()
     })
   }
   
@@ -243,15 +256,29 @@ const RoomType = () => {
       </div>
       
       {/* 房型列表 */}
-      <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-        <Table
-          columns={columns}
-          dataSource={filteredRoomTypes}
-          rowKey="id"
-          pagination={false}
-          size="middle"
-          style={{ minWidth: 800 }}
-        />
+      <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.1)', overflow: 'hidden', minHeight: 300 }}>
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+            <Spin size="large" tip="加载中..." />
+          </div>
+        ) : (
+          <Table
+            columns={columns}
+            dataSource={filteredRoomTypes}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total, range) => `${range[0]}-${range[1]} 共 ${total} 条`
+            }}
+            size="middle"
+            style={{ minWidth: 800 }}
+            locale={{
+              emptyText: '暂无房型数据'
+            }}
+          />
+        )}
       </div>
       
       {/* 新增/编辑模态框 */}
