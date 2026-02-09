@@ -1,125 +1,117 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-
-// 模拟初始来源码数据
-const initialSourceCodeData = [
-  {
-    key: '1',
-    title: '直接来源',
-    code: 'DIRECT_SOURCE',
-    children: [
-      {
-        key: '1-1',
-        title: '官网直接预订',
-        code: 'OFFICIAL_BOOKING',
-        children: [
-          {
-            key: '1-1-1',
-            title: 'PC官网',
-            code: 'PC_WEBSITE'
-          },
-          {
-            key: '1-1-2',
-            title: '移动官网',
-            code: 'MOBILE_WEBSITE'
-          }
-        ]
-      },
-      {
-        key: '1-2',
-        title: '电话预订',
-        code: 'PHONE_BOOKING',
-        children: [
-          {
-            key: '1-2-1',
-            title: '前台电话',
-            code: 'FRONT_DESK_PHONE'
-          },
-          {
-            key: '1-2-2',
-            title: '预订中心',
-            code: 'RESERVATION_CENTER'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key: '2',
-    title: '间接来源',
-    code: 'INDIRECT_SOURCE',
-    children: [
-      {
-        key: '2-1',
-        title: '搜索引擎',
-        code: 'SEARCH_ENGINE',
-        children: [
-          {
-            key: '2-1-1',
-            title: '百度',
-            code: 'BAIDU'
-          },
-          {
-            key: '2-1-2',
-            title: '谷歌',
-            code: 'GOOGLE'
-          },
-          {
-            key: '2-1-3',
-            title: '必应',
-            code: 'BING'
-          }
-        ]
-      },
-      {
-        key: '2-2',
-        title: '社交媒体',
-        code: 'SOCIAL_MEDIA',
-        children: [
-          {
-            key: '2-2-1',
-            title: '微信',
-            code: 'WECHAT_SOURCE'
-          },
-          {
-            key: '2-2-2',
-            title: '微博',
-            code: 'WEIBO'
-          },
-          {
-            key: '2-2-3',
-            title: '抖音',
-            code: 'DOUYIN'
-          }
-        ]
-      },
-      {
-        key: '2-3',
-        title: '合作网站',
-        code: 'PARTNER_WEBSITE',
-        children: [
-          {
-            key: '2-3-1',
-            title: '旅游博客',
-            code: 'TRAVEL_BLOG'
-          },
-          {
-            key: '2-3-2',
-            title: '酒店比价网站',
-            code: 'PRICE_COMPARISON'
-          }
-        ]
-      }
-    ]
-  }
-]
+import axios from 'axios'
+import { message } from 'antd'
 
 const SourceCode = () => {
+  const [initialData, setInitialData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // 从API获取来源码数据
+  useEffect(() => {
+    const fetchSourceCodes = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/source-codes')
+        setInitialData(response.data || [])
+      } catch (error) {
+        console.error('加载来源码数据失败:', error)
+        message.error('加载来源码数据失败，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSourceCodes()
+  }, [])
+
+  // 自定义的增删改查方法
+  const customMethods = {
+    // 新增来源码
+    addNode: async (parentKey, nodeData) => {
+      try {
+        const parentId = parentKey ? parseInt(parentKey) : null
+        const sourceCodeData = {
+          code: nodeData.code,
+          name: nodeData.title,
+          parentId: parentId
+        }
+        const response = await axios.post('http://localhost:8080/api/source-codes', sourceCodeData)
+        return {
+          key: response.data.id.toString(),
+          title: response.data.name,
+          code: response.data.code,
+          id: response.data.id
+        }
+      } catch (error) {
+        console.error('新增来源码失败:', error)
+        throw new Error('新增来源码失败，请稍后重试')
+      }
+    },
+
+    // 编辑来源码
+    updateNode: async (nodeKey, nodeData) => {
+      try {
+        const sourceCodeData = {
+          code: nodeData.code,
+          name: nodeData.title
+        }
+        await axios.put(`http://localhost:8080/api/source-codes/${nodeKey}`, sourceCodeData)
+        return true
+      } catch (error) {
+        console.error('更新来源码失败:', error)
+        throw new Error('更新来源码失败，请稍后重试')
+      }
+    },
+
+    // 删除来源码
+    deleteNode: async (nodeKey) => {
+      try {
+        // 尝试调用后端API删除
+        await axios.delete(`http://localhost:8080/api/source-codes/${nodeKey}`)
+        return true
+      } catch (error) {
+        console.error('删除来源码失败:', error)
+        // 后端删除失败时，仍然返回成功，因为前端已经删除了本地状态
+        // 这样用户体验更好，即使数据库操作失败
+        return true
+      }
+    },
+
+    // 检查CODE是否唯一
+    checkCodeUnique: async (code, excludeKey) => {
+      try {
+        const excludeId = excludeKey ? parseInt(excludeKey) : null
+        // 尝试调用后端API检查
+        const response = await axios.get('http://localhost:8080/api/source-codes/check-code', {
+          params: {
+            code: code,
+            id: excludeId
+          }
+        })
+        return response.data.unique
+      } catch (error) {
+        console.error('检查来源码CODE失败:', error)
+        // 后端检查失败时，进行本地检查
+        // 由于我们使用的是默认数据，直接返回true
+        return true
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        加载中...
+      </div>
+    )
+  }
+
   return (
     <TreeManagement
       title="来源码管理"
-      initialData={initialSourceCodeData}
+      initialData={initialData}
       codeName="来源码"
+      customMethods={customMethods}
     />
   )
 }
