@@ -1,7 +1,7 @@
 package com.crs.controller;
 
-import com.crs.entity.ChannelCode;
-import com.crs.service.ChannelCodeService;
+import com.crs.entity.SourceCode;
+import com.crs.service.SourceCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,23 +11,23 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 渠道码控制器
- * 提供渠道码的CRUD操作API
+ * 来源码控制器
+ * 提供来源码的CRUD操作API
  */
 @RestController
-@RequestMapping("/api/channel-codes")
-public class ChannelCodeController {
+@RequestMapping("/api/source-codes")
+public class SourceCodeController {
 
     @Autowired
-    private ChannelCodeService channelCodeService;
+    private SourceCodeService sourceCodeService;
 
     /**
-     * 获取所有渠道码（树形结构）
+     * 获取所有来源码（树形结构）
      */
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAllChannelCodes() {
+    public ResponseEntity<List<Map<String, Object>>> getAllSourceCodes() {
         try {
-            List<Map<String, Object>> treeData = channelCodeService.getAllChannelCodesAsTree();
+            List<Map<String, Object>> treeData = sourceCodeService.getAllSourceCodesAsTree();
             return ResponseEntity.ok(treeData);
         } catch (Exception e) {
             e.printStackTrace();
@@ -36,13 +36,13 @@ public class ChannelCodeController {
     }
 
     /**
-     * 根据父ID获取渠道码
+     * 根据父ID获取来源码
      */
     @GetMapping("/parent/{parentId}")
-    public ResponseEntity<List<ChannelCode>> getChannelCodesByParentId(@PathVariable Integer parentId) {
+    public ResponseEntity<List<SourceCode>> getSourceCodesByParentId(@PathVariable Integer parentId) {
         try {
-            List<ChannelCode> channelCodes = channelCodeService.getChannelCodesByParentId(parentId);
-            return ResponseEntity.ok(channelCodes);
+            List<SourceCode> sourceCodes = sourceCodeService.getSourceCodesByParentId(parentId);
+            return ResponseEntity.ok(sourceCodes);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
@@ -50,14 +50,14 @@ public class ChannelCodeController {
     }
 
     /**
-     * 根据ID获取渠道码
+     * 根据ID获取来源码
      */
     @GetMapping("/{id}")
-    public ResponseEntity<ChannelCode> getChannelCodeById(@PathVariable Integer id) {
+    public ResponseEntity<SourceCode> getSourceCodeById(@PathVariable Integer id) {
         try {
-            ChannelCode channelCode = channelCodeService.getChannelCodeById(id);
-            if (channelCode != null) {
-                return ResponseEntity.ok(channelCode);
+            SourceCode sourceCode = sourceCodeService.getSourceCodeById(id);
+            if (sourceCode != null) {
+                return ResponseEntity.ok(sourceCode);
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
@@ -68,13 +68,13 @@ public class ChannelCodeController {
     }
 
     /**
-     * 创建渠道码
+     * 创建来源码
      */
     @PostMapping
-    public ResponseEntity<ChannelCode> createChannelCode(@RequestBody ChannelCode channelCode) {
+    public ResponseEntity<SourceCode> createSourceCode(@RequestBody SourceCode sourceCode) {
         try {
-            ChannelCode createdChannelCode = channelCodeService.createChannelCode(channelCode);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdChannelCode);
+            SourceCode createdSourceCode = sourceCodeService.createSourceCode(sourceCode);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdSourceCode);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
@@ -82,15 +82,15 @@ public class ChannelCodeController {
     }
 
     /**
-     * 更新渠道码
+     * 更新来源码
      */
     @PutMapping("/{id}")
-    public ResponseEntity<ChannelCode> updateChannelCode(@PathVariable Integer id, @RequestBody ChannelCode channelCode) {
+    public ResponseEntity<SourceCode> updateSourceCode(@PathVariable Integer id, @RequestBody SourceCode sourceCode) {
         try {
-            channelCode.setId(id);
-            ChannelCode updatedChannelCode = channelCodeService.updateChannelCode(channelCode);
-            if (updatedChannelCode != null) {
-                return ResponseEntity.ok(updatedChannelCode);
+            sourceCode.setId(id);
+            SourceCode updatedSourceCode = sourceCodeService.updateSourceCode(sourceCode);
+            if (updatedSourceCode != null) {
+                return ResponseEntity.ok(updatedSourceCode);
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
@@ -101,12 +101,12 @@ public class ChannelCodeController {
     }
 
     /**
-     * 删除渠道码
+     * 删除来源码
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteChannelCode(@PathVariable Integer id) {
+    public ResponseEntity<Void> deleteSourceCode(@PathVariable Integer id) {
         try {
-            channelCodeService.deleteChannelCode(id);
+            sourceCodeService.deleteSourceCode(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -115,13 +115,13 @@ public class ChannelCodeController {
     }
 
     /**
-     * 检查渠道码CODE是否唯一
+     * 检查来源码CODE是否唯一
      */
     @GetMapping("/check-code")
     public ResponseEntity<Map<String, Boolean>> checkCodeUnique(@RequestParam String code, @RequestParam(required = false) Integer id) {
         try {
-            boolean isUnique = channelCodeService.isCodeUnique(code, id);
-            return ResponseEntity.ok().body(Map.of("unique", isUnique));
+            boolean isUnique = sourceCodeService.isCodeUnique(code, id);
+            return ResponseEntity.ok(Map.of("unique", isUnique));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);

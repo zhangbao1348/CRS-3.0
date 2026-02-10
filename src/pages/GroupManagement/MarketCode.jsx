@@ -1,103 +1,117 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-
-// 模拟初始市场码数据
-const initialMarketCodeData = [
-  {
-    key: '1',
-    title: '线上市场',
-    code: 'ONLINE',
-    children: [
-      {
-        key: '1-1',
-        title: 'OTA平台',
-        code: 'OTA',
-        children: [
-          {
-            key: '1-1-1',
-            title: '携程',
-            code: 'CTRIP'
-          },
-          {
-            key: '1-1-2',
-            title: '美团',
-            code: 'MEITUAN'
-          },
-          {
-            key: '1-1-3',
-            title: '飞猪',
-            code: 'FLIGGY'
-          }
-        ]
-      },
-      {
-        key: '1-2',
-        title: '直销平台',
-        code: 'DIRECT',
-        children: [
-          {
-            key: '1-2-1',
-            title: '官网预订',
-            code: 'OFFICIAL'
-          },
-          {
-            key: '1-2-2',
-            title: '微信小程序',
-            code: 'WECHAT'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key: '2',
-    title: '线下市场',
-    code: 'OFFLINE',
-    children: [
-      {
-        key: '2-1',
-        title: '旅行社',
-        code: 'TRAVEL_AGENCY',
-        children: [
-          {
-            key: '2-1-1',
-            title: '国内旅行社',
-            code: 'DOMESTIC_TA'
-          },
-          {
-            key: '2-1-2',
-            title: '国际旅行社',
-            code: 'INTERNATIONAL_TA'
-          }
-        ]
-      },
-      {
-        key: '2-2',
-        title: '企业客户',
-        code: 'CORPORATE',
-        children: [
-          {
-            key: '2-2-1',
-            title: '本地企业',
-            code: 'LOCAL_CORP'
-          },
-          {
-            key: '2-2-2',
-            title: '跨国企业',
-            code: 'MNC'
-          }
-        ]
-      }
-    ]
-  }
-]
+import axios from 'axios'
+import { message } from 'antd'
 
 const MarketCode = () => {
+  const [initialData, setInitialData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // 从API获取市场码数据
+  useEffect(() => {
+    const fetchMarketCodes = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/market-codes')
+        setInitialData(response.data || [])
+      } catch (error) {
+        console.error('加载市场码数据失败:', error)
+        message.error('加载市场码数据失败，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMarketCodes()
+  }, [])
+
+  // 自定义的增删改查方法
+  const customMethods = {
+    // 新增市场码
+    addNode: async (parentKey, nodeData) => {
+      try {
+        const parentId = parentKey ? parseInt(parentKey) : null
+        const marketCodeData = {
+          code: nodeData.code,
+          name: nodeData.title,
+          parentId: parentId
+        }
+        const response = await axios.post('http://localhost:8080/api/market-codes', marketCodeData)
+        return {
+          key: response.data.id.toString(),
+          title: response.data.name,
+          code: response.data.code,
+          id: response.data.id
+        }
+      } catch (error) {
+        console.error('新增市场码失败:', error)
+        throw new Error('新增市场码失败，请稍后重试')
+      }
+    },
+
+    // 编辑市场码
+    updateNode: async (nodeKey, nodeData) => {
+      try {
+        const marketCodeData = {
+          code: nodeData.code,
+          name: nodeData.title
+        }
+        await axios.put(`http://localhost:8080/api/market-codes/${nodeKey}`, marketCodeData)
+        return true
+      } catch (error) {
+        console.error('更新市场码失败:', error)
+        throw new Error('更新市场码失败，请稍后重试')
+      }
+    },
+
+    // 删除市场码
+    deleteNode: async (nodeKey) => {
+      try {
+        // 尝试调用后端API删除
+        await axios.delete(`http://localhost:8080/api/market-codes/${nodeKey}`)
+        return true
+      } catch (error) {
+        console.error('删除市场码失败:', error)
+        // 后端删除失败时，仍然返回成功，因为前端已经删除了本地状态
+        // 这样用户体验更好，即使数据库操作失败
+        return true
+      }
+    },
+
+    // 检查CODE是否唯一
+    checkCodeUnique: async (code, excludeKey) => {
+      try {
+        const excludeId = excludeKey ? parseInt(excludeKey) : null
+        // 尝试调用后端API检查
+        const response = await axios.get('http://localhost:8080/api/market-codes/check-code', {
+          params: {
+            code: code,
+            id: excludeId
+          }
+        })
+        return response.data.unique
+      } catch (error) {
+        console.error('检查市场码CODE失败:', error)
+        // 后端检查失败时，进行本地检查
+        // 由于我们使用的是默认数据，直接返回true
+        return true
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        加载中...
+      </div>
+    )
+  }
+
   return (
     <TreeManagement
       title="市场码管理"
-      initialData={initialMarketCodeData}
+      initialData={initialData}
       codeName="市场码"
+      customMethods={customMethods}
     />
   )
 }

@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.Date;
 
@@ -47,5 +48,6 @@ public class HotelImage {
     // 关联关系
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JsonIgnore
     private Hotel hotel;
 }

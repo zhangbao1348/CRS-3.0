@@ -733,6 +733,25 @@ const EditHotel = () => {
                     console.error('Upload error:', info.file.error);
                   }
                 }}
+                onRemove={(file) => {
+                  console.log('Remove file:', file);
+                  // 从前端状态中移除图片
+                  setHotelImages(prev => ({
+                    ...prev,
+                    logo: prev.logo.filter(item => item.uid !== file.uid)
+                  }));
+                  // 调用后端 API 删除图片
+                  if (file.uid) {
+                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                      .then(() => {
+                        message.success('图片删除成功');
+                      })
+                      .catch(error => {
+                        console.error('删除图片失败:', error);
+                        message.error('删除图片失败，请稍后重试');
+                      });
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />
@@ -770,6 +789,25 @@ const EditHotel = () => {
                     }));
                   } else if (info.file.status === 'error') {
                     message.error(`${info.file.name} 上传失败`);
+                  }
+                }}
+                onRemove={(file) => {
+                  console.log('Remove file:', file);
+                  // 从前端状态中移除图片
+                  setHotelImages(prev => ({
+                    ...prev,
+                    external: prev.external.filter(item => item.uid !== file.uid)
+                  }));
+                  // 调用后端 API 删除图片
+                  if (file.uid) {
+                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                      .then(() => {
+                        message.success('图片删除成功');
+                      })
+                      .catch(error => {
+                        console.error('删除图片失败:', error);
+                        message.error('删除图片失败，请稍后重试');
+                      });
                   }
                 }}
               >
@@ -811,6 +849,25 @@ const EditHotel = () => {
                     message.error(`${info.file.name} 上传失败`);
                   }
                 }}
+                onRemove={(file) => {
+                  console.log('Remove file:', file);
+                  // 从前端状态中移除图片
+                  setHotelImages(prev => ({
+                    ...prev,
+                    restaurant: prev.restaurant.filter(item => item.uid !== file.uid)
+                  }));
+                  // 调用后端 API 删除图片
+                  if (file.uid) {
+                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                      .then(() => {
+                        message.success('图片删除成功');
+                      })
+                      .catch(error => {
+                        console.error('删除图片失败:', error);
+                        message.error('删除图片失败，请稍后重试');
+                      });
+                  }
+                }}
               >
                 <div>
                   <PlusOutlined />
@@ -848,6 +905,25 @@ const EditHotel = () => {
                     }));
                   } else if (info.file.status === 'error') {
                     message.error(`${info.file.name} 上传失败`);
+                  }
+                }}
+                onRemove={(file) => {
+                  console.log('Remove file:', file);
+                  // 从前端状态中移除图片
+                  setHotelImages(prev => ({
+                    ...prev,
+                    lobby: prev.lobby.filter(item => item.uid !== file.uid)
+                  }));
+                  // 调用后端 API 删除图片
+                  if (file.uid) {
+                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                      .then(() => {
+                        message.success('图片删除成功');
+                      })
+                      .catch(error => {
+                        console.error('删除图片失败:', error);
+                        message.error('删除图片失败，请稍后重试');
+                      });
                   }
                 }}
               >

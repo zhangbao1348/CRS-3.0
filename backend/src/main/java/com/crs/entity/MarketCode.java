@@ -31,6 +31,12 @@ public class MarketCode {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
+    @Column(name = "parent_id")
+    private Integer parentId;
+    
+    @Column(name = "level", nullable = false, columnDefinition = "INT DEFAULT 1")
+    private Integer level = 1;
+    
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Status status = Status.active;

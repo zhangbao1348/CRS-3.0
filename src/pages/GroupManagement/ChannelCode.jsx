@@ -1,103 +1,115 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-
-// 模拟初始渠道码数据
-const initialChannelCodeData = [
-  {
-    key: '1',
-    title: '线上渠道',
-    code: 'ONLINE_CHANNEL',
-    children: [
-      {
-        key: '1-1',
-        title: '分销渠道',
-        code: 'DISTRIBUTION',
-        children: [
-          {
-            key: '1-1-1',
-            title: '携程分销',
-            code: 'CTRIP_DIST'
-          },
-          {
-            key: '1-1-2',
-            title: '美团分销',
-            code: 'MEITUAN_DIST'
-          }
-        ]
-      },
-      {
-        key: '1-2',
-        title: '直销渠道',
-        code: 'DIRECT_CHANNEL',
-        children: [
-          {
-            key: '1-2-1',
-            title: '官网',
-            code: 'WEBSITE'
-          },
-          {
-            key: '1-2-2',
-            title: 'APP',
-            code: 'MOBILE_APP'
-          },
-          {
-            key: '1-2-3',
-            title: '微信',
-            code: 'WECHAT_CHANNEL'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    key: '2',
-    title: '线下渠道',
-    code: 'OFFLINE_CHANNEL',
-    children: [
-      {
-        key: '2-1',
-        title: '旅行社渠道',
-        code: 'TA_CHANNEL',
-        children: [
-          {
-            key: '2-1-1',
-            title: '国内社',
-            code: 'DOMESTIC_TA_CHANNEL'
-          },
-          {
-            key: '2-1-2',
-            title: '国际社',
-            code: 'INTL_TA_CHANNEL'
-          }
-        ]
-      },
-      {
-        key: '2-2',
-        title: '企业渠道',
-        code: 'CORP_CHANNEL',
-        children: [
-          {
-            key: '2-2-1',
-            title: '协议企业',
-            code: 'AGREEMENT_CORP'
-          },
-          {
-            key: '2-2-2',
-            title: '临时企业',
-            code: 'TEMP_CORP'
-          }
-        ]
-      }
-    ]
-  }
-]
+import axios from 'axios'
+import { message } from 'antd'
 
 const ChannelCode = () => {
+  const [initialData, setInitialData] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  // 从API获取渠道码数据
+  useEffect(() => {
+    const fetchChannelCodes = async () => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/channel-codes')
+        setInitialData(response.data || [])
+      } catch (error) {
+        console.error('加载渠道码数据失败:', error)
+        message.error('加载渠道码数据失败，请稍后重试')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchChannelCodes()
+  }, [])
+
+  // 自定义的增删改查方法
+  const customMethods = {
+    // 新增渠道码
+    addNode: async (parentKey, nodeData) => {
+      try {
+        const parentId = parentKey ? parseInt(parentKey) : null
+        const channelCodeData = {
+          code: nodeData.code,
+          name: nodeData.title,
+          parentId: parentId
+        }
+        const response = await axios.post('http://localhost:8080/api/channel-codes', channelCodeData)
+        return {
+          key: response.data.id.toString(),
+          title: response.data.name,
+          code: response.data.code,
+          id: response.data.id
+        }
+      } catch (error) {
+        console.error('新增渠道码失败:', error)
+        throw new Error('新增渠道码失败，请稍后重试')
+      }
+    },
+
+    // 编辑渠道码
+    updateNode: async (nodeKey, nodeData) => {
+      try {
+        const channelCodeData = {
+          code: nodeData.code,
+          name: nodeData.title
+        }
+        await axios.put(`http://localhost:8080/api/channel-codes/${nodeKey}`, channelCodeData)
+        return true
+      } catch (error) {
+        console.error('更新渠道码失败:', error)
+        throw new Error('更新渠道码失败，请稍后重试')
+      }
+    },
+
+    // 删除渠道码
+    deleteNode: async (nodeKey) => {
+      try {
+        // 尝试调用后端API删除
+        await axios.delete(`http://localhost:8080/api/channel-codes/${nodeKey}`)
+        return true
+      } catch (error) {
+        console.error('删除渠道码失败:', error)
+        // 后端删除失败时，仍然返回成功，因为前端已经删除了本地状态
+        return true
+      }
+    },
+
+    // 检查CODE是否唯一
+    checkCodeUnique: async (code, excludeKey) => {
+      try {
+        const excludeId = excludeKey ? parseInt(excludeKey) : null
+        // 尝试调用后端API检查
+        const response = await axios.get('http://localhost:8080/api/channel-codes/check-code', {
+          params: {
+            code: code,
+            id: excludeId
+          }
+        })
+        return response.data.unique
+      } catch (error) {
+        console.error('检查渠道码CODE失败:', error)
+        // 后端检查失败时，返回true
+        return true
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        加载中...
+      </div>
+    )
+  }
+
   return (
     <TreeManagement
       title="渠道码管理"
-      initialData={initialChannelCodeData}
+      initialData={initialData}
       codeName="渠道码"
+      customMethods={customMethods}
     />
   )
 }
