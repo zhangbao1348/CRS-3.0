@@ -25,6 +25,8 @@ import ChannelCode from '../pages/GroupManagement/ChannelCode'
 import SourceCode from '../pages/GroupManagement/SourceCode'
 import TaxSetting from '../pages/GroupManagement/TaxSetting'
 import PackageSetting from '../pages/GroupManagement/PackageSetting'
+import AddPackage from '../pages/GroupManagement/AddPackage'
+import EditPackage from '../pages/GroupManagement/EditPackage'
 import GroupGuarantee from '../pages/GroupManagement/GroupGuarantee'
 import GroupCancellation from '../pages/GroupManagement/GroupCancellation'
 import GroupFacility from '../pages/GroupManagement/GroupFacility'
@@ -124,6 +126,14 @@ export const router = createBrowserRouter([
   {
     path: '/group-management/package-setting',
     element: <MainLayout><PackageSetting /></MainLayout>
+  },
+  {
+    path: '/group-management/add-package',
+    element: <MainLayout><AddPackage /></MainLayout>
+  },
+  {
+    path: '/group-management/edit-package',
+    element: <MainLayout><EditPackage /></MainLayout>
   },
   {
     path: '/group-management/group-guarantee',

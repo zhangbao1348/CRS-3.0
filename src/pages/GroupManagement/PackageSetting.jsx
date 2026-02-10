@@ -1,5 +1,5 @@
-import React from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, Radio } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
@@ -8,90 +8,173 @@ import {
   EyeOutlined,
   GiftOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 
 const { Option } = Select
-const { Group: RadioGroup } = Radio
-
-// 模拟套餐设置数据
-const mockPackageSettings = [
-  {
-    id: 1,
-    name: '含单早套餐',
-    code: 'SINGLE_BREAKFAST',
-    type: '早餐套餐',
-    status: '启用',
-    description: '包含单人早餐',
-    price: '+¥50/人',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 2,
-    name: '含双早套餐',
-    code: 'DOUBLE_BREAKFAST',
-    type: '早餐套餐',
-    status: '启用',
-    description: '包含双人早餐',
-    price: '+¥80/间',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 3,
-    name: '豪华套餐',
-    code: 'LUXURY_PACKAGE',
-    type: '综合套餐',
-    status: '启用',
-    description: '包含双早+下午茶+机场接送',
-    price: '+¥200/间',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 4,
-    name: '商务套餐',
-    code: 'BUSINESS_PACKAGE',
-    type: '商务套餐',
-    status: '启用',
-    description: '包含双早+会议室2小时+洗衣服务',
-    price: '+¥150/间',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 5,
-    name: '亲子套餐',
-    code: 'FAMILY_PACKAGE',
-    type: '亲子套餐',
-    status: '启用',
-    description: '包含双早+儿童早餐+儿童乐园门票',
-    price: '+¥120/间',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 6,
-    name: '周末套餐',
-    code: 'WEEKEND_PACKAGE',
-    type: '限时套餐',
-    status: '停用',
-    description: '包含双早+延迟退房至14:00',
-    price: '+¥60/间',
-    validPeriod: '每周五至周日'
-  }
-]
 
 const PackageSetting = () => {
+  const [packages, setPackages] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [searchParams, setSearchParams] = useState({
+    name: '',
+    code: '',
+    type: '',
+    status: ''
+  })
+  const navigate = useNavigate()
+  
+  // 包价类型选项
+  const packageTypes = [
+    { value: '早餐', label: '早餐' },
+    { value: '午餐', label: '午餐' },
+    { value: '晚餐', label: '晚餐' },
+    { value: '综合', label: '综合' }
+  ]
+  
+  // 状态选项
+  const statusOptions = [
+    { value: 'active', label: '启用' },
+    { value: 'inactive', label: '停用' }
+  ]
+  
+  // 初始化加载包价列表
+  useEffect(() => {
+    fetchPackages()
+  }, [])
+  
+  // 获取包价列表
+  const fetchPackages = async () => {
+    setLoading(true)
+    try {
+      const response = await axios.get('http://localhost:8080/api/packages')
+      // 转换数据格式以匹配前端需求
+      const formattedPackages = response.data.map(pkg => {
+        let validPeriod = '长期有效'
+        if (pkg.startDate && pkg.endDate) {
+          validPeriod = `${pkg.startDate} 至 ${pkg.endDate}`
+        } else if (pkg.startDate) {
+          validPeriod = `从 ${pkg.startDate} 开始`
+        } else if (pkg.endDate) {
+          validPeriod = `至 ${pkg.endDate} 结束`
+        }
+        return {
+          id: pkg.id,
+          name: pkg.name,
+          code: pkg.code,
+          type: pkg.type,
+          status: pkg.status === 'active' ? '启用' : '停用',
+          description: pkg.description,
+          price: pkg.fixedPrice ? `¥${pkg.fixedPrice}` : '酒店设置',
+          validPeriod: validPeriod
+        }
+      })
+      setPackages(formattedPackages)
+    } catch (error) {
+      console.error('获取包价列表失败:', error)
+      message.error('获取包价列表失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // 处理搜索
+  const handleSearch = async () => {
+    setLoading(true)
+    try {
+      // 构建搜索参数
+      const params = {}
+      if (searchParams.name) params.name = searchParams.name
+      if (searchParams.code) params.code = searchParams.code
+      if (searchParams.type) params.type = searchParams.type
+      if (searchParams.status) params.status = searchParams.status
+      
+      // 调用搜索API
+      const response = await axios.post('http://localhost:8080/api/packages/search', params)
+      
+      // 转换数据格式
+      const formattedPackages = response.data.map(pkg => {
+        let validPeriod = '长期有效'
+        if (pkg.startDate && pkg.endDate) {
+          validPeriod = `${pkg.startDate} 至 ${pkg.endDate}`
+        } else if (pkg.startDate) {
+          validPeriod = `从 ${pkg.startDate} 开始`
+        } else if (pkg.endDate) {
+          validPeriod = `至 ${pkg.endDate} 结束`
+        }
+        return {
+          id: pkg.id,
+          name: pkg.name,
+          code: pkg.code,
+          type: pkg.type,
+          status: pkg.status === 'active' ? '启用' : '停用',
+          description: pkg.description,
+          price: pkg.fixedPrice ? `¥${pkg.fixedPrice}` : '酒店设置',
+          validPeriod: validPeriod
+        }
+      })
+      setPackages(formattedPackages)
+    } catch (error) {
+      console.error('搜索包价失败:', error)
+      message.error('搜索失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // 处理重置
+  const handleReset = () => {
+    setSearchParams({
+      name: '',
+      code: '',
+      type: '',
+      status: ''
+    })
+    fetchPackages()
+  }
+  
+  // 处理新增包价
+  const handleAddPackage = () => {
+    navigate('/group-management/add-package')
+  }
+  
+  // 处理编辑包价
+  const handleEditPackage = (record) => {
+    navigate(`/group-management/edit-package?id=${record.id}`)
+  }
+  
+  // 处理删除包价
+  const handleDeletePackage = async (id) => {
+    try {
+      await axios.delete(`http://localhost:8080/api/packages/${id}`)
+      message.success('包价删除成功')
+      fetchPackages()
+    } catch (error) {
+      console.error('删除包价失败:', error)
+      if (error.response && error.response.data) {
+        message.error(error.response.data)
+      } else {
+        message.error('删除失败，请稍后重试')
+      }
+    }
+  }
+  
+  // 列配置
   const columns = [
     {
-      title: '套餐名称',
+      title: '包价名称',
       dataIndex: 'name',
       key: 'name',
       width: 180
     },
     {
-      title: '套餐代码',
+      title: '包价代码',
       dataIndex: 'code',
       key: 'code',
       width: 150
     },
     {
-      title: '套餐类型',
+      title: '包价类型',
       dataIndex: 'type',
       key: 'type',
       width: 120
@@ -111,7 +194,7 @@ const PackageSetting = () => {
       )
     },
     {
-      title: '套餐价格',
+      title: '包价价格',
       dataIndex: 'price',
       key: 'price',
       width: 120
@@ -135,8 +218,8 @@ const PackageSetting = () => {
       render: (_, record) => (
         <Space size="middle">
           <Button type="link" size="small" icon={<EyeOutlined />}>查看</Button>
-          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditPackage(record)}>编辑</Button>
+          <Button type="link" size="small" icon={<DeleteOutlined />} danger onClick={() => handleDeletePackage(record.id)}>删除</Button>
         </Space>
       )
     }
@@ -153,30 +236,52 @@ const PackageSetting = () => {
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="套餐名称" prefix={<SearchOutlined />} allowClear />
+            <Input 
+              placeholder="包价名称" 
+              prefix={<SearchOutlined />} 
+              allowClear
+              value={searchParams.name}
+              onChange={(e) => setSearchParams({...searchParams, name: e.target.value})}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="套餐代码" allowClear />
+            <Input 
+              placeholder="包价代码" 
+              allowClear
+              value={searchParams.code}
+              onChange={(e) => setSearchParams({...searchParams, code: e.target.value})}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="套餐类型" allowClear style={{ width: '100%' }}>
-              <Option value="早餐套餐">早餐套餐</Option>
-              <Option value="综合套餐">综合套餐</Option>
-              <Option value="商务套餐">商务套餐</Option>
-              <Option value="亲子套餐">亲子套餐</Option>
-              <Option value="限时套餐">限时套餐</Option>
+            <Select 
+              placeholder="包价类型" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchParams.type || undefined}
+              onChange={(value) => setSearchParams({...searchParams, type: value})}
+            >
+              {packageTypes.map(item => (
+                <Option key={item.value} value={item.value}>{item.label}</Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="状态" allowClear style={{ width: '100%' }}>
-              <Option value="启用">启用</Option>
-              <Option value="停用">停用</Option>
+            <Select 
+              placeholder="状态" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchParams.status || undefined}
+              onChange={(value) => setSearchParams({...searchParams, status: value})}
+            >
+              {statusOptions.map(item => (
+                <Option key={item.value} value={item.value}>{item.label}</Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={24} md={16} lg={12} style={{ textAlign: 'right' }}>
             <Space>
-              <Button type="default">重置</Button>
-              <Button type="primary" icon={<SearchOutlined />}>搜索</Button>
+              <Button type="default" onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
             </Space>
           </Col>
         </Row>
@@ -184,16 +289,17 @@ const PackageSetting = () => {
 
       {/* 操作按钮区域 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="primary" icon={<PlusOutlined />} size="large">
-          新增套餐
+        <Button type="primary" icon={<PlusOutlined />} size="large" onClick={handleAddPackage}>
+          新增包价
         </Button>
       </div>
 
-      {/* 套餐列表表格 */}
+      {/* 包价列表表格 */}
       <Table
         columns={columns}
-        dataSource={mockPackageSettings}
+        dataSource={packages}
         rowKey="id"
+        loading={loading}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,
