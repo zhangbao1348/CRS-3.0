@@ -1,87 +1,64 @@
-import React from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined, 
   EyeOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import api from '../../utils/api'
 
 const { Option } = Select
 
-// 模拟集团取消政策数据
-const mockCancellationPolicies = [
-  {
-    id: 1,
-    name: '免费取消',
-    code: 'FREE_CANCEL',
-    type: '免费取消',
-    status: '启用',
-    description: '入住前24小时可免费取消',
-    cancellationFee: '无',
-    deadline: '入住前24小时',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 2,
-    name: '部分费用',
-    code: 'PARTIAL_FEE',
-    type: '部分费用',
-    status: '启用',
-    description: '入住前12小时取消收取50%房费，12小时内取消收取100%房费',
-    cancellationFee: '50%-100%房费',
-    deadline: '入住前12小时',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 3,
-    name: '不可取消',
-    code: 'NON_REFUNDABLE',
-    type: '不可取消',
-    status: '启用',
-    description: '预订后不可取消，无论何时取消均收取100%房费',
-    cancellationFee: '100%房费',
-    deadline: '预订后立即生效',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 4,
-    name: '特殊取消',
-    code: 'SPECIAL_CANCEL',
-    type: '特殊取消',
-    status: '启用',
-    description: '根据特殊情况协商取消，具体费用双方协商',
-    cancellationFee: '协商确定',
-    deadline: '协商确定',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 5,
-    name: '提前7天取消',
-    code: '7DAYS_ADVANCE',
-    type: '提前取消',
-    status: '启用',
-    description: '入住前7天可免费取消，7天内取消收取100%房费',
-    cancellationFee: '100%房费（7天内）',
-    deadline: '入住前7天',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 6,
-    name: '提前14天取消',
-    code: '14DAYS_ADVANCE',
-    type: '提前取消',
-    status: '停用',
-    description: '入住前14天可免费取消，14天内取消收取100%房费',
-    cancellationFee: '100%房费（14天内）',
-    deadline: '入住前14天',
-    validPeriod: '长期有效'
-  }
-]
-
 const GroupCancellation = () => {
+  const [cancellationPolicies, setCancellationPolicies] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [searchName, setSearchName] = useState('')
+  const [searchCode, setSearchCode] = useState('')
+  const [searchType, setSearchType] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
+  const navigate = useNavigate()
+  
+  // 加载数据
+  useEffect(() => {
+    loadCancellationPolicies()
+  }, [])
+  
+  const loadCancellationPolicies = async () => {
+    setLoading(true)
+    try {
+      const data = await api.get('/cancellation-policies')
+      setCancellationPolicies(data)
+    } catch (error) {
+      console.error('加载取消政策数据失败:', error)
+      message.error('加载取消政策数据失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleAddCancellation = () => {
+    navigate('/group-management/add-edit-cancellation')
+  }
+  
+  const handleEditCancellation = (record) => {
+    navigate('/group-management/add-edit-cancellation', { state: { record } })
+  }
+  
+  // 搜索过滤
+  const filteredPolicies = cancellationPolicies.filter(item => {
+    if (searchName && !item.name?.includes(searchName)) return false
+    if (searchCode && !item.code?.includes(searchCode)) return false
+    if (searchType && item.type !== searchType) return false
+    if (searchStatus) {
+      const statusMap = { '启用': 'active', '停用': 'inactive' }
+      if (item.status !== statusMap[searchStatus]) return false
+    }
+    return true
+  })
+  
   const columns = [
     {
       title: '取消政策名称',
@@ -102,42 +79,28 @@ const GroupCancellation = () => {
       width: 120
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status) => (
-        <span style={{ 
-          color: status === '启用' ? '#52c41a' : '#ff4d4f',
-          fontWeight: 500
-        }}>
-          {status}
-        </span>
-      )
-    },
-    {
-      title: '取消费用',
-      dataIndex: 'cancellationFee',
-      key: 'cancellationFee',
-      width: 150
-    },
-    {
-      title: '取消截止时间',
-      dataIndex: 'deadline',
-      key: 'deadline',
-      width: 180
-    },
-    {
-      title: '有效期',
-      dataIndex: 'validPeriod',
-      key: 'validPeriod',
-      width: 120
-    },
-    {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status) => {
+        const statusMap = { 'active': '启用', 'inactive': '停用' }
+        const displayStatus = statusMap[status] || status
+        return (
+          <span style={{ 
+            color: status === 'active' || status === '启用' ? '#52c41a' : '#ff4d4f',
+            fontWeight: 500
+          }}>
+            {displayStatus}
+          </span>
+        )
+      }
     },
     {
       title: '操作',
@@ -145,9 +108,7 @@ const GroupCancellation = () => {
       width: 180,
       render: (_, record) => (
         <Space size="middle">
-          <Button type="link" size="small" icon={<EyeOutlined />}>查看</Button>
-          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditCancellation(record)}>编辑</Button>
         </Space>
       )
     }
@@ -164,13 +125,30 @@ const GroupCancellation = () => {
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="取消政策名称" prefix={<SearchOutlined />} allowClear />
+            <Input 
+              placeholder="取消政策名称" 
+              prefix={<SearchOutlined />} 
+              allowClear 
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="取消政策代码" allowClear />
+            <Input 
+              placeholder="取消政策代码" 
+              allowClear 
+              value={searchCode}
+              onChange={(e) => setSearchCode(e.target.value)}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="取消类型" allowClear style={{ width: '100%' }}>
+            <Select 
+              placeholder="取消类型" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchType}
+              onChange={setSearchType}
+            >
               <Option value="免费取消">免费取消</Option>
               <Option value="部分费用">部分费用</Option>
               <Option value="不可取消">不可取消</Option>
@@ -179,15 +157,26 @@ const GroupCancellation = () => {
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="状态" allowClear style={{ width: '100%' }}>
+            <Select 
+              placeholder="状态" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchStatus}
+              onChange={setSearchStatus}
+            >
               <Option value="启用">启用</Option>
               <Option value="停用">停用</Option>
             </Select>
           </Col>
           <Col xs={24} sm={24} md={16} lg={12} style={{ textAlign: 'right' }}>
             <Space>
-              <Button type="default">重置</Button>
-              <Button type="primary" icon={<SearchOutlined />}>搜索</Button>
+              <Button type="default" onClick={() => {
+                setSearchName('')
+                setSearchCode('')
+                setSearchType('')
+                setSearchStatus('')
+              }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={loadCancellationPolicies}>搜索</Button>
             </Space>
           </Col>
         </Row>
@@ -195,7 +184,7 @@ const GroupCancellation = () => {
 
       {/* 操作按钮区域 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="primary" icon={<PlusOutlined />} size="large">
+        <Button type="primary" icon={<PlusOutlined />} size="large" onClick={handleAddCancellation}>
           新增取消政策
         </Button>
       </div>
@@ -203,8 +192,9 @@ const GroupCancellation = () => {
       {/* 取消政策列表表格 */}
       <Table
         columns={columns}
-        dataSource={mockCancellationPolicies}
+        dataSource={filteredPolicies}
         rowKey="id"
+        loading={loading}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,

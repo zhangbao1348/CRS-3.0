@@ -21,11 +21,14 @@ public class HotelRateCodeAllocation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
+    @Column(name = "tenant_id", nullable = false)
+    private Integer tenantId;
     
-    @Column(name = "rate_code_id", nullable = false)
-    private Integer rateCodeId;
+    @Column(name = "hotel_code", nullable = false, length = 50)
+    private String hotelCode;
+    
+    @Column(name = "rate_code", nullable = false, length = 50)
+    private String rateCode;
     
     @Column(name = "allocated", nullable = false)
     private Boolean allocated = false;
@@ -44,13 +47,4 @@ public class HotelRateCodeAllocation {
     
     @Column(name = "promotion_editable", nullable = false)
     private Boolean promotionEditable = false;
-    
-    // 关联关系
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
-    private Hotel hotel;
-    
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rate_code_id", insertable = false, updatable = false)
-    private RateCode rateCode;
 }

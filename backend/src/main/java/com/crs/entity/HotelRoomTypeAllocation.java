@@ -24,8 +24,14 @@ public class HotelRoomTypeAllocation {
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
     
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
+    
     @Column(name = "room_type_id", nullable = false)
     private Integer roomTypeId;
+    
+    @Column(name = "room_type_code", length = 50)
+    private String roomTypeCode;
     
     @Column(name = "allocated", nullable = false)
     private Boolean allocated = false;

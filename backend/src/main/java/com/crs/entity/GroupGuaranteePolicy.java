@@ -46,11 +46,6 @@ public class GroupGuaranteePolicy {
     @Temporal(TemporalType.TIMESTAMP)
     private Date updatedAt = new Date();
     
-    // 关联关系
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", insertable = false, updatable = false)
-    private Group group;
-    
     // 状态枚举
     public enum Status {
         active, inactive

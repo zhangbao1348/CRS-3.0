@@ -4,22 +4,306 @@ import {
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined, 
   EyeOutlined,
   DollarOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import api from '../../utils/api'
 
 const { Option } = Select
 const { Group: RadioGroup } = Radio
 
 const GroupRateCode = () => {
   const navigate = useNavigate()
+
+  // 模拟集团房价码数据
+  const mockRateCodes = [
+    {
+      id: 1,
+      name: '标准价',
+      code: 'RACK',
+      rateCategory: '公共价',
+      marketCode: 'MARKET01',
+      sourceCode: 'SOURCE01',
+      type: '基础房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 2,
+      name: '周末价',
+      code: 'WEEKEND',
+      rateCategory: '公共价',
+      marketCode: 'MARKET02',
+      sourceCode: 'SOURCE02',
+      type: '基础房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 3,
+      name: '企业价',
+      code: 'CORP',
+      rateCategory: '协议价',
+      marketCode: 'MARKET03',
+      sourceCode: 'SOURCE03',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 4,
+      name: '会员价',
+      code: 'MEMBER',
+      rateCategory: '会员价',
+      marketCode: 'MARKET04',
+      sourceCode: 'SOURCE04',
+      type: '衍生房价码',
+      status: '停用',
+      includeBreakfast: '含双早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不可用优惠'
+    },
+    {
+      id: 5,
+      name: '团队价',
+      code: 'GROUP',
+      rateCategory: '团队价',
+      marketCode: 'MARKET05',
+      sourceCode: 'SOURCE05',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 6,
+      name: '促销价',
+      code: 'PROMO',
+      rateCategory: '促销价',
+      marketCode: 'MARKET06',
+      sourceCode: 'SOURCE06',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 7,
+      name: '长住价',
+      code: 'LONG_STAY',
+      rateCategory: '协议价',
+      marketCode: 'MARKET07',
+      sourceCode: 'SOURCE07',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 8,
+      name: '政府价',
+      code: 'GOV',
+      rateCategory: '协议价',
+      marketCode: 'MARKET08',
+      sourceCode: 'SOURCE08',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 9,
+      name: '军人价',
+      code: 'MILITARY',
+      rateCategory: '协议价',
+      marketCode: 'MARKET09',
+      sourceCode: 'SOURCE09',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 10,
+      name: '学生价',
+      code: 'STUDENT',
+      rateCategory: '促销价',
+      marketCode: 'MARKET10',
+      sourceCode: 'SOURCE10',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '不含早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 11,
+      name: '旺季价',
+      code: 'PEAK',
+      rateCategory: '公共价',
+      marketCode: 'MARKET11',
+      sourceCode: 'SOURCE11',
+      type: '基础房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 12,
+      name: '淡季价',
+      code: 'OFF_PEAK',
+      rateCategory: '公共价',
+      marketCode: 'MARKET12',
+      sourceCode: 'SOURCE12',
+      type: '基础房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 13,
+      name: '节假日价',
+      code: 'HOLIDAY',
+      rateCategory: '公共价',
+      marketCode: 'MARKET13',
+      sourceCode: 'SOURCE13',
+      type: '基础房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 14,
+      name: '生日价',
+      code: 'BIRTHDAY',
+      rateCategory: '促销价',
+      marketCode: 'MARKET14',
+      sourceCode: 'SOURCE14',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 15,
+      name: '情侣价',
+      code: 'COUPLE',
+      rateCategory: '促销价',
+      marketCode: 'MARKET15',
+      sourceCode: 'SOURCE15',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '不限制'
+    },
+    {
+      id: 16,
+      name: '家庭价',
+      code: 'FAMILY',
+      rateCategory: '促销价',
+      marketCode: 'MARKET16',
+      sourceCode: 'SOURCE16',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含三早',
+      refundable: '可退',
+      guarantee: '需要担保',
+      promotion: '不限制'
+    },
+    {
+      id: 17,
+      name: '商务价',
+      code: 'BUSINESS',
+      rateCategory: '协议价',
+      marketCode: 'MARKET17',
+      sourceCode: 'SOURCE17',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 18,
+      name: '会议价',
+      code: 'MEETING',
+      rateCategory: '团队价',
+      marketCode: 'MARKET18',
+      sourceCode: 'SOURCE18',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含双早',
+      refundable: '不可退',
+      guarantee: '需要担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 19,
+      name: '航空价',
+      code: 'AIRLINE',
+      rateCategory: '协议价',
+      marketCode: 'MARKET19',
+      sourceCode: 'SOURCE19',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '限制部分优惠'
+    },
+    {
+      id: 20,
+      name: '酒店员工价',
+      code: 'EMPLOYEE',
+      rateCategory: '协议价',
+      marketCode: 'MARKET20',
+      sourceCode: 'SOURCE20',
+      type: '衍生房价码',
+      status: '启用',
+      includeBreakfast: '含单早',
+      refundable: '可退',
+      guarantee: '无需担保',
+      promotion: '限制部分优惠'
+    }
+  ]
   
   // 状态管理
-  const [rateCodes, setRateCodes] = useState([])
+  const [rateCodes, setRateCodes] = useState(mockRateCodes)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchParams, setSearchParams] = useState({
@@ -29,11 +313,20 @@ const GroupRateCode = () => {
     marketCode: '',
     sourceCode: '',
     type: '',
+    derivativeLevel: '',
     promotion: '',
-    status: ''
+    status: '',
+    rateClass: ''
   })
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false)
-  const [deleteId, setDeleteId] = useState(null)
+  const [marketCodes, setMarketCodes] = useState([])
+  const [loadingMarketCodes, setLoadingMarketCodes] = useState(false)
+  const [sourceCodes, setSourceCodes] = useState([])
+  const [loadingSourceCodes, setLoadingSourceCodes] = useState(false)
+  const [rateCategories, setRateCategories] = useState([])
+  const [allPackages, setAllPackages] = useState([])
+  const [guaranteePolicies, setGuaranteePolicies] = useState([])
+  const [cancellationPolicies, setCancellationPolicies] = useState([])
+
   
   // 处理新增房价码
   const handleAddRateCode = () => {
@@ -45,35 +338,60 @@ const GroupRateCode = () => {
     navigate('/group-management/add-rate-code', { state: { record } })
   }
   
-  // 处理查看房价码
-  const handleViewRateCode = (record) => {
-    // 可以实现查看详情的逻辑
-    message.info(`查看房价码: ${record.name}`)
-  }
-  
-  // 处理删除房价码
-  const handleDeleteRateCode = (record) => {
-    setDeleteId(record.id)
-    setDeleteModalVisible(true)
-  }
-  
-  // 确认删除
-  const handleConfirmDelete = async () => {
-    if (!deleteId) return
-    
+  // 处理启用房价码
+  const handleEnableRateCode = async (record) => {
     try {
       setLoading(true)
-      await axios.delete(`http://localhost:8080/api/group-rate-codes/${deleteId}`)
-      message.success('房价码删除成功')
-      // 重新获取数据
+      await api.put(`/group-rate-codes/${record.id}/enable`)
+      message.success('启用成功')
       fetchRateCodes()
-      setDeleteModalVisible(false)
     } catch (error) {
-      message.error('删除失败: ' + (error.response?.data || '未知错误'))
+      console.error('启用失败:', error)
+      message.error('启用失败，请稍后重试')
     } finally {
       setLoading(false)
     }
   }
+  
+  // 处理停用房价码
+  const handleDisableRateCode = async (record) => {
+    try {
+      setLoading(true)
+      await api.put(`/group-rate-codes/${record.id}/disable`)
+      message.success('停用成功')
+      fetchRateCodes()
+    } catch (error) {
+      console.error('停用失败:', error)
+      message.error('停用失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  // 处理停用前确认（检查子衍生码）
+  const confirmDisableRateCode = (record) => {
+    // 检查是否有子衍生码（通过查看列表中parentRateCodeId匹配的记录）
+    const childCount = rateCodes.filter(rc => rc.parentRateCodeId === record.id).length
+    const hasChildren = record.derivativeLevelValue === 'basic' || record.derivativeLevelValue === 'level1'
+    
+    if (hasChildren) {
+      Modal.confirm({
+        title: '确认停用',
+        content: `停用房价码"${record.name}"将同时停用其下所有衍生码，并将已下发到酒店的该房价码全部置为无效。确定要继续吗？`,
+        onOk: () => handleDisableRateCode(record)
+      })
+    } else {
+      Modal.confirm({
+        title: '确认停用',
+        content: `停用房价码"${record.name}"将同时将已下发到酒店的该房价码置为无效。确定要继续吗？`,
+        onOk: () => handleDisableRateCode(record)
+      })
+    }
+  }
+  
+
+  
+
   
   // 从后端API获取集团房价码数据
   const fetchRateCodes = async () => {
@@ -87,45 +405,181 @@ const GroupRateCode = () => {
         if (value) params[key] = value
       })
       
-      const response = await axios.get('http://localhost:8080/api/group-rate-codes', {
+      console.log('API请求参数:', params)
+      
+      const response = await api.get('/group-rate-codes', {
         params
       })
       
-      // 转换数据格式以匹配前端展示需求
-      const formattedRateCodes = response.data.map(item => ({
-        id: item.id,
-        name: item.rateName,
-        code: item.rateCode,
-        rateCategory: '公共价', // 可以根据实际数据调整
-        marketCode: 'MARKET01', // 可以根据实际数据调整
-        sourceCode: 'SOURCE01', // 可以根据实际数据调整
-        type: '基础房价码', // 可以根据实际数据调整
-        status: item.status === 'active' ? '启用' : '停用',
-        includeBreakfast: '含单早', // 可以根据实际数据调整
-        refundable: '可退', // 可以根据实际数据调整
-        guarantee: '无需担保', // 可以根据实际数据调整
-        promotion: '不限制' // 可以根据实际数据调整
-      }))
+      console.log('API响应数据:', response)
       
+      // 转换数据格式以匹配前端展示需求
+      const formattedRateCodes = response.map(item => {
+        // 转换衍生层级为显示文本
+        let derivativeLevelText = ''
+        if (item.derivativeLevel === 'basic') {
+          derivativeLevelText = '基础价格'
+        } else if (item.derivativeLevel === 'level1') {
+          derivativeLevelText = '一级衍生价'
+        } else if (item.derivativeLevel === 'level2') {
+          derivativeLevelText = '二级衍生价'
+        }
+        
+        // 根据rateType设置类型显示
+        let typeText = ''
+        if (item.rateType === 'basic') {
+          typeText = '基础房价码'
+        } else if (item.rateType === 'level1') {
+          typeText = '一级衍生码'
+        } else if (item.rateType === 'level2') {
+          typeText = '二级衍生码'
+        } else if (item.rateType === 'derivative') {
+          typeText = '衍生房价码'
+        }
+        
+        return {
+          id: item.id,
+          name: item.rateName,
+          code: item.rateCode,
+          rateCategory: (() => {
+            const cat = rateCategories.find(c => c.code === item.rateCategory)
+            return cat ? `${cat.name}（${cat.code}）` : (item.rateCategory || '')
+          })(),
+          marketCode: (() => {
+            const mc = marketCodes.find(c => c.id === item.marketCodeId)
+            return mc ? `${mc.name}（${mc.code}）` : (item.marketCode || '')
+          })(),
+          sourceCode: (() => {
+            const sc = sourceCodes.find(c => c.id === item.sourceCodeId)
+            return sc ? `${sc.name}（${sc.code}）` : (item.sourceCode || '')
+          })(),
+          type: typeText || '基础房价码',
+          derivativeLevel: derivativeLevelText,
+          derivativeLevelValue: item.derivativeLevel,
+          parentRateCodeId: item.parentRateCodeId,
+          status: item.status === 'active' ? '启用' : '停用',
+          packages: (() => {
+            try {
+              const pkgs = item.packages ? (typeof item.packages === 'string' ? JSON.parse(item.packages) : item.packages) : []
+              if (!Array.isArray(pkgs)) return []
+              return pkgs.map(code => {
+                const pkg = allPackages.find(p => p.code === code)
+                return pkg ? `${pkg.name}（${pkg.code}）` : code
+              })
+            } catch (e) {
+              return []
+            }
+          })(),
+          refundable: (() => {
+            const cp = cancellationPolicies.find(p => p.code === item.cancellationRule)
+            return cp ? `${cp.name}（${cp.code}）` : (item.cancellationRule || '')
+          })(),
+          guarantee: (() => {
+            const gp = guaranteePolicies.find(p => p.code === item.guaranteeRule)
+            return gp ? `${gp.name}（${gp.code}）` : (item.guaranteeRule || '')
+          })(),
+          promotion: (() => {
+            const promoMap = { 'unlimited': '不限制', 'limited': '限制部分', 'disabled': '不可用' }
+            return promoMap[item.promotionRule] || item.promotionRule || ''
+          })()
+        }
+      })
+      
+      console.log('格式化后的数据:', formattedRateCodes)
       setRateCodes(formattedRateCodes)
     } catch (error) {
-      setError('获取房价码数据失败')
-      message.error('获取数据失败: ' + (error.message || '网络错误'))
+      console.error('获取房价码数据失败，使用模拟数据:', error)
+      setRateCodes(mockRateCodes)
     } finally {
       setLoading(false)
     }
   }
   
+  // 获取第三级市场码
+  const fetchThirdLevelMarketCodes = async () => {
+    try {
+      setLoadingMarketCodes(true)
+      const response = await api.get('/market-codes/third-level')
+      setMarketCodes(response)
+    } catch (error) {
+      console.error('获取第三级市场码失败:', error)
+      setMarketCodes([])
+      message.error('获取市场码数据失败，请稍后重试')
+    } finally {
+      setLoadingMarketCodes(false)
+    }
+  }
+
+  // 获取第三级来源码
+  const fetchThirdLevelSourceCodes = async () => {
+    try {
+      setLoadingSourceCodes(true)
+      const response = await api.get('/source-codes/third-level')
+      setSourceCodes(response)
+    } catch (error) {
+      console.error('获取第三级来源码失败:', error)
+      setSourceCodes([])
+      message.error('获取来源码数据失败，请稍后重试')
+    } finally {
+      setLoadingSourceCodes(false)
+    }
+  }
+
   // 初始化时获取数据
   useEffect(() => {
-    fetchRateCodes()
+    fetchThirdLevelMarketCodes()
+    fetchThirdLevelSourceCodes()
+    fetchRateCategories()
+    fetchAllPackages()
+    fetchPolicies()
   }, [])
+
+  // 当引用数据加载完成后获取房价码列表
+  useEffect(() => {
+    fetchRateCodes()
+  }, [marketCodes, sourceCodes, rateCategories, allPackages, guaranteePolicies, cancellationPolicies])
+
+  // 获取房价大类
+  const fetchRateCategories = async () => {
+    try {
+      const response = await api.get('/rate-types/active')
+      setRateCategories(response || [])
+    } catch (error) {
+      console.error('获取房价大类失败:', error)
+      setRateCategories([])
+    }
+  }
+
+  // 获取包价数据
+  const fetchAllPackages = async () => {
+    try {
+      const response = await api.get('/packages')
+      setAllPackages(response || [])
+    } catch (error) {
+      console.error('获取包价数据失败:', error)
+      setAllPackages([])
+    }
+  }
+
+  // 获取担保和取消政策
+  const fetchPolicies = async () => {
+    try {
+      const [gpRes, cpRes] = await Promise.all([
+        api.get('/guarantee-policies'),
+        api.get('/cancellation-policies')
+      ])
+      setGuaranteePolicies(gpRes || [])
+      setCancellationPolicies(cpRes || [])
+    } catch (error) {
+      console.error('获取政策数据失败:', error)
+    }
+  }
   
   // 处理搜索参数变化
   const handleSearchParamChange = (key, value) => {
     setSearchParams(prev => ({
       ...prev,
-      [key]: value
+      [key]: value || ''
     }))
   }
   
@@ -143,8 +597,10 @@ const GroupRateCode = () => {
       marketCode: '',
       sourceCode: '',
       type: '',
+      derivativeLevel: '',
       promotion: '',
-      status: ''
+      status: '',
+      rateClass: ''
     })
     fetchRateCodes()
   }
@@ -187,10 +643,20 @@ const GroupRateCode = () => {
       width: 120
     },
     {
-      title: '早餐',
-      dataIndex: 'includeBreakfast',
-      key: 'includeBreakfast',
-      width: 120
+      title: '包价',
+      dataIndex: 'packages',
+      key: 'packages',
+      width: 150,
+      render: (packages) => {
+        if (!packages || packages.length === 0) return '-'
+        return (
+          <div>
+            {packages.map((pkg, index) => (
+              <div key={index}>{pkg}</div>
+            ))}
+          </div>
+        )
+      }
     },
     {
       title: '退改政策',
@@ -227,12 +693,35 @@ const GroupRateCode = () => {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 220,
       render: (_, record) => (
         <Space size="middle">
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewRateCode(record)}>查看</Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditRateCode(record)}>编辑</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} danger onClick={() => handleDeleteRateCode(record)}>删除</Button>
+          {record.status === '启用' ? (
+            <Button 
+              type="link" 
+              size="small" 
+              danger
+              onClick={() => confirmDisableRateCode(record)}
+            >
+              停用
+            </Button>
+          ) : (
+            <Button 
+              type="link" 
+              size="small" 
+              style={{ color: '#52c41a' }}
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认启用',
+                  content: `确定要启用房价码"${record.name}"吗？`,
+                  onOk: () => handleEnableRateCode(record)
+                })
+              }}
+            >
+              启用
+            </Button>
+          )}
         </Space>
       )
     }
@@ -255,6 +744,11 @@ const GroupRateCode = () => {
               allowClear
               value={searchParams.name}
               onChange={(e) => handleSearchParamChange('name', e.target.value)}
+              style={{ 
+                height: 32, 
+                display: 'flex', 
+                alignItems: 'center'
+              }}
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
@@ -263,13 +757,23 @@ const GroupRateCode = () => {
               allowClear
               value={searchParams.code}
               onChange={(e) => handleSearchParamChange('code', e.target.value)}
+              style={{ 
+                height: 32, 
+                display: 'flex', 
+                alignItems: 'center'
+              }}
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Select 
               placeholder="房价类别" 
               allowClear 
-              style={{ width: '100%' }}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
               value={searchParams.rateCategory || undefined}
               onChange={(value) => handleSearchParamChange('rateCategory', value)}
             >
@@ -284,49 +788,92 @@ const GroupRateCode = () => {
             <Select 
               placeholder="市场码" 
               allowClear 
-              style={{ width: '100%' }}
+              loading={loadingMarketCodes}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
               value={searchParams.marketCode || undefined}
               onChange={(value) => handleSearchParamChange('marketCode', value)}
             >
-              <Option value="MARKET01">MARKET01</Option>
-              <Option value="MARKET02">MARKET02</Option>
-              <Option value="MARKET03">MARKET03</Option>
-              <Option value="MARKET04">MARKET04</Option>
-              <Option value="MARKET05">MARKET05</Option>
+              {marketCodes.map(code => (
+                <Option key={code.id} value={code.code}>
+                  {code.name} ({code.code})
+                </Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Select 
               placeholder="来源码" 
               allowClear 
-              style={{ width: '100%' }}
+              loading={loadingSourceCodes}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
               value={searchParams.sourceCode || undefined}
               onChange={(value) => handleSearchParamChange('sourceCode', value)}
             >
-              <Option value="SOURCE01">SOURCE01</Option>
-              <Option value="SOURCE02">SOURCE02</Option>
-              <Option value="SOURCE03">SOURCE03</Option>
-              <Option value="SOURCE04">SOURCE04</Option>
-              <Option value="SOURCE05">SOURCE05</Option>
+              {sourceCodes.map(code => (
+                <Option key={code.id} value={code.code}>
+                  {code.name} ({code.code})
+                </Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Select 
               placeholder="类型" 
               allowClear 
-              style={{ width: '100%' }}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
               value={searchParams.type || undefined}
               onChange={(value) => handleSearchParamChange('type', value)}
             >
               <Option value="基础房价码">基础房价码</Option>
-              <Option value="衍生房价码">衍生房价码</Option>
+              <Option value="一级衍生码">一级衍生码</Option>
+              <Option value="二级衍生码">二级衍生码</Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Select 
+              placeholder="房价大类" 
+              allowClear 
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              value={searchParams.rateClass || undefined}
+              onChange={(value) => handleSearchParamChange('rateClass', value)}
+            >
+              <Option value="public">公共价</Option>
+              <Option value="agreement">协议价</Option>
+              <Option value="team">团队价</Option>
+              <Option value="member">会员价</Option>
+              <Option value="promotion">促销价</Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
             <Select 
               placeholder="促销优惠" 
               allowClear 
-              style={{ width: '100%' }}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
               value={searchParams.promotion || undefined}
               onChange={(value) => handleSearchParamChange('promotion', value)}
             >
@@ -339,26 +886,30 @@ const GroupRateCode = () => {
             <Select 
               placeholder="状态" 
               allowClear 
-              style={{ width: '100%' }}
-              value={searchParams.status || undefined}
-              onChange={(value) => handleSearchParamChange('status', value === '启用' ? 'active' : 'inactive')}
+              style={{ 
+                width: '100%',
+                height: 32,
+                display: 'flex',
+                alignItems: 'center'
+              }}
+              value={searchParams.status === 'active' ? '启用' : searchParams.status === 'inactive' ? '停用' : undefined}
+              onChange={(value) => handleSearchParamChange('status', value === '启用' ? 'active' : value === '停用' ? 'inactive' : '')}
             >
               <Option value="启用">启用</Option>
               <Option value="停用">停用</Option>
             </Select>
           </Col>
-          <Col xs={24} sm={24} md={16} lg={12} style={{ textAlign: 'right' }}>
-            <Space>
-              <Button type="default" onClick={handleReset}>重置</Button>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              <Button 
-                icon={<ReloadOutlined />} 
-                onClick={fetchRateCodes}
-                loading={loading}
-              >
-                刷新
-              </Button>
-            </Space>
+        </Row>
+        <Row style={{ marginTop: 16 }}>
+          <Col span={24} style={{ textAlign: 'right' }}>
+            <Button 
+              type="primary" 
+              icon={<SearchOutlined />} 
+              onClick={handleSearch}
+              style={{ height: 32 }}
+            >
+              搜索
+            </Button>
           </Col>
         </Row>
       </Card>
@@ -400,18 +951,7 @@ const GroupRateCode = () => {
         />
       )}
       
-      {/* 删除确认弹窗 */}
-      <Modal
-        title="确认删除"
-        open={deleteModalVisible}
-        onOk={handleConfirmDelete}
-        onCancel={() => setDeleteModalVisible(false)}
-        okText="确认删除"
-        cancelText="取消"
-        okButtonProps={{ danger: true }}
-      >
-        <p>确定要删除该集团房价码吗？此操作不可撤销。</p>
-      </Modal>
+
     </div>
   )
 }

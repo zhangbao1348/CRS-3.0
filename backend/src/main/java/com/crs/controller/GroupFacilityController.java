@@ -1,11 +1,14 @@
 package com.crs.controller;
 
 import com.crs.entity.GroupFacility;
+import com.crs.repository.GroupFacilityRepository;
 import com.crs.service.GroupFacilityService;
+import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/group-facilities")
@@ -14,13 +17,21 @@ public class GroupFacilityController {
     @Autowired
     private GroupFacilityService groupFacilityService;
     
+    @Autowired
+    private GroupFacilityRepository groupFacilityRepository;
+    
     /**
      * 获取所有集团设施
      * @return 设施列表
      */
     @GetMapping
-    public ResponseEntity<List<GroupFacility>> getAllFacilities() {
-        List<GroupFacility> facilities = groupFacilityService.getAllFacilities();
+    public ResponseEntity<List<GroupFacility>> getAllFacilities(@RequestParam(required = false) String scope) {
+        List<GroupFacility> facilities;
+        if (scope != null && !scope.isEmpty()) {
+            facilities = groupFacilityRepository.findByScope(scope);
+        } else {
+            facilities = groupFacilityService.getAllFacilities();
+        }
         return ResponseEntity.ok(facilities);
     }
     
@@ -52,7 +63,10 @@ public class GroupFacilityController {
      * @return 创建的设施对象
      */
     @PostMapping
-    public ResponseEntity<GroupFacility> createFacility(@RequestBody GroupFacility facility) {
+    public ResponseEntity<?> createFacility(@RequestBody GroupFacility facility) {
+        if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
+            return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+        }
         GroupFacility createdFacility = groupFacilityService.createFacility(facility);
         return ResponseEntity.ok(createdFacility);
     }
@@ -64,7 +78,10 @@ public class GroupFacilityController {
      * @return 更新后的设施对象
      */
     @PutMapping("/{id}")
-    public ResponseEntity<GroupFacility> updateFacility(@PathVariable Integer id, @RequestBody GroupFacility facility) {
+    public ResponseEntity<?> updateFacility(@PathVariable Integer id, @RequestBody GroupFacility facility) {
+        if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
+            return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+        }
         facility.setId(id);
         GroupFacility updatedFacility = groupFacilityService.updateFacility(facility);
         return ResponseEntity.ok(updatedFacility);
@@ -78,6 +95,40 @@ public class GroupFacilityController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteFacility(@PathVariable Integer id) {
         groupFacilityService.deleteFacility(id);
+        return ResponseEntity.ok().build();
+    }
+    
+    // ===== CODE-based endpoints =====
+    
+    /**
+     * 根据设施代码更新设施
+     * @param code 设施代码
+     * @param facility 设施对象
+     * @return 更新后的设施对象
+     */
+    @PutMapping("/code/{code}")
+    public ResponseEntity<?> updateFacilityByCode(@PathVariable String code, @RequestBody GroupFacility facility) {
+        GroupFacility existing = groupFacilityRepository.findByFacilityCode(code);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        facility.setId(existing.getId());
+        GroupFacility updatedFacility = groupFacilityService.updateFacility(facility);
+        return ResponseEntity.ok(updatedFacility);
+    }
+    
+    /**
+     * 根据设施代码删除设施
+     * @param code 设施代码
+     * @return 响应实体
+     */
+    @DeleteMapping("/code/{code}")
+    public ResponseEntity<?> deleteFacilityByCode(@PathVariable String code) {
+        GroupFacility existing = groupFacilityRepository.findByFacilityCode(code);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        groupFacilityService.deleteFacility(existing.getId());
         return ResponseEntity.ok().build();
     }
 }

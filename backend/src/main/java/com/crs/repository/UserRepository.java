@@ -4,6 +4,7 @@ import com.crs.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -32,7 +33,22 @@ public interface UserRepository extends JpaRepository<User, Integer> {
      * @param status 状态
      * @return 用户列表
      */
-    java.util.List<User> findByStatus(User.Status status);
+    List<User> findByStatus(User.Status status);
+    
+    /**
+     * 根据租户ID查询用户
+     * @param tenantId 租户ID
+     * @return 用户列表
+     */
+    List<User> findByTenantId(Integer tenantId);
+    
+    /**
+     * 根据租户ID和状态查询用户
+     * @param tenantId 租户ID
+     * @param status 状态
+     * @return 用户列表
+     */
+    List<User> findByTenantIdAndStatus(Integer tenantId, User.Status status);
     
     /**
      * 检查用户名是否存在

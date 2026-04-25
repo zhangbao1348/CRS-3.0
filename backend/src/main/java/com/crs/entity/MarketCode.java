@@ -22,7 +22,10 @@ public class MarketCode {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "code", nullable = false, unique = true, length = 50)
+    @Column(name = "tenant_id")
+    private Integer tenantId;
+    
+    @Column(name = "code", nullable = false, length = 50)
     private String code;
     
     @Column(name = "name", nullable = false, length = 100)

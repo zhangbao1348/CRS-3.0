@@ -25,8 +25,8 @@ public class Hotel {
     @Column(name = "hotel_code", nullable = false, unique = true, length = 50)
     private String hotelCode;
     
-    @Column(name = "group_id")
-    private Integer groupId;
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     @Column(name = "chinese_name", nullable = false, length = 100)
     private String chineseName;
@@ -64,6 +64,24 @@ public class Hotel {
     @Column(name = "total_rooms")
     private Integer totalRooms;
     
+    @Column(name = "allow_create_rate_code", length = 20)
+    private String allowCreateRateCode = "allow";
+    
+    @Column(name = "allow_create_room_type", length = 20)
+    private String allowCreateRoomType = "allow";
+    
+    @Column(name = "support_multi_price", length = 10)
+    private String supportMultiPrice = "no";
+    
+    @Column(name = "multi_price_options", columnDefinition = "TEXT")
+    private String multiPriceOptions;
+    
+    @Column(name = "support_room_type_price_diff", length = 10)
+    private String supportRoomTypePriceDiff = "no";
+    
+    @Column(name = "support_person_price_diff", length = 10)
+    private String supportPersonPriceDiff = "no";
+    
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Status status = Status.active;
@@ -78,11 +96,6 @@ public class Hotel {
     
     // 关联关系
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", insertable = false, updatable = false)
-    private Group group;
-    
-    @JsonIgnore
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<RoomType> roomTypes;
     
@@ -94,13 +107,13 @@ public class Hotel {
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<PersonDiffSystem> personDiffSystems;
     
-    @JsonIgnore
-    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<RatePlan> ratePlans;
+    // @JsonIgnore
+    // @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // private List<RatePlan> ratePlans;
     
-    @JsonIgnore
-    @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<BasePrice> basePrices;
+    // @JsonIgnore
+    // @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // private List<BasePrice> basePrices;
     
     @JsonIgnore
     @OneToMany(mappedBy = "hotel", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -133,12 +146,12 @@ public class Hotel {
         this.hotelCode = hotelCode;
     }
     
-    public Integer getGroupId() {
-        return groupId;
+    public Integer getTenantId() {
+        return tenantId;
     }
     
-    public void setGroupId(Integer groupId) {
-        this.groupId = groupId;
+    public void setTenantId(Integer tenantId) {
+        this.tenantId = tenantId;
     }
     
     public String getChineseName() {
@@ -237,6 +250,54 @@ public class Hotel {
         this.totalRooms = totalRooms;
     }
     
+    public String getAllowCreateRateCode() {
+        return allowCreateRateCode;
+    }
+    
+    public void setAllowCreateRateCode(String allowCreateRateCode) {
+        this.allowCreateRateCode = allowCreateRateCode;
+    }
+    
+    public String getAllowCreateRoomType() {
+        return allowCreateRoomType;
+    }
+    
+    public void setAllowCreateRoomType(String allowCreateRoomType) {
+        this.allowCreateRoomType = allowCreateRoomType;
+    }
+    
+    public String getSupportMultiPrice() {
+        return supportMultiPrice;
+    }
+    
+    public void setSupportMultiPrice(String supportMultiPrice) {
+        this.supportMultiPrice = supportMultiPrice;
+    }
+    
+    public String getMultiPriceOptions() {
+        return multiPriceOptions;
+    }
+    
+    public void setMultiPriceOptions(String multiPriceOptions) {
+        this.multiPriceOptions = multiPriceOptions;
+    }
+    
+    public String getSupportRoomTypePriceDiff() {
+        return supportRoomTypePriceDiff;
+    }
+    
+    public void setSupportRoomTypePriceDiff(String supportRoomTypePriceDiff) {
+        this.supportRoomTypePriceDiff = supportRoomTypePriceDiff;
+    }
+    
+    public String getSupportPersonPriceDiff() {
+        return supportPersonPriceDiff;
+    }
+    
+    public void setSupportPersonPriceDiff(String supportPersonPriceDiff) {
+        this.supportPersonPriceDiff = supportPersonPriceDiff;
+    }
+    
     public Status getStatus() {
         return status;
     }
@@ -259,14 +320,6 @@ public class Hotel {
     
     public void setUpdatedAt(Date updatedAt) {
         this.updatedAt = updatedAt;
-    }
-    
-    public Group getGroup() {
-        return group;
-    }
-    
-    public void setGroup(Group group) {
-        this.group = group;
     }
     
     public List<RoomType> getRoomTypes() {
@@ -293,21 +346,21 @@ public class Hotel {
         this.personDiffSystems = personDiffSystems;
     }
     
-    public List<RatePlan> getRatePlans() {
-        return ratePlans;
-    }
+    // public List<RatePlan> getRatePlans() {
+    //     return ratePlans;
+    // }
     
-    public void setRatePlans(List<RatePlan> ratePlans) {
-        this.ratePlans = ratePlans;
-    }
+    // public void setRatePlans(List<RatePlan> ratePlans) {
+    //     this.ratePlans = ratePlans;
+    // }
     
-    public List<BasePrice> getBasePrices() {
-        return basePrices;
-    }
+    // public List<BasePrice> getBasePrices() {
+    //     return basePrices;
+    // }
     
-    public void setBasePrices(List<BasePrice> basePrices) {
-        this.basePrices = basePrices;
-    }
+    // public void setBasePrices(List<BasePrice> basePrices) {
+    //     this.basePrices = basePrices;
+    // }
     
     public List<Inventory> getInventories() {
         return inventories;

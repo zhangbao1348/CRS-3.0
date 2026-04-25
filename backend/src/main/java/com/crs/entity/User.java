@@ -7,10 +7,6 @@ import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
 import java.util.Date;
 
-/**
- * 用户实体类
- * 用于认证和用户管理
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,6 +17,9 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+    
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
@@ -34,12 +33,22 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
     
-    @Column(name = "role", nullable = false, length = 20)
-    private String role;
+    @Column(name = "phone", length = 20)
+    private String phone;
+    
+    @Column(name = "avatar", length = 255)
+    private String avatar;
     
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Status status = Status.active;
+    
+    @Column(name = "last_login_time")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date lastLoginTime;
+    
+    @Column(name = "last_login_ip", length = 50)
+    private String lastLoginIp;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
@@ -49,7 +58,6 @@ public class User {
     @Temporal(TemporalType.TIMESTAMP)
     private Date updatedAt = new Date();
     
-    // 状态枚举
     public enum Status {
         active, inactive
     }

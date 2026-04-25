@@ -3,17 +3,16 @@ package com.crs.service.impl;
 import com.crs.entity.ChannelCode;
 import com.crs.repository.ChannelCodeRepository;
 import com.crs.service.ChannelCodeService;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 渠道码服务实现类
- */
 @Service
 public class ChannelCodeServiceImpl implements ChannelCodeService {
 
@@ -22,14 +21,17 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
 
     @Override
     public List<Map<String, Object>> getAllChannelCodesAsTree() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1;
+        }
+        
         try {
-            List<ChannelCode> allChannelCodes = channelCodeRepository.findAll();
+            List<ChannelCode> allChannelCodes = channelCodeRepository.findByTenantId(tenantId);
             List<Map<String, Object>> treeData = new ArrayList<>();
 
-            // 构建树形结构
             for (ChannelCode channelCode : allChannelCodes) {
                 if (channelCode.getParentId() == null) {
-                    // 根节点
                     Map<String, Object> rootNode = buildTreeNode(channelCode);
                     rootNode.put("children", buildChildNodes(channelCode.getId(), allChannelCodes));
                     treeData.add(rootNode);
@@ -38,71 +40,121 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
 
             return treeData;
         } catch (Exception e) {
-            // 如果数据库表不存在或有其他错误，返回默认的树形结构
             e.printStackTrace();
-            return getDefaultChannelCodeTree();
+            return new ArrayList<>();
         }
     }
 
     @Override
-    public List<ChannelCode> getChannelCodesByParentId(Integer parentId) {
-        return channelCodeRepository.findByParentId(parentId);
+    public List<ChannelCode> getChannelCodesByParentId(Integer tenantId, Integer parentId) {
+        Integer currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = 1;
+        }
+        return channelCodeRepository.findByTenantIdAndParentId(currentTenantId, parentId);
     }
 
     @Override
     public ChannelCode getChannelCodeById(Integer id) {
-        return channelCodeRepository.findById(id).orElse(null);
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1;
+        }
+        return channelCodeRepository.findByTenantIdAndId(tenantId, id);
     }
 
     @Override
+    @Transactional
     public ChannelCode createChannelCode(ChannelCode channelCode) {
-        // 暂时不设置level，使用数据库默认值
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1;
+        }
+        channelCode.setTenantId(tenantId);
+        
+        if (channelCode.getParentId() != null) {
+            ChannelCode parent = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getParentId());
+            if (parent != null) {
+                channelCode.setLevel(parent.getLevel() + 1);
+            } else {
+                channelCode.setLevel(1);
+            }
+        } else {
+            channelCode.setLevel(1);
+        }
+        
         return channelCodeRepository.save(channelCode);
     }
 
     @Override
+    @Transactional
     public ChannelCode updateChannelCode(ChannelCode channelCode) {
-        return channelCodeRepository.save(channelCode);
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1;
+        }
+        
+        ChannelCode existing = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getId());
+        if (existing != null) {
+            existing.setName(channelCode.getName());
+            existing.setCode(channelCode.getCode());
+            existing.setDescription(channelCode.getDescription());
+            existing.setStatus(channelCode.getStatus());
+            return channelCodeRepository.save(existing);
+        }
+        return null;
     }
 
     @Override
+    @Transactional
     public void deleteChannelCode(Integer id) {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            tenantId = 1;
+        }
+        
         try {
-            // 递归删除子节点
-            deleteRecursive(id);
+            ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(tenantId, id);
+            if (channelCode != null) {
+                deleteRecursive(id, tenantId);
+            }
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回
             e.printStackTrace();
         }
     }
 
     @Override
-    public boolean isCodeUnique(String code, Integer excludeId) {
+    public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
+        Integer currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = 1;
+        }
+        
         try {
-            ChannelCode existing = channelCodeRepository.findByCode(code);
-            return existing == null || (excludeId != null && existing.getId().equals(excludeId));
+            if (excludeId != null) {
+                return !channelCodeRepository.existsByTenantIdAndCodeAndIdNot(currentTenantId, code, excludeId);
+            } else {
+                ChannelCode existing = channelCodeRepository.findByTenantIdAndCode(currentTenantId, code);
+                return existing == null;
+            }
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回true
             e.printStackTrace();
             return true;
         }
     }
 
-    // 递归删除子节点
-    private void deleteRecursive(Integer parentId) {
+    private void deleteRecursive(Integer parentId, Integer tenantId) {
         try {
-            List<ChannelCode> children = channelCodeRepository.findByParentId(parentId);
+            List<ChannelCode> children = channelCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
             for (ChannelCode child : children) {
-                deleteRecursive(child.getId());
+                deleteRecursive(child.getId(), tenantId);
             }
             channelCodeRepository.deleteById(parentId);
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回
             e.printStackTrace();
         }
     }
 
-    // 构建子节点
     private List<Map<String, Object>> buildChildNodes(Integer parentId, List<ChannelCode> allChannelCodes) {
         List<Map<String, Object>> childNodes = new ArrayList<>();
         for (ChannelCode channelCode : allChannelCodes) {
@@ -118,7 +170,6 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         return childNodes;
     }
 
-    // 构建单个树节点
     private Map<String, Object> buildTreeNode(ChannelCode channelCode) {
         Map<String, Object> node = new HashMap<>();
         node.put("key", channelCode.getId().toString());
@@ -131,98 +182,204 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         return node;
     }
 
-    // 默认渠道码树形结构
-    private List<Map<String, Object>> getDefaultChannelCodeTree() {
-        List<Map<String, Object>> treeData = new ArrayList<>();
+    @Override
+    @Transactional
+    public List<ChannelCode> batchCreateChannelCodes(Integer tenantId, List<ChannelCode> channelCodes) {
+        Integer currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = 1;
+        }
         
-        // 线上渠道
-        Map<String, Object> onlineChannel = new HashMap<>();
-        onlineChannel.put("key", "1");
-        onlineChannel.put("title", "线上渠道");
-        onlineChannel.put("code", "ONLINE_CHANNEL");
-        onlineChannel.put("id", 1);
+        if (tenantId == null) {
+            tenantId = currentTenantId;
+        }
         
-        List<Map<String, Object>> onlineChildren = new ArrayList<>();
+        List<ChannelCode> savedChannelCodes = new ArrayList<>();
         
-        // 分销渠道
-        Map<String, Object> distributionChannel = new HashMap<>();
-        distributionChannel.put("key", "2");
-        distributionChannel.put("title", "分销渠道");
-        distributionChannel.put("code", "DISTRIBUTION");
-        distributionChannel.put("id", 2);
+        for (ChannelCode channelCode : channelCodes) {
+            channelCode.setTenantId(tenantId);
+            
+            if (channelCode.getParentId() != null) {
+                ChannelCode parent = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getParentId());
+                if (parent != null) {
+                    channelCode.setLevel(parent.getLevel() + 1);
+                } else {
+                    channelCode.setLevel(1);
+                }
+            } else {
+                channelCode.setLevel(1);
+            }
+            
+            savedChannelCodes.add(channelCodeRepository.save(channelCode));
+        }
         
-        List<Map<String, Object>> distributionChildren = new ArrayList<>();
-        distributionChildren.add(createDefaultNode("3", "携程分销", "CTRIP_DIST", 3));
-        distributionChildren.add(createDefaultNode("4", "美团分销", "MEITUAN_DIST", 4));
-        distributionChannel.put("children", distributionChildren);
-        
-        // 直销渠道
-        Map<String, Object> directChannel = new HashMap<>();
-        directChannel.put("key", "5");
-        directChannel.put("title", "直销渠道");
-        directChannel.put("code", "DIRECT_CHANNEL");
-        directChannel.put("id", 5);
-        
-        List<Map<String, Object>> directChildren = new ArrayList<>();
-        directChildren.add(createDefaultNode("6", "官网", "WEBSITE", 6));
-        directChildren.add(createDefaultNode("7", "APP", "MOBILE_APP", 7));
-        directChildren.add(createDefaultNode("8", "微信", "WECHAT_CHANNEL", 8));
-        directChannel.put("children", directChildren);
-        
-        onlineChildren.add(distributionChannel);
-        onlineChildren.add(directChannel);
-        onlineChannel.put("children", onlineChildren);
-        
-        // 线下渠道
-        Map<String, Object> offlineChannel = new HashMap<>();
-        offlineChannel.put("key", "9");
-        offlineChannel.put("title", "线下渠道");
-        offlineChannel.put("code", "OFFLINE_CHANNEL");
-        offlineChannel.put("id", 9);
-        
-        List<Map<String, Object>> offlineChildren = new ArrayList<>();
-        
-        // 旅行社渠道
-        Map<String, Object> taChannel = new HashMap<>();
-        taChannel.put("key", "10");
-        taChannel.put("title", "旅行社渠道");
-        taChannel.put("code", "TA_CHANNEL");
-        taChannel.put("id", 10);
-        
-        List<Map<String, Object>> taChildren = new ArrayList<>();
-        taChildren.add(createDefaultNode("11", "国内社", "DOMESTIC_TA_CHANNEL", 11));
-        taChildren.add(createDefaultNode("12", "国际社", "INTL_TA_CHANNEL", 12));
-        taChannel.put("children", taChildren);
-        
-        // 企业渠道
-        Map<String, Object> corpChannel = new HashMap<>();
-        corpChannel.put("key", "13");
-        corpChannel.put("title", "企业渠道");
-        corpChannel.put("code", "CORP_CHANNEL");
-        corpChannel.put("id", 13);
-        
-        List<Map<String, Object>> corpChildren = new ArrayList<>();
-        corpChildren.add(createDefaultNode("14", "协议企业", "AGREEMENT_CORP", 14));
-        corpChildren.add(createDefaultNode("15", "临时企业", "TEMP_CORP", 15));
-        corpChannel.put("children", corpChildren);
-        
-        offlineChildren.add(taChannel);
-        offlineChildren.add(corpChannel);
-        offlineChannel.put("children", offlineChildren);
-        
-        treeData.add(onlineChannel);
-        treeData.add(offlineChannel);
-        
-        return treeData;
+        return savedChannelCodes;
     }
 
-    // 创建默认节点
-    private Map<String, Object> createDefaultNode(String key, String title, String code, Integer id) {
-        Map<String, Object> node = new HashMap<>();
-        node.put("key", key);
-        node.put("title", title);
-        node.put("code", code);
-        node.put("id", id);
-        return node;
+    @Override
+    @Transactional
+    public List<ChannelCode> initDefaultChannelCodesForTenant(Integer tenantId) {
+        Integer currentTenantId = TenantContext.getTenantId();
+        if (currentTenantId == null) {
+            currentTenantId = 1;
+        }
+        
+        if (tenantId == null) {
+            tenantId = currentTenantId;
+        }
+        
+        List<ChannelCode> defaultCodes = new ArrayList<>();
+        
+        ChannelCode online = new ChannelCode();
+        online.setTenantId(tenantId);
+        online.setCode("ONLINE");
+        online.setName("在线渠道");
+        online.setDescription("在线销售渠道");
+        online.setParentId(null);
+        online.setLevel(1);
+        online.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(online));
+        
+        ChannelCode offline = new ChannelCode();
+        offline.setTenantId(tenantId);
+        offline.setCode("OFFLINE");
+        offline.setName("线下渠道");
+        offline.setDescription("线下销售渠道");
+        offline.setParentId(null);
+        offline.setLevel(1);
+        offline.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(offline));
+        
+        ChannelCode ota = new ChannelCode();
+        ota.setTenantId(tenantId);
+        ota.setCode("OTA");
+        ota.setName("OTA渠道");
+        ota.setDescription("在线旅行社渠道");
+        ota.setParentId(online.getId());
+        ota.setLevel(2);
+        ota.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(ota));
+        
+        ChannelCode direct = new ChannelCode();
+        direct.setTenantId(tenantId);
+        direct.setCode("DIRECT");
+        direct.setName("直销渠道");
+        direct.setDescription("直接销售渠道");
+        direct.setParentId(online.getId());
+        direct.setLevel(2);
+        direct.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(direct));
+        
+        ChannelCode travel = new ChannelCode();
+        travel.setTenantId(tenantId);
+        travel.setCode("TRAVEL");
+        travel.setName("旅行社");
+        travel.setDescription("旅行社渠道");
+        travel.setParentId(offline.getId());
+        travel.setLevel(2);
+        travel.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(travel));
+        
+        ChannelCode corp = new ChannelCode();
+        corp.setTenantId(tenantId);
+        corp.setCode("CORP");
+        corp.setName("企业协议");
+        corp.setDescription("企业协议渠道");
+        corp.setParentId(offline.getId());
+        corp.setLevel(2);
+        corp.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(corp));
+        
+        ChannelCode ctrip = new ChannelCode();
+        ctrip.setTenantId(tenantId);
+        ctrip.setCode("CTRIP");
+        ctrip.setName("携程");
+        ctrip.setDescription("携程旅行网");
+        ctrip.setParentId(ota.getId());
+        ctrip.setLevel(3);
+        ctrip.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(ctrip));
+        
+        ChannelCode meituan = new ChannelCode();
+        meituan.setTenantId(tenantId);
+        meituan.setCode("MEITUAN");
+        meituan.setName("美团");
+        meituan.setDescription("美团酒店");
+        meituan.setParentId(ota.getId());
+        meituan.setLevel(3);
+        meituan.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(meituan));
+        
+        ChannelCode fliggy = new ChannelCode();
+        fliggy.setTenantId(tenantId);
+        fliggy.setCode("FLIGGY");
+        fliggy.setName("飞猪");
+        fliggy.setDescription("飞猪旅行");
+        fliggy.setParentId(ota.getId());
+        fliggy.setLevel(3);
+        fliggy.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(fliggy));
+        
+        ChannelCode website = new ChannelCode();
+        website.setTenantId(tenantId);
+        website.setCode("WEBSITE");
+        website.setName("官网");
+        website.setDescription("官方网站");
+        website.setParentId(direct.getId());
+        website.setLevel(3);
+        website.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(website));
+        
+        ChannelCode app = new ChannelCode();
+        app.setTenantId(tenantId);
+        app.setCode("APP");
+        app.setName("APP");
+        app.setDescription("手机应用");
+        app.setParentId(direct.getId());
+        app.setLevel(3);
+        app.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(app));
+        
+        ChannelCode callcenter = new ChannelCode();
+        callcenter.setTenantId(tenantId);
+        callcenter.setCode("CALLCENTER");
+        callcenter.setName("呼叫中心");
+        callcenter.setDescription("电话预订");
+        callcenter.setParentId(direct.getId());
+        callcenter.setLevel(3);
+        callcenter.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(callcenter));
+        
+        ChannelCode fortune500 = new ChannelCode();
+        fortune500.setTenantId(tenantId);
+        fortune500.setCode("FORTUNE500");
+        fortune500.setName("世界500强");
+        fortune500.setDescription("世界500强企业协议");
+        fortune500.setParentId(corp.getId());
+        fortune500.setLevel(3);
+        fortune500.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(fortune500));
+        
+        ChannelCode gov = new ChannelCode();
+        gov.setTenantId(tenantId);
+        gov.setCode("GOV");
+        gov.setName("政府协议");
+        gov.setDescription("政府机关协议");
+        gov.setParentId(corp.getId());
+        gov.setLevel(3);
+        gov.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(gov));
+        
+        ChannelCode mice = new ChannelCode();
+        mice.setTenantId(tenantId);
+        mice.setCode("MICE");
+        mice.setName("MICE协议");
+        mice.setDescription("会议展览协议");
+        mice.setParentId(corp.getId());
+        mice.setLevel(3);
+        mice.setStatus(ChannelCode.Status.active);
+        defaultCodes.add(channelCodeRepository.save(mice));
+        
+        return defaultCodes;
     }
 }

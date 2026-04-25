@@ -18,13 +18,14 @@ const { TextArea } = Input
  * @param {string} props.title - 页面标题
  * @param {Array} props.initialData - 初始树状数据
  * @param {string} props.codeName - 编码名称（如"市场码"、"渠道码"、"来源码"）
+ * @param {boolean} props.showAddChild - 是否显示新增子节点按钮（默认true）
  * @param {Object} props.customMethods - 自定义方法（可选）
  * @param {Function} props.customMethods.addNode - 新增节点方法
  * @param {Function} props.customMethods.updateNode - 更新节点方法
  * @param {Function} props.customMethods.deleteNode - 删除节点方法
  * @param {Function} props.customMethods.checkCodeUnique - 检查CODE是否唯一方法
  */
-const TreeManagement = ({ title, initialData = [], codeName = '编码', customMethods = {} }) => {
+const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddChild = true, customMethods = {} }) => {
   // 状态管理
   const [treeData, setTreeData] = useState(initialData)
   const [selectedKeys, setSelectedKeys] = useState([])
@@ -184,11 +185,11 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', customMe
             // 新增节点
             if (customMethods.addNode) {
               // 使用自定义方法新增节点
-              const parentKey = selectedKeys.length > 0 ? selectedKeys[0] : null
-              const newNode = await customMethods.addNode(parentKey, {
-                title: values.title,
-                code: values.code
-              })
+                const parentKey = selectedKeys.length > 0 ? selectedKeys[0] : null
+                const newNode = await customMethods.addNode(parentKey, {
+                  title: values.title,
+                  code: values.code
+                })
               
               if (selectedKeys.length > 0) {
                 // 在选中节点下新增子节点
@@ -333,19 +334,21 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', customMe
           >
             新增根节点
           </Button>
-          <Button 
-            type="default" 
-            icon={<PlusCircleOutlined />} 
-            onClick={() => {
-              if (selectedKeys.length === 0) {
-                message.warning('请先选择父节点')
-                return
-              }
-              showModal('add')
-            }}
-          >
-            新增子节点
-          </Button>
+          {showAddChild && (
+            <Button 
+              type="default" 
+              icon={<PlusCircleOutlined />} 
+              onClick={() => {
+                if (selectedKeys.length === 0) {
+                  message.warning('请先选择父节点')
+                  return
+                }
+                showModal('add')
+              }}
+            >
+              新增子节点
+            </Button>
+          )}
           <Button 
             type="default" 
             icon={<ReloadOutlined />} 
@@ -452,7 +455,7 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', customMe
             label={`${codeName}CODE`}
             rules={[
               { required: true, message: `请输入${codeName}CODE` },
-              { pattern: /^[a-zA-Z0-9-_]+$/, message: `${codeName}CODE只能包含字母、数字、-和_` },
+              { pattern: /^[A-Za-z0-9_]+$/, message: `${codeName}CODE只能包含英文字母、数字和下划线` },
               { validator: validateCodeUnique, message: `${codeName}CODE已存在` }
             ]}
           >

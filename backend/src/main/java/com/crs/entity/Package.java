@@ -22,6 +22,9 @@ public class Package {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
+    @Column(name = "tenant_id", nullable = false)
+    private Integer tenantId;
+    
     @Column(name = "code", nullable = false, unique = true, length = 50)
     private String code;
     
@@ -55,14 +58,6 @@ public class Package {
     
     @Column(name = "tax_included", nullable = false)
     private Boolean taxIncluded = false; // 是否含税
-    
-    @Column(name = "start_date")
-    @Temporal(TemporalType.DATE)
-    private Date startDate; // 开始日期
-    
-    @Column(name = "end_date")
-    @Temporal(TemporalType.DATE)
-    private Date endDate; // 结束日期
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)

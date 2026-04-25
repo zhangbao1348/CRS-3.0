@@ -18,7 +18,7 @@ public interface ChannelCodeService {
     /**
      * 根据父ID获取渠道码
      */
-    List<ChannelCode> getChannelCodesByParentId(Integer parentId);
+    List<ChannelCode> getChannelCodesByParentId(Integer tenantId, Integer parentId);
 
     /**
      * 根据ID获取渠道码
@@ -43,5 +43,15 @@ public interface ChannelCodeService {
     /**
      * 检查渠道码CODE是否唯一
      */
-    boolean isCodeUnique(String code, Integer excludeId);
+    boolean isCodeUnique(Integer tenantId, String code, Integer excludeId);
+
+    /**
+     * 批量创建渠道码（按租户）
+     */
+    List<ChannelCode> batchCreateChannelCodes(Integer tenantId, List<ChannelCode> channelCodes);
+
+    /**
+     * 为指定租户初始化默认渠道码
+     */
+    List<ChannelCode> initDefaultChannelCodesForTenant(Integer tenantId);
 }

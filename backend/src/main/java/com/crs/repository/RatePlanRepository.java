@@ -27,7 +27,7 @@ public interface RatePlanRepository extends JpaRepository<RatePlan, Integer> {
      * @param status 状态
      * @return 价格计划列表
      */
-    List<RatePlan> findByHotelIdAndStatus(Integer hotelId, RatePlan.Status status);
+    List<RatePlan> findByHotelIdAndStatus(Integer hotelId, String status);
     
     /**
      * 根据酒店ID和价格计划代码查询价格计划
@@ -38,39 +38,11 @@ public interface RatePlanRepository extends JpaRepository<RatePlan, Integer> {
     Optional<RatePlan> findByHotelIdAndRateCode(Integer hotelId, String rateCode);
     
     /**
-     * 根据价格计划类型查询价格计划列表
-     * @param type 价格计划类型
+     * 根据集团房价码ID查询价格计划列表
+     * @param sourceGroupRateCodeId 集团房价码ID
      * @return 价格计划列表
      */
-    List<RatePlan> findByType(String type);
-    
-    /**
-     * 根据父级价格计划代码查询价格计划列表
-     * @param parentRateCode 父级价格计划代码
-     * @return 价格计划列表
-     */
-    List<RatePlan> findByParentRateCode(String parentRateCode);
-    
-    /**
-     * 根据市场码ID查询价格计划列表
-     * @param marketCodeId 市场码ID
-     * @return 价格计划列表
-     */
-    List<RatePlan> findByMarketCodeId(Integer marketCodeId);
-    
-    /**
-     * 根据渠道码ID查询价格计划列表
-     * @param channelCodeId 渠道码ID
-     * @return 价格计划列表
-     */
-    List<RatePlan> findByChannelCodeId(Integer channelCodeId);
-    
-    /**
-     * 根据状态查询价格计划
-     * @param status 状态
-     * @return 价格计划列表
-     */
-    List<RatePlan> findByStatus(RatePlan.Status status);
+    List<RatePlan> findBySourceGroupRateCodeId(Integer sourceGroupRateCodeId);
     
     /**
      * 检查酒店内价格计划代码是否存在
@@ -79,4 +51,25 @@ public interface RatePlanRepository extends JpaRepository<RatePlan, Integer> {
      * @return 是否存在
      */
     boolean existsByHotelIdAndRateCode(Integer hotelId, String rateCode);
+    
+    /**
+     * 检查酒店内价格计划代码是否存在（排除指定ID）
+     * @param hotelId 酒店ID
+     * @param rateCode 价格计划代码
+     * @param id 排除的价格计划ID
+     * @return 是否存在
+     */
+    boolean existsByHotelIdAndRateCodeAndIdNot(Integer hotelId, String rateCode, Integer id);
+    
+    /**
+     * 根据酒店代码查询价格计划列表
+     * @param hotelCode 酒店代码
+     * @return 价格计划列表
+     */
+    List<RatePlan> findByHotelCode(String hotelCode);
+    
+    /**
+     * 根据酒店代码和父级房价码代码查询衍生价格计划
+     */
+    List<RatePlan> findByHotelCodeAndParentRateCodeAndStatus(String hotelCode, String parentRateCode, String status);
 }

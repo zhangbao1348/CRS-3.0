@@ -65,4 +65,11 @@ public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
      * @return 是否存在
      */
     boolean existsByHotelIdAndCode(Integer hotelId, String code);
+    
+    /**
+     * 根据酒店代码查询房型列表
+     * @param hotelCode 酒店代码
+     * @return 房型列表
+     */
+    List<RoomType> findByHotelCode(String hotelCode);
 }

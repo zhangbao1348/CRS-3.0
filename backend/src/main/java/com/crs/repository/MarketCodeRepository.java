@@ -13,12 +13,22 @@ import java.util.List;
 public interface MarketCodeRepository extends JpaRepository<MarketCode, Integer> {
 
     /**
-     * 根据父ID查询市场码
+     * 根据租户ID查询所有市场码
      */
-    List<MarketCode> findByParentId(Integer parentId);
+    List<MarketCode> findByTenantId(Integer tenantId);
 
     /**
-     * 根据CODE查询市场码
+     * 根据租户ID和父ID查询市场码
      */
-    MarketCode findByCode(String code);
+    List<MarketCode> findByTenantIdAndParentId(Integer tenantId, Integer parentId);
+
+    /**
+     * 根据租户ID和CODE查询市场码
+     */
+    MarketCode findByTenantIdAndCode(Integer tenantId, String code);
+
+    /**
+     * 根据租户ID和级别查询市场码
+     */
+    List<MarketCode> findByTenantIdAndLevel(Integer tenantId, Integer level);
 }

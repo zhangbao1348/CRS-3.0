@@ -15,6 +15,21 @@ import java.util.Optional;
 public interface RateTypeRepository extends JpaRepository<RateType, Integer> {
     
     /**
+     * 根据租户ID查询所有房价大类
+     */
+    List<RateType> findByTenantId(Integer tenantId);
+    
+    /**
+     * 根据租户ID和状态查询房价大类
+     */
+    List<RateType> findByTenantIdAndStatus(Integer tenantId, RateType.Status status);
+    
+    /**
+     * 根据租户ID和代码查询房价大类
+     */
+    RateType findByTenantIdAndCode(Integer tenantId, String code);
+    
+    /**
      * 根据价格类型代码查询价格类型
      * @param code 价格类型代码
      * @return 价格类型信息

@@ -25,14 +25,26 @@ public class Inventory {
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
     
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
+    
     @Column(name = "rate_plan_id", nullable = false)
     private Integer ratePlanId;
+    
+    @Column(name = "rate_plan_code", length = 50)
+    private String ratePlanCode;
     
     @Column(name = "room_type_id", nullable = false)
     private Integer roomTypeId;
     
+    @Column(name = "room_type_code", length = 50)
+    private String roomTypeCode;
+    
     @Column(name = "channel_id")
     private Integer channelId;
+    
+    @Column(name = "channel_code", length = 50)
+    private String channelCode;
     
     @Column(name = "date", nullable = false)
     @Temporal(TemporalType.DATE)

@@ -22,19 +22,19 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
     Optional<Hotel> findByHotelCode(String hotelCode);
     
     /**
-     * 根据集团ID查询酒店列表
-     * @param groupId 集团ID
+     * 根据租户ID查询酒店列表
+     * @param tenantId 租户ID
      * @return 酒店列表
      */
-    List<Hotel> findByGroupId(Integer groupId);
+    List<Hotel> findByTenantId(Integer tenantId);
     
     /**
-     * 根据集团ID和状态查询酒店列表
-     * @param groupId 集团ID
+     * 根据租户ID和状态查询酒店列表
+     * @param tenantId 租户ID
      * @param status 状态
      * @return 酒店列表
      */
-    List<Hotel> findByGroupIdAndStatus(Integer groupId, Hotel.Status status);
+    List<Hotel> findByTenantIdAndStatus(Integer tenantId, Hotel.Status status);
     
     /**
      * 根据酒店名称查询酒店
@@ -63,12 +63,4 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
      * @return 是否存在
      */
     boolean existsByHotelCode(String hotelCode);
-    
-    /**
-     * 根据集团ID和酒店代码查询酒店
-     * @param groupId 集团ID
-     * @param hotelCode 酒店代码
-     * @return 酒店信息
-     */
-    Optional<Hotel> findByGroupIdAndHotelCode(Integer groupId, String hotelCode);
 }

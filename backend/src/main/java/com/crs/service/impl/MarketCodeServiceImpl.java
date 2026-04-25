@@ -7,13 +7,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 市场码服务实现类
- */
 @Service
 public class MarketCodeServiceImpl implements MarketCodeService {
 
@@ -21,21 +19,18 @@ public class MarketCodeServiceImpl implements MarketCodeService {
     private MarketCodeRepository marketCodeRepository;
 
     @Override
-    public List<Map<String, Object>> getAllMarketCodesAsTree() {
+    public List<Map<String, Object>> getAllMarketCodesAsTree(Integer tenantId) {
         try {
-            List<MarketCode> allMarketCodes = marketCodeRepository.findAll();
+            List<MarketCode> allMarketCodes = marketCodeRepository.findByTenantId(tenantId);
             Map<Integer, MarketCode> marketCodeMap = new HashMap<>();
             List<Map<String, Object>> treeData = new ArrayList<>();
 
-            // 构建市场码映射
             for (MarketCode marketCode : allMarketCodes) {
                 marketCodeMap.put(marketCode.getId(), marketCode);
             }
 
-            // 构建树形结构
             for (MarketCode marketCode : allMarketCodes) {
                 if (marketCode.getParentId() == null) {
-                    // 根节点
                     Map<String, Object> rootNode = buildTreeNode(marketCode);
                     rootNode.put("children", buildChildNodes(marketCode.getId(), allMarketCodes));
                     treeData.add(rootNode);
@@ -44,17 +39,14 @@ public class MarketCodeServiceImpl implements MarketCodeService {
 
             return treeData;
         } catch (Exception e) {
-            // 如果数据库表不存在或有其他错误，返回默认的树形结构
             e.printStackTrace();
             return getDefaultMarketCodeTree();
         }
     }
 
-    // 默认市场码树形结构
     private List<Map<String, Object>> getDefaultMarketCodeTree() {
         List<Map<String, Object>> treeData = new ArrayList<>();
         
-        // 线上市场
         Map<String, Object> onlineMarket = new HashMap<>();
         onlineMarket.put("key", "1");
         onlineMarket.put("title", "线上市场");
@@ -63,7 +55,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         
         List<Map<String, Object>> onlineChildren = new ArrayList<>();
         
-        // OTA平台
         Map<String, Object> otaPlatform = new HashMap<>();
         otaPlatform.put("key", "2");
         otaPlatform.put("title", "OTA平台");
@@ -76,7 +67,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         otaChildren.add(createDefaultNode("5", "飞猪", "FLIGGY", 5));
         otaPlatform.put("children", otaChildren);
         
-        // 直销平台
         Map<String, Object> directPlatform = new HashMap<>();
         directPlatform.put("key", "6");
         directPlatform.put("title", "直销平台");
@@ -92,7 +82,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         onlineChildren.add(directPlatform);
         onlineMarket.put("children", onlineChildren);
         
-        // 线下市场
         Map<String, Object> offlineMarket = new HashMap<>();
         offlineMarket.put("key", "9");
         offlineMarket.put("title", "线下市场");
@@ -101,7 +90,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         
         List<Map<String, Object>> offlineChildren = new ArrayList<>();
         
-        // 旅行社
         Map<String, Object> travelAgency = new HashMap<>();
         travelAgency.put("key", "10");
         travelAgency.put("title", "旅行社");
@@ -113,7 +101,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         agencyChildren.add(createDefaultNode("12", "国际旅行社", "INTERNATIONAL_TA", 12));
         travelAgency.put("children", agencyChildren);
         
-        // 企业客户
         Map<String, Object> corporateClient = new HashMap<>();
         corporateClient.put("key", "13");
         corporateClient.put("title", "企业客户");
@@ -135,7 +122,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         return treeData;
     }
 
-    // 创建默认节点
     private Map<String, Object> createDefaultNode(String key, String title, String code, Integer id) {
         Map<String, Object> node = new HashMap<>();
         node.put("key", key);
@@ -146,75 +132,81 @@ public class MarketCodeServiceImpl implements MarketCodeService {
     }
 
     @Override
-    public List<MarketCode> getMarketCodesByParentId(Integer parentId) {
-        return marketCodeRepository.findByParentId(parentId);
+    public List<MarketCode> getMarketCodesByParentId(Integer tenantId, Integer parentId) {
+        return marketCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
     }
 
     @Override
-    public MarketCode getMarketCodeById(Integer id) {
-        return marketCodeRepository.findById(id).orElse(null);
-    }
-
-    @Override
-    public MarketCode createMarketCode(MarketCode marketCode) {
-        // 暂时不设置level，使用数据库默认值
-        // 计算层级
-        /*if (marketCode.getParentId() != null) {
-            MarketCode parent = marketCodeRepository.findById(marketCode.getParentId()).orElse(null);
-            if (parent != null) {
-                marketCode.setLevel(parent.getLevel() + 1);
-            } else {
-                marketCode.setLevel(1);
-            }
-        } else {
-            marketCode.setLevel(1);
-        }*/
-        return marketCodeRepository.save(marketCode);
-    }
-
-    @Override
-    public MarketCode updateMarketCode(MarketCode marketCode) {
-        return marketCodeRepository.save(marketCode);
-    }
-
-    @Override
-    public void deleteMarketCode(Integer id) {
+    public List<MarketCode> getThirdLevelMarketCodes(Integer tenantId) {
         try {
-            // 递归删除子节点
-            deleteRecursive(id);
+            // 从数据库获取第三级市场码
+            List<MarketCode> thirdLevelCodes = marketCodeRepository.findByTenantIdAndLevel(tenantId, 3);
+            return thirdLevelCodes;
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+
+
+    @Override
+    public MarketCode getMarketCodeById(Integer tenantId, Integer id) {
+        MarketCode marketCode = marketCodeRepository.findById(id).orElse(null);
+        if (marketCode != null && marketCode.getTenantId() != null && marketCode.getTenantId().equals(tenantId)) {
+            return marketCode;
+        }
+        return null;
+    }
+
+    @Override
+    public MarketCode createMarketCode(Integer tenantId, MarketCode marketCode) {
+        marketCode.setTenantId(tenantId);
+        return marketCodeRepository.save(marketCode);
+    }
+
+    @Override
+    public MarketCode updateMarketCode(Integer tenantId, MarketCode marketCode) {
+        MarketCode existing = getMarketCodeById(tenantId, marketCode.getId());
+        if (existing != null) {
+            marketCode.setTenantId(tenantId);
+            return marketCodeRepository.save(marketCode);
+        }
+        return null;
+    }
+
+    @Override
+    public void deleteMarketCode(Integer tenantId, Integer id) {
+        try {
+            deleteRecursive(tenantId, id);
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     @Override
-    public boolean isCodeUnique(String code, Integer excludeId) {
+    public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
         try {
-            MarketCode existing = marketCodeRepository.findByCode(code);
+            MarketCode existing = marketCodeRepository.findByTenantIdAndCode(tenantId, code);
             return existing == null || (excludeId != null && existing.getId().equals(excludeId));
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回true
             e.printStackTrace();
             return true;
         }
     }
 
-    // 递归删除子节点
-    private void deleteRecursive(Integer parentId) {
+    private void deleteRecursive(Integer tenantId, Integer parentId) {
         try {
-            List<MarketCode> children = marketCodeRepository.findByParentId(parentId);
+            List<MarketCode> children = marketCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
             for (MarketCode child : children) {
-                deleteRecursive(child.getId());
+                deleteRecursive(tenantId, child.getId());
             }
             marketCodeRepository.deleteById(parentId);
         } catch (Exception e) {
-            // 如果数据库操作失败，直接返回
             e.printStackTrace();
         }
     }
 
-    // 构建子节点
     private List<Map<String, Object>> buildChildNodes(Integer parentId, List<MarketCode> allMarketCodes) {
         List<Map<String, Object>> childNodes = new ArrayList<>();
         for (MarketCode marketCode : allMarketCodes) {
@@ -230,7 +222,6 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         return childNodes;
     }
 
-    // 构建单个树节点
     private Map<String, Object> buildTreeNode(MarketCode marketCode) {
         Map<String, Object> node = new HashMap<>();
         node.put("key", marketCode.getId().toString());

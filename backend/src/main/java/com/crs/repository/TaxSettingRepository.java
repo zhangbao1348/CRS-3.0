@@ -14,16 +14,25 @@ import java.util.List;
 public interface TaxSettingRepository extends JpaRepository<TaxSetting, Integer> {
     
     /**
-     * 根据税率类型查询税率设置
-     * @param taxType 税率类型
+     * 根据租户ID查询所有税率设置
+     * @param tenantId 租户ID
      * @return 税率设置列表
      */
-    List<TaxSetting> findByTaxType(String taxType);
+    List<TaxSetting> findByTenantId(Integer tenantId);
     
     /**
-     * 根据状态查询税率设置
+     * 根据租户ID和税率编码查询
+     * @param tenantId 租户ID
+     * @param taxCode 税率编码
+     * @return 税率设置
+     */
+    TaxSetting findByTenantIdAndTaxCode(Integer tenantId, String taxCode);
+    
+    /**
+     * 根据租户ID和状态查询
+     * @param tenantId 租户ID
      * @param status 状态
      * @return 税率设置列表
      */
-    List<TaxSetting> findByStatus(TaxSetting.Status status);
+    List<TaxSetting> findByTenantIdAndStatus(Integer tenantId, String status);
 }

@@ -25,8 +25,14 @@ public class RatePlanPackage {
     @Column(name = "rate_plan_id", nullable = false)
     private Integer ratePlanId;
     
+    @Column(name = "rate_plan_code", length = 50)
+    private String ratePlanCode;
+    
     @Column(name = "package_id", nullable = false)
     private Integer packageId;
+    
+    @Column(name = "package_code", length = 50)
+    private String packageCode;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)

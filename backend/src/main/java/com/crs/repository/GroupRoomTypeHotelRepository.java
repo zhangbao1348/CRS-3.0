@@ -2,15 +2,15 @@ package com.crs.repository;
 
 import com.crs.entity.GroupRoomTypeHotel;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
-/**
- * 集团房型和酒店关联仓库接口
- * 用于处理集团房型和酒店关联表的数据库操作
- */
 @Repository
 public interface GroupRoomTypeHotelRepository extends JpaRepository<GroupRoomTypeHotel, Integer> {
     
@@ -51,4 +51,13 @@ public interface GroupRoomTypeHotelRepository extends JpaRepository<GroupRoomTyp
      * @return 是否存在
      */
     boolean existsByGroupRoomTypeIdAndHotelId(Integer groupRoomTypeId, Integer hotelId);
+    
+    /**
+     * 根据集团房型ID删除所有关联
+     * @param groupRoomTypeId 集团房型ID
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeId = :groupRoomTypeId")
+    void deleteByGroupRoomTypeId(@Param("groupRoomTypeId") Integer groupRoomTypeId);
 }

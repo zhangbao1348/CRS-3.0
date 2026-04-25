@@ -28,6 +28,9 @@ public class RoomTypeDiff {
     @Column(name = "room_type_id", nullable = false)
     private Integer roomTypeId;
     
+    @Column(name = "room_type_code", length = 50)
+    private String roomTypeCode;
+    
     @Column(name = "code", nullable = false, length = 50)
     private String code;
     

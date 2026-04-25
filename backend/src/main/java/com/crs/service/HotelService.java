@@ -47,12 +47,22 @@ public class HotelService {
     }
     
     /**
-     * 根据集团ID获取酒店列表
-     * @param groupId 集团ID
+     * 根据租户ID获取酒店列表
+     * @param tenantId 租户ID
      * @return 酒店列表
      */
-    public List<Hotel> getHotelsByGroupId(Integer groupId) {
-        return hotelRepository.findByGroupId(groupId);
+    public List<Hotel> getHotelsByTenantId(Integer tenantId) {
+        return hotelRepository.findByTenantId(tenantId);
+    }
+    
+    /**
+     * 根据租户ID和状态获取酒店列表
+     * @param tenantId 租户ID
+     * @param status 状态
+     * @return 酒店列表
+     */
+    public List<Hotel> getHotelsByTenantIdAndStatus(Integer tenantId, Hotel.Status status) {
+        return hotelRepository.findByTenantIdAndStatus(tenantId, status);
     }
     
     /**
@@ -64,11 +74,6 @@ public class HotelService {
         // 检查酒店代码是否已存在
         if (hotelRepository.existsByHotelCode(hotel.getHotelCode())) {
             throw new RuntimeException("Hotel code already exists");
-        }
-        
-        // 为group_id设置默认值，避免数据库约束错误
-        if (hotel.getGroupId() == null) {
-            hotel.setGroupId(1); // 设置默认集团ID为1
         }
         
         return hotelRepository.save(hotel);
@@ -84,11 +89,12 @@ public class HotelService {
         Hotel existingHotel = hotelRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Hotel not found"));
         
-        // 酒店代码不允许修改，不需要检查代码变更
-        
         // 酒店代码不允许修改，保留原有代码
         // existingHotel.setHotelCode(hotel.getHotelCode());
-        existingHotel.setGroupId(hotel.getGroupId());
+        
+        // 租户ID不允许修改，保留原有租户归属
+        // existingHotel.setTenantId(hotel.getTenantId());
+        
         existingHotel.setChineseName(hotel.getChineseName());
         existingHotel.setEnglishName(hotel.getEnglishName());
         existingHotel.setStarRating(hotel.getStarRating());
@@ -102,6 +108,26 @@ public class HotelService {
         existingHotel.setIntroduction(hotel.getIntroduction());
         existingHotel.setTotalRooms(hotel.getTotalRooms());
         existingHotel.setStatus(hotel.getStatus());
+        
+        // 更新酒店管控字段
+        if (hotel.getAllowCreateRateCode() != null) {
+            existingHotel.setAllowCreateRateCode(hotel.getAllowCreateRateCode());
+        }
+        if (hotel.getAllowCreateRoomType() != null) {
+            existingHotel.setAllowCreateRoomType(hotel.getAllowCreateRoomType());
+        }
+        if (hotel.getSupportMultiPrice() != null) {
+            existingHotel.setSupportMultiPrice(hotel.getSupportMultiPrice());
+        }
+        if (hotel.getMultiPriceOptions() != null) {
+            existingHotel.setMultiPriceOptions(hotel.getMultiPriceOptions());
+        }
+        if (hotel.getSupportRoomTypePriceDiff() != null) {
+            existingHotel.setSupportRoomTypePriceDiff(hotel.getSupportRoomTypePriceDiff());
+        }
+        if (hotel.getSupportPersonPriceDiff() != null) {
+            existingHotel.setSupportPersonPriceDiff(hotel.getSupportPersonPriceDiff());
+        }
         
         return hotelRepository.save(existingHotel);
     }

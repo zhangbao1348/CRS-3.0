@@ -4,6 +4,8 @@ import { ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { router } from './router'
 import { HotelProvider } from './contexts/HotelContext.jsx'
+import { AuthProvider } from './contexts/AuthContext.jsx'
+import { TenantProvider } from './contexts/TenantContext.jsx'
 
 // 自定义主题配置
 const themeConfig = {
@@ -45,9 +47,13 @@ function App() {
       locale={zhCN}
       theme={themeConfig}
     >
-      <HotelProvider>
-        <RouterProvider router={router} />
-      </HotelProvider>
+      <AuthProvider>
+        <TenantProvider>
+          <HotelProvider>
+            <RouterProvider router={router} />
+          </HotelProvider>
+        </TenantProvider>
+      </AuthProvider>
     </ConfigProvider>
   )
 }

@@ -1,453 +1,555 @@
-import React, { useState } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, DatePicker, Tag, Tooltip, Modal, Tabs } from 'antd'
-import {
-  SearchOutlined,
-  ExportOutlined,
-  EyeOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloseCircleOutlined,
-  FilterOutlined,
-  PlusOutlined,
-  FileTextOutlined
-} from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Card, Typography, Form, Input, Select, Button, Table, Space, Tag, Checkbox, message, Badge } from 'antd'
+import { SearchOutlined, ReloadOutlined, ExportOutlined, DownOutlined, PhoneOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, GlobalOutlined, ShoppingOutlined, HomeOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 
+const { Title, Text } = Typography
 const { Option } = Select
-const { RangePicker } = DatePicker
-const { TabPane } = Tabs
-
-// 模拟订单数据 - 扩展为20条记录
-const mockOrders = Array.from({ length: 20 }, (_, index) => {
-  // 基础信息
-  const id = index + 1
-  const orderNo = `11281447904909777_${id}`
-  const confirmationNo = `FMNJCC/J0251231_YFNJCC_000113${String(1198 + index).padStart(5, '0')}`
-  const internalNo = `GPPCU161813${String(184 + index).padStart(3, '0')}`
-  const pmsNo = internalNo
-  
-  // 随机生成日期和时间
-  const baseDate = new Date(2025, 11, 28 + Math.floor(Math.random() * 10))
-  const orderTime = baseDate.toISOString().replace('T', ' ').substring(0, 19)
-  const checkinDate = new Date(baseDate)
-  checkinDate.setDate(checkinDate.getDate() + Math.floor(Math.random() * 3))
-  const checkoutDate = new Date(checkinDate)
-  checkoutDate.setDate(checkoutDate.getDate() + (Math.floor(Math.random() * 3) + 1))
-  
-  // 随机生成状态、渠道等
-  const statuses = ['已确认', '已入住', '待确认', '已取消']
-  const channels = ['携程', '美团', '飞猪', 'Booking.com', 'Agoda']
-  const roomTypes = ['标准大床房', '豪华大床房', '探索大床房', '探索双床房', '好眠大床房', '探索家庭房', '探索大床套间']
-  const paymentMethods = ['在线支付', '到店支付', '信用卡担保']
-  const bookingSources = ['OTA', '国际OTA', '官网']
-  const specialRequests = ['无特殊要求', '需要无烟房', '需要婴儿床', '需要连通房', '需要高楼层', '需要安静房间']
-  
-  const status = statuses[index % 4]
-  const channel = channels[Math.floor(Math.random() * channels.length)]
-  const roomType = roomTypes[Math.floor(Math.random() * roomTypes.length)]
-  const paymentMethod = paymentMethods[Math.floor(Math.random() * paymentMethods.length)]
-  const bookingSource = channel.includes('OTA') ? 'OTA' : '国际OTA'
-  const specialRequest = specialRequests[Math.floor(Math.random() * specialRequests.length)]
-  
-  // 随机生成客人信息和价格
-  const guestNames = ['张**', '李**', '王**', '刘**', '陈**', '杨**', '赵**', '黄**', '周**', '吴**', 'Smith John', 'Johnson Mary', 'Williams David']
-  const guestName = guestNames[Math.floor(Math.random() * guestNames.length)]
-  const guestPhone = guestName.includes('**') ? `${135 + Math.floor(Math.random() * 10)}****${Math.floor(Math.random() * 10000)}` : `+${Math.floor(Math.random() * 9)}****${Math.floor(Math.random() * 10000)}`
-  const adults = Math.floor(Math.random() * 4) + 1
-  const children = Math.floor(Math.random() * 3)
-  const totalPrice = parseFloat((Math.random() * 600 + 396).toFixed(2))
-  
-  return {
-    id,
-    orderNo,
-    status,
-    channel,
-    orderTime,
-    checkinDate: checkinDate.toISOString().split('T')[0],
-    checkoutDate: checkoutDate.toISOString().split('T')[0],
-    totalPrice,
-    roomType,
-    guestName,
-    guestPhone,
-    adults,
-    children,
-    paymentMethod,
-    bookingSource,
-    specialRequests: specialRequest,
-    confirmationNo,
-    internalNo,
-    pmsNo
-  }
-})
-
-// 订单状态配置
-const orderStatusConfig = {
-  '已确认': { color: 'green', icon: <CheckCircleOutlined />, text: '已确认' },
-  '已入住': { color: 'blue', icon: <ClockCircleOutlined />, text: '已入住' },
-  '待确认': { color: 'orange', icon: <ClockCircleOutlined />, text: '待确认' },
-  '已取消': { color: 'red', icon: <CloseCircleOutlined />, text: '已取消' }
-}
 
 const ReservationList = () => {
-  // 状态管理
-  const [orders, setOrders] = useState(mockOrders)
-  const [isModalVisible, setIsModalVisible] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState(null)
-  const [filterVisible, setFilterVisible] = useState(false)
-  const [activeTab, setActiveTab] = useState('today')
+  const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+  const [orderData, setOrderData] = useState([])
+  const navigate = useNavigate()
 
-  // 筛选条件
-  const [filters, setFilters] = useState({
-    orderNo: '',
-    status: '所有状态',
-    channel: '所有渠道',
-    bookingTime: null,
-    checkinDate: null,
-    checkoutDate: null
-  })
-
-  // 表格列配置
-  const columns = [
+  // 模拟订单数据
+  const mockOrderData = [
     {
-      title: '选择',
-      dataIndex: 'id',
-      key: 'id',
-      width: 60,
-      render: (id) => <input type="checkbox" />
+      key: '1',
+      channelOrderNumber: '112814479949077',
+      crsOrderNumber: 'CRS123456789',
+      pmsNumber: 'YFNJCC/0251231_YFNJCC_0001131198',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-31 00:01:11',
+      checkInDate: '2025-12-30',
+      checkOutDate: '2025-12-31',
+      totalPrice: 396.00,
+      isManual: false,
+      guestName: '张三'
     },
     {
-      title: '订单号',
-      dataIndex: 'orderNo',
-      key: 'orderNo',
-      width: 180,
-      render: (orderNo) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Tooltip title="查看订单详情">
-            <a href="#" onClick={() => handleViewOrder(orderNo)}>{orderNo}</a>
-          </Tooltip>
-          <Tag color="blue" size="small">PMS</Tag>
-        </div>
-      )
+      key: '2',
+      channelOrderNumber: '112814479947981',
+      crsOrderNumber: 'CRS123456790',
+      pmsNumber: 'YFNJCC/0251230_YFNJCC_2359537115',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-30 23:59:52',
+      checkInDate: '2025-12-30',
+      checkOutDate: '2025-12-31',
+      totalPrice: 422.00,
+      isManual: false,
+      guestName: '李四'
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status) => {
-        const config = orderStatusConfig[status]
-        return (
-          <Tag color={config.color} icon={config.icon}>
-            {config.text}
-          </Tag>
-        )
-      }
+      key: '3',
+      channelOrderNumber: '5008013766286861837',
+      crsOrderNumber: 'CRS123456791',
+      pmsNumber: 'YFNJCC/0251230_YFNJCC_2358122150',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-30 23:58:10',
+      checkInDate: '2025-12-31',
+      checkOutDate: '2026-01-01',
+      totalPrice: 607.00,
+      isManual: false,
+      guestName: '王五'
     },
     {
-      title: '渠道',
-      dataIndex: 'channel',
-      key: 'channel',
-      width: 100,
-      render: (channel) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <Tag color="green" size="small">{channel}</Tag>
-        </div>
-      )
+      key: '4',
+      channelOrderNumber: '4501815373003003933',
+      crsOrderNumber: 'CRS123456792',
+      pmsNumber: 'YFNJCC/0251230_YFNJCC_1554576767',
+      status: '取消失败',
+      statusColor: 'red',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-30 15:54:55',
+      checkInDate: '2025-12-30',
+      checkOutDate: '2025-12-31',
+      totalPrice: 578.00,
+      isManual: true,
+      guestName: '赵六'
     },
     {
-      title: '预订时间',
-      dataIndex: 'orderTime',
-      key: 'orderTime',
-      width: 150
+      key: '5',
+      channelOrderNumber: '1128144786236519',
+      crsOrderNumber: 'CRS123456793',
+      pmsNumber: 'YFNJCC/0251230_YFNJCC_0949503278',
+      status: '已取消',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-30 09:49:48',
+      checkInDate: '2026-01-02',
+      checkOutDate: '2026-01-03',
+      totalPrice: 668.00,
+      isManual: false,
+      guestName: '孙七'
     },
     {
-      title: '住宿日期',
-      dataIndex: ['checkinDate', 'checkoutDate'],
-      key: 'stayDate',
-      width: 150,
-      render: (dates) => {
-        const [checkin, checkout] = dates
-        return `${checkin} ~ ${checkout}`
-      }
+      key: '6',
+      channelOrderNumber: '1128144776236520',
+      crsOrderNumber: 'CRS123456794',
+      pmsNumber: 'YFNJCC/0251229_YFNJCC_1549503279',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-29 15:49:49',
+      checkInDate: '2026-01-03',
+      checkOutDate: '2026-01-04',
+      totalPrice: 598.00,
+      isManual: false,
+      guestName: '周八'
     },
     {
-      title: '总价(CNY)',
-      dataIndex: 'totalPrice',
-      key: 'totalPrice',
-      width: 120,
-      render: (price) => (
-        <span style={{ fontWeight: 600, color: '#faad14' }}>
-          {price.toFixed(2)}
-        </span>
-      )
+      key: '7',
+      channelOrderNumber: '5008013766286861838',
+      crsOrderNumber: 'CRS123456795',
+      pmsNumber: 'YFNJCC/0251229_YFNJCC_1458122151',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-29 14:58:11',
+      checkInDate: '2026-01-04',
+      checkOutDate: '2026-01-05',
+      totalPrice: 628.00,
+      isManual: false,
+      guestName: '吴九'
     },
     {
-      title: '操作',
-      key: 'action',
-      width: 100,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="查看">
-            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewOrder(record.orderNo)} />
-          </Tooltip>
-        </Space>
-      )
+      key: '8',
+      channelOrderNumber: '4501815373003003934',
+      crsOrderNumber: 'CRS123456796',
+      pmsNumber: 'YFNJCC/0251229_YFNJCC_1354576768',
+      status: '已入住',
+      statusColor: 'blue',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-29 13:54:56',
+      checkInDate: '2025-12-31',
+      checkOutDate: '2026-01-02',
+      totalPrice: 798.00,
+      isManual: false,
+      guestName: '郑十'
+    },
+    {
+      key: '9',
+      channelOrderNumber: '1128144766236521',
+      crsOrderNumber: 'CRS123456797',
+      pmsNumber: 'YFNJCC/0251228_YFNJCC_1249503280',
+      status: '已离店',
+      statusColor: 'gray',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-28 12:49:50',
+      checkInDate: '2025-12-29',
+      checkOutDate: '2025-12-30',
+      totalPrice: 498.00,
+      isManual: false,
+      guestName: '王十一'
+    },
+    {
+      key: '10',
+      channelOrderNumber: '5008013766286861839',
+      crsOrderNumber: 'CRS123456798',
+      pmsNumber: 'YFNJCC/0251228_YFNJCC_1158122152',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-28 11:58:12',
+      checkInDate: '2026-01-05',
+      checkOutDate: '2026-01-06',
+      totalPrice: 568.00,
+      isManual: false,
+      guestName: '李十二'
+    },
+    {
+      key: '11',
+      channelOrderNumber: '4501815373003003935',
+      crsOrderNumber: 'CRS123456799',
+      pmsNumber: 'YFNJCC/0251228_YFNJCC_1054576769',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-28 10:54:57',
+      checkInDate: '2026-01-06',
+      checkOutDate: '2026-01-07',
+      totalPrice: 638.00,
+      isManual: false,
+      guestName: '张十三'
+    },
+    {
+      key: '12',
+      channelOrderNumber: '1128144756236522',
+      crsOrderNumber: 'CRS123456800',
+      pmsNumber: 'YFNJCC/0251227_YFNJCC_0949503281',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-27 09:49:51',
+      checkInDate: '2026-01-07',
+      checkOutDate: '2026-01-08',
+      totalPrice: 588.00,
+      isManual: false,
+      guestName: '刘十四'
+    },
+    {
+      key: '13',
+      channelOrderNumber: '5008013766286861840',
+      crsOrderNumber: 'CRS123456801',
+      pmsNumber: 'YFNJCC/0251227_YFNJCC_0858122153',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-27 08:58:13',
+      checkInDate: '2026-01-08',
+      checkOutDate: '2026-01-09',
+      totalPrice: 618.00,
+      isManual: false,
+      guestName: '陈十五'
+    },
+    {
+      key: '14',
+      channelOrderNumber: '4501815373003003936',
+      crsOrderNumber: 'CRS123456802',
+      pmsNumber: 'YFNJCC/0251227_YFNJCC_0754576770',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-27 07:54:58',
+      checkInDate: '2026-01-09',
+      checkOutDate: '2026-01-10',
+      totalPrice: 598.00,
+      isManual: false,
+      guestName: '杨十六'
+    },
+    {
+      key: '15',
+      channelOrderNumber: '1128144746236523',
+      crsOrderNumber: 'CRS123456803',
+      pmsNumber: 'YFNJCC/0251226_YFNJCC_0649503282',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-26 06:49:52',
+      checkInDate: '2026-01-10',
+      checkOutDate: '2026-01-11',
+      totalPrice: 628.00,
+      isManual: false,
+      guestName: '黄十七'
+    },
+    {
+      key: '16',
+      channelOrderNumber: '5008013766286861841',
+      crsOrderNumber: 'CRS123456804',
+      pmsNumber: 'YFNJCC/0251226_YFNJCC_0558122154',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-26 05:58:14',
+      checkInDate: '2026-01-11',
+      checkOutDate: '2026-01-12',
+      totalPrice: 578.00,
+      isManual: false,
+      guestName: '周十八'
+    },
+    {
+      key: '17',
+      channelOrderNumber: '4501815373003003937',
+      crsOrderNumber: 'CRS123456805',
+      pmsNumber: 'YFNJCC/0251226_YFNJCC_0454576771',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-26 04:54:59',
+      checkInDate: '2026-01-12',
+      checkOutDate: '2026-01-13',
+      totalPrice: 608.00,
+      isManual: false,
+      guestName: '吴十九'
+    },
+    {
+      key: '18',
+      channelOrderNumber: '1128144736236524',
+      crsOrderNumber: 'CRS123456806',
+      pmsNumber: 'YFNJCC/0251225_YFNJCC_0349503283',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '携程',
+      channelIcon: <GlobalOutlined />,
+      bookingTime: '2025-12-25 03:49:53',
+      checkInDate: '2026-01-13',
+      checkOutDate: '2026-01-14',
+      totalPrice: 588.00,
+      isManual: false,
+      guestName: '郑二十'
+    },
+    {
+      key: '19',
+      channelOrderNumber: '5008013766286861842',
+      crsOrderNumber: 'CRS123456807',
+      pmsNumber: 'YFNJCC/0251225_YFNJCC_0258122155',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '美团',
+      channelIcon: <HomeOutlined />,
+      bookingTime: '2025-12-25 02:58:15',
+      checkInDate: '2026-01-14',
+      checkOutDate: '2026-01-15',
+      totalPrice: 638.00,
+      isManual: false,
+      guestName: '王二十一'
+    },
+    {
+      key: '20',
+      channelOrderNumber: '4501815373003003938',
+      crsOrderNumber: 'CRS123456808',
+      pmsNumber: 'YFNJCC/0251225_YFNJCC_0154576772',
+      status: '已确认',
+      statusColor: 'green',
+      channel: '飞猪',
+      channelIcon: <ShoppingOutlined />,
+      bookingTime: '2025-12-25 01:54:00',
+      checkInDate: '2026-01-15',
+      checkOutDate: '2026-01-16',
+      totalPrice: 598.00,
+      isManual: false,
+      guestName: '李二十二'
     }
   ]
 
-  // 查看订单详情
-  const handleViewOrder = (orderNo) => {
-    const order = orders.find(o => o.orderNo === orderNo)
-    if (order) {
-      setSelectedOrder(order)
-      setIsModalVisible(true)
-    }
-  }
-
-  // 关闭订单详情
-  const handleCloseModal = () => {
-    setIsModalVisible(false)
-    setSelectedOrder(null)
-  }
-
-  // 搜索订单
+  // 处理搜索
   const handleSearch = () => {
-    // 这里可以添加搜索逻辑
-    console.log('Searching with filters:', filters)
+    setLoading(true)
+    // 模拟API请求
+    setTimeout(() => {
+      setOrderData(mockOrderData)
+      setLoading(false)
+      message.success('查询成功')
+    }, 1000)
   }
 
-  // 重置筛选条件
+  // 处理重置
   const handleReset = () => {
-    setFilters({
-      orderNo: '',
-      status: '所有状态',
-      channel: '所有渠道',
-      bookingTime: null,
-      checkinDate: null,
-      checkoutDate: null
-    })
+    form.resetFields()
   }
 
-  // 导出订单
+  // 处理导出
   const handleExport = () => {
-    console.log('Exporting orders...')
+    message.info('导出功能开发中')
   }
 
-  // 切换标签页
-  const handleTabChange = (key) => {
-    setActiveTab(key)
+  // 处理查看订单
+  const handleViewOrder = (record) => {
+    navigate('/reservation/reservation-detail')
   }
+
+  // 初始化加载数据
+  useEffect(() => {
+    handleSearch()
+  }, [])
 
   return (
     <div className="fade-in">
-      {/* 标题区域 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h1 className="page-title">
-          <FileTextOutlined /> 订单
-        </h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button type="default" icon={<FilterOutlined />} onClick={() => setFilterVisible(!filterVisible)}>
-            筛选条件
-          </Button>
-          <Button type="primary" icon={<ExportOutlined />} onClick={handleExport}>
-            导出
-          </Button>
-        </div>
-      </div>
-
-      {/* 标签页 */}
-      <Card style={{ marginBottom: 16, borderRadius: 8 }}>
-        <Tabs activeKey={activeTab} onChange={handleTabChange}>
-          <TabPane tab="今日" key="today">
-            {/* 今日订单内容 */}
-          </TabPane>
-          <TabPane tab="明日" key="tomorrow">
-            {/* 明日订单内容 */}
-          </TabPane>
-          <TabPane tab="近期" key="recent">
-            {/* 近期订单内容 */}
-          </TabPane>
-          <TabPane tab="所有" key="all">
-            {/* 所有订单内容 */}
-          </TabPane>
-        </Tabs>
-      </Card>
-
-      {/* 筛选条件区域 */}
-      {filterVisible && (
-        <Card title="筛选条件" style={{ marginBottom: 16, borderRadius: 8 }}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Input 
-                placeholder="请输入订单号" 
-                value={filters.orderNo}
-                onChange={(e) => setFilters({...filters, orderNo: e.target.value})}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Select 
-                placeholder="所有状态" 
-                value={filters.status}
-                onChange={(value) => setFilters({...filters, status: value})}
-                style={{ width: '100%' }}
-              >
+      <h1 className="page-title">
+        订单
+      </h1>
+      
+      <Card>
+        {/* 搜索区域 */}
+        <div style={{ marginBottom: 24 }}>
+          <Form
+            form={form}
+            layout="inline"
+            initialValues={{
+              orderNumber: '',
+              status: '所有状态',
+              channel: '携程',
+              guestName: ''
+            }}
+          >
+            <Form.Item name="orderNumber">
+              <Input placeholder="请输入订单号" style={{ width: 180 }} />
+            </Form.Item>
+            <Form.Item name="status">
+              <Select placeholder="所有状态" style={{ width: 120 }}>
                 <Option value="所有状态">所有状态</Option>
                 <Option value="已确认">已确认</Option>
-                <Option value="已入住">已入住</Option>
-                <Option value="待确认">待确认</Option>
                 <Option value="已取消">已取消</Option>
+                <Option value="取消失败">取消失败</Option>
+                <Option value="已入住">已入住</Option>
+                <Option value="已离店">已离店</Option>
               </Select>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Select 
-                placeholder="所有渠道" 
-                value={filters.channel}
-                onChange={(value) => setFilters({...filters, channel: value})}
-                style={{ width: '100%' }}
-              >
+            </Form.Item>
+            <Form.Item name="channel">
+              <Select placeholder="所有渠道" style={{ width: 120 }}>
                 <Option value="所有渠道">所有渠道</Option>
                 <Option value="携程">携程</Option>
-                <Option value="美团">美团</Option>
                 <Option value="飞猪">飞猪</Option>
-                <Option value="Booking.com">Booking.com</Option>
-                <Option value="Agoda">Agoda</Option>
+                <Option value="美团">美团</Option>
+                <Option value="PMS">PMS</Option>
               </Select>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <RangePicker 
-                placeholder={['预订开始时间', '预订结束时间']} 
-                value={filters.bookingTime}
-                onChange={(value) => setFilters({...filters, bookingTime: value})}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <DatePicker 
-                placeholder="入住日期" 
-                value={filters.checkinDate}
-                onChange={(value) => setFilters({...filters, checkinDate: value})}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <DatePicker 
-                placeholder="离店日期" 
-                value={filters.checkoutDate}
-                onChange={(value) => setFilters({...filters, checkoutDate: value})}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={24} sm={24} md={16} lg={12} style={{ textAlign: 'right' }}>
-              <Space>
-                <Button type="default" onClick={handleReset}>重置</Button>
-                <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>搜索</Button>
-              </Space>
-            </Col>
-          </Row>
-        </Card>
-      )}
+            </Form.Item>
+            <Form.Item name="guestName">
+              <Input placeholder="请输入入住人" style={{ width: 150 }} />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
+                搜索
+              </Button>
+            </Form.Item>
+            <Form.Item>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>
+                重置
+              </Button>
+            </Form.Item>
 
-      {/* 订单表格 */}
-      <Card style={{ borderRadius: 8 }}>
+            <Form.Item>
+              <Button icon={<ExportOutlined />} onClick={handleExport} style={{ float: 'right' }}>
+                导出
+              </Button>
+            </Form.Item>
+          </Form>
+          
+
+        </div>
+        
+        {/* 订单列表 */}
         <Table
-          columns={columns}
-          dataSource={orders}
-          rowKey="id"
-          pagination={{
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} 共 ${total} 条`
-          }}
-          scroll={{ x: 1200 }}
+          loading={loading}
+          pagination={false}
+          scroll={{ x: 1000 }}
+          dataSource={orderData}
+          rowKey="key"
+          columns={[
+            {
+              title: (
+                <Checkbox>
+                  <span style={{ marginLeft: 8 }}>全选</span>
+                </Checkbox>
+              ),
+              dataIndex: 'selected',
+              key: 'selected',
+              width: 40,
+              render: () => <Checkbox />
+            },
+            {
+              title: '订单号',
+              key: 'orderNumber',
+              width: 250,
+              render: (text, record) => (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <CheckCircleOutlined style={{ color: '#1890ff', marginRight: 8 }} />
+                    <Text strong>{record.channelOrderNumber}</Text>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                    CRS {record.crsOrderNumber}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                    PMS {record.pmsNumber}
+                  </div>
+                  {record.isManual && (
+                    <Badge
+                      count="人工干预"
+                      title="人工干预单"
+                      style={{ backgroundColor: '#ff4d4f', marginTop: 4 }}
+                    />
+                  )}
+                </div>
+              )
+            },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              key: 'status',
+              width: 100,
+              render: (text, record) => (
+                <Tag color={record.statusColor} style={{ fontSize: 12, padding: '4px 8px' }}>
+                  {text}
+                </Tag>
+              )
+            },
+            {
+              title: '渠道',
+              dataIndex: 'channel',
+              key: 'channel',
+              width: 100,
+              render: (text, record) => (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <span style={{ marginRight: 8 }}>{record.channelIcon}</span>
+                  {text}
+                </div>
+              )
+            },
+            {
+              title: '预订时间',
+              dataIndex: 'bookingTime',
+              key: 'bookingTime',
+              width: 150
+            },
+            {
+              title: '住宿日期',
+              dataIndex: 'checkInDate',
+              key: 'checkInDate',
+              width: 150,
+              render: (text, record) => (
+                <Text>
+                  {text} ~ {record.checkOutDate}
+                </Text>
+              )
+            },
+            {
+              title: '入住人',
+              dataIndex: 'guestName',
+              key: 'guestName',
+              width: 100
+            },
+            {
+              title: '总房价',
+              dataIndex: 'totalPrice',
+              key: 'totalPrice',
+              width: 120,
+              render: (text) => (
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <DollarOutlined style={{ marginRight: 4, fontSize: 12 }} />
+                  CNY {text.toFixed(2)}
+                </div>
+              )
+            },
+            {
+              title: '操作',
+              key: 'action',
+              width: 80,
+              render: (text, record) => (
+                <Button size="small" onClick={() => handleViewOrder(record)}>
+                  查看
+                </Button>
+              )
+            }
+          ]}
         />
       </Card>
-
-      {/* 订单详情弹窗 */}
-      <Modal
-        title="订单详情"
-        open={isModalVisible}
-        onCancel={handleCloseModal}
-        footer={null}
-        width={800}
-        destroyOnClose
-      >
-        {selectedOrder && (
-          <div>
-            <Tabs defaultActiveKey="basic">
-              <TabPane tab="基本信息" key="basic">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, margin: '16px 0' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>订单信息</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>订单号: {selectedOrder.orderNo}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>确认号: {selectedOrder.confirmationNo}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>内部号: {selectedOrder.internalNo}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>PMS单号: {selectedOrder.pmsNo}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>预订信息</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>预订时间: {selectedOrder.orderTime}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>预订渠道: {selectedOrder.channel}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>预订来源: {selectedOrder.bookingSource}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>支付方式: {selectedOrder.paymentMethod}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>客人信息</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>客人姓名: {selectedOrder.guestName}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>联系电话: {selectedOrder.guestPhone}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>成人: {selectedOrder.adults}人</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>儿童: {selectedOrder.children}人</div>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: 4 }}>住宿信息</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>房型: {selectedOrder.roomType}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>入住日期: {selectedOrder.checkinDate}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>离店日期: {selectedOrder.checkoutDate}</div>
-                    <div style={{ fontSize: 12, color: '#8c8c8c' }}>总价: {selectedOrder.totalPrice.toFixed(2)} CNY</div>
-                  </div>
-                </div>
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>特殊要求</div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>{selectedOrder.specialRequests}</div>
-                </div>
-              </TabPane>
-              <TabPane tab="价格明细" key="price">
-                <div style={{ padding: '16px 0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <span>房费</span>
-                    <span>{selectedOrder.totalPrice.toFixed(2)} CNY</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <span>服务费</span>
-                    <span>0.00 CNY</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <span>税费</span>
-                    <span>0.00 CNY</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontWeight: 600 }}>
-                    <span>总计</span>
-                    <span>{selectedOrder.totalPrice.toFixed(2)} CNY</span>
-                  </div>
-                </div>
-              </TabPane>
-              <TabPane tab="操作日志" key="log">
-                <div style={{ padding: '16px 0' }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
-                    2025-12-31 00:01:11 - 订单创建
-                  </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
-                    2025-12-31 00:01:15 - 订单已确认
-                  </div>
-                </div>
-              </TabPane>
-            </Tabs>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }
-
-
 
 export default ReservationList

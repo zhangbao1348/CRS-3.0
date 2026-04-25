@@ -44,6 +44,15 @@ public class GroupRoomTypeHotelService {
     }
     
     /**
+     * 获取酒店的集团房型分配列表
+     * @param hotelId 酒店ID
+     * @return 分配列表
+     */
+    public List<GroupRoomTypeHotel> getHotelRoomTypeAllocations(Integer hotelId) {
+        return groupRoomTypeHotelRepository.findByHotelId(hotelId);
+    }
+    
+    /**
      * 更新酒店房型分配状态
      * @param groupRoomTypeId 集团房型ID
      * @param hotelId 酒店ID
@@ -79,6 +88,16 @@ public class GroupRoomTypeHotelService {
             allocation.setHotelId(hotelId);
         }
         
+        // 设置 CODE 字段
+        var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
+        var hotel = hotelRepository.findById(hotelId).orElse(null);
+        if (groupRoomType != null) {
+            allocation.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
+        }
+        if (hotel != null) {
+            allocation.setHotelCode(hotel.getHotelCode());
+        }
+        
         allocation.setAllocated(allocated);
         allocation.setRoomInfoEditable(roomInfoEditable);
         
@@ -101,7 +120,7 @@ public class GroupRoomTypeHotelService {
      * @param groupRoomTypeId 集团房型ID
      * @param hotelId 酒店ID
      */
-    private void createOrUpdateHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
+    public void createOrUpdateHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
         // 获取集团房型信息
         var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
                 .orElseThrow(() -> new RuntimeException("Group room type not found"));
@@ -122,9 +141,19 @@ public class GroupRoomTypeHotelService {
             hotelRoomType.setRoomTypeCode(groupRoomType.getRoomTypeCode());
         }
         
+        // 设置 CODE 字段
+        var hotel = hotelRepository.findById(hotelId).orElse(null);
+        if (hotel != null) {
+            hotelRoomType.setHotelCode(hotel.getHotelCode());
+        }
+        hotelRoomType.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
+        
         // 更新房型信息
         hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
         hotelRoomType.setDescription(groupRoomType.getDescription());
+        hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
+        hotelRoomType.setSortOrder(groupRoomType.getSortOrder());
+        hotelRoomType.setRoomTypeCategoryId(groupRoomType.getRoomTypeCategoryId());
         hotelRoomType.setStatus(groupRoomType.getStatus());
         
         hotelRoomTypeRepository.save(hotelRoomType);
@@ -135,16 +164,19 @@ public class GroupRoomTypeHotelService {
      * @param groupRoomTypeId 集团房型ID
      * @param hotelId 酒店ID
      */
-    private void deleteHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
+    public void deleteHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
         // 获取集团房型信息
         var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
                 .orElseThrow(() -> new RuntimeException("Group room type not found"));
         
-        // 查找并删除酒店房型
+        // 查找酒店房型，设为无效（软删除）
         Optional<HotelRoomType> existingHotelRoomType = 
                 hotelRoomTypeRepository.findByHotelIdAndRoomTypeCode(hotelId, groupRoomType.getRoomTypeCode());
         
-        existingHotelRoomType.ifPresent(hotelRoomTypeRepository::delete);
+        existingHotelRoomType.ifPresent(roomType -> {
+            roomType.setStatus("inactive");
+            hotelRoomTypeRepository.save(roomType);
+        });
     }
     
     /**

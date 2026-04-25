@@ -1,7 +1,9 @@
 package com.crs.controller;
 
 import com.crs.entity.MarketCode;
+import com.crs.repository.GroupRateCodeRepository;
 import com.crs.service.MarketCodeService;
+import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,10 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 市场码控制器
- * 提供市场码的CRUD操作API
- */
 @RestController
 @RequestMapping("/api/market-codes")
 public class MarketCodeController {
@@ -21,13 +19,15 @@ public class MarketCodeController {
     @Autowired
     private MarketCodeService marketCodeService;
 
-    /**
-     * 获取所有市场码（树形结构）
-     */
+    @Autowired
+    private GroupRateCodeRepository groupRateCodeRepository;
+
+    private static final Integer DEFAULT_TENANT_ID = 1;
+
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getAllMarketCodes() {
         try {
-            List<Map<String, Object>> treeData = marketCodeService.getAllMarketCodesAsTree();
+            List<Map<String, Object>> treeData = marketCodeService.getAllMarketCodesAsTree(DEFAULT_TENANT_ID);
             return ResponseEntity.ok(treeData);
         } catch (Exception e) {
             e.printStackTrace();
@@ -35,13 +35,21 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 根据父ID获取市场码
-     */
+    @GetMapping("/third-level")
+    public ResponseEntity<List<MarketCode>> getThirdLevelMarketCodes() {
+        try {
+            List<MarketCode> thirdLevelCodes = marketCodeService.getThirdLevelMarketCodes(DEFAULT_TENANT_ID);
+            return ResponseEntity.ok(thirdLevelCodes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @GetMapping("/parent/{parentId}")
     public ResponseEntity<List<MarketCode>> getMarketCodesByParentId(@PathVariable Integer parentId) {
         try {
-            List<MarketCode> marketCodes = marketCodeService.getMarketCodesByParentId(parentId);
+            List<MarketCode> marketCodes = marketCodeService.getMarketCodesByParentId(DEFAULT_TENANT_ID, parentId);
             return ResponseEntity.ok(marketCodes);
         } catch (Exception e) {
             e.printStackTrace();
@@ -49,13 +57,10 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 根据ID获取市场码
-     */
     @GetMapping("/{id}")
     public ResponseEntity<MarketCode> getMarketCodeById(@PathVariable Integer id) {
         try {
-            MarketCode marketCode = marketCodeService.getMarketCodeById(id);
+            MarketCode marketCode = marketCodeService.getMarketCodeById(DEFAULT_TENANT_ID, id);
             if (marketCode != null) {
                 return ResponseEntity.ok(marketCode);
             } else {
@@ -67,13 +72,13 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 创建市场码
-     */
     @PostMapping
-    public ResponseEntity<MarketCode> createMarketCode(@RequestBody MarketCode marketCode) {
+    public ResponseEntity<?> createMarketCode(@RequestBody MarketCode marketCode) {
         try {
-            MarketCode createdMarketCode = marketCodeService.createMarketCode(marketCode);
+            if (marketCode.getCode() != null && !CodeValidator.isValid(marketCode.getCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            MarketCode createdMarketCode = marketCodeService.createMarketCode(DEFAULT_TENANT_ID, marketCode);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdMarketCode);
         } catch (Exception e) {
             e.printStackTrace();
@@ -81,14 +86,14 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 更新市场码
-     */
     @PutMapping("/{id}")
-    public ResponseEntity<MarketCode> updateMarketCode(@PathVariable Integer id, @RequestBody MarketCode marketCode) {
+    public ResponseEntity<?> updateMarketCode(@PathVariable Integer id, @RequestBody MarketCode marketCode) {
         try {
+            if (marketCode.getCode() != null && !CodeValidator.isValid(marketCode.getCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
             marketCode.setId(id);
-            MarketCode updatedMarketCode = marketCodeService.updateMarketCode(marketCode);
+            MarketCode updatedMarketCode = marketCodeService.updateMarketCode(DEFAULT_TENANT_ID, marketCode);
             if (updatedMarketCode != null) {
                 return ResponseEntity.ok(updatedMarketCode);
             } else {
@@ -100,13 +105,18 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 删除市场码
-     */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteMarketCode(@PathVariable Integer id) {
+    public ResponseEntity<?> deleteMarketCode(@PathVariable Integer id) {
         try {
-            marketCodeService.deleteMarketCode(id);
+            // 检查是否被房价码引用
+            MarketCode existing = marketCodeService.getMarketCodeById(DEFAULT_TENANT_ID, id);
+            if (existing != null) {
+                long refCount = groupRateCodeRepository.countByMarketCodeId(id);
+                if (refCount > 0) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "该市场码已被 " + refCount + " 个房价码引用，无法删除"));
+                }
+            }
+            marketCodeService.deleteMarketCode(DEFAULT_TENANT_ID, id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -114,13 +124,10 @@ public class MarketCodeController {
         }
     }
 
-    /**
-     * 检查市场码CODE是否唯一
-     */
     @GetMapping("/check-code")
     public ResponseEntity<Map<String, Boolean>> checkCodeUnique(@RequestParam String code, @RequestParam(required = false) Integer id) {
         try {
-            boolean isUnique = marketCodeService.isCodeUnique(code, id);
+            boolean isUnique = marketCodeService.isCodeUnique(DEFAULT_TENANT_ID, code, id);
             return ResponseEntity.ok(Map.of("unique", isUnique));
         } catch (Exception e) {
             e.printStackTrace();

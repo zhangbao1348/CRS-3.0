@@ -13,35 +13,40 @@ public interface MarketCodeService {
     /**
      * 获取所有市场码（树形结构）
      */
-    List<Map<String, Object>> getAllMarketCodesAsTree();
+    List<Map<String, Object>> getAllMarketCodesAsTree(Integer tenantId);
 
     /**
      * 根据父ID获取市场码
      */
-    List<MarketCode> getMarketCodesByParentId(Integer parentId);
+    List<MarketCode> getMarketCodesByParentId(Integer tenantId, Integer parentId);
+
+    /**
+     * 获取第三级市场码
+     */
+    List<MarketCode> getThirdLevelMarketCodes(Integer tenantId);
 
     /**
      * 根据ID获取市场码
      */
-    MarketCode getMarketCodeById(Integer id);
+    MarketCode getMarketCodeById(Integer tenantId, Integer id);
 
     /**
      * 创建市场码
      */
-    MarketCode createMarketCode(MarketCode marketCode);
+    MarketCode createMarketCode(Integer tenantId, MarketCode marketCode);
 
     /**
      * 更新市场码
      */
-    MarketCode updateMarketCode(MarketCode marketCode);
+    MarketCode updateMarketCode(Integer tenantId, MarketCode marketCode);
 
     /**
      * 删除市场码
      */
-    void deleteMarketCode(Integer id);
+    void deleteMarketCode(Integer tenantId, Integer id);
 
     /**
      * 检查市场码CODE是否唯一
      */
-    boolean isCodeUnique(String code, Integer excludeId);
+    boolean isCodeUnique(Integer tenantId, String code, Integer excludeId);
 }

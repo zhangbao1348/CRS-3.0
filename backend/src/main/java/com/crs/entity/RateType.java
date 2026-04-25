@@ -22,14 +22,20 @@ public class RateType {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "code", nullable = false, unique = true, length = 50)
+    @Column(name = "code", nullable = false, length = 50)
     private String code;
+    
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     @Column(name = "name", nullable = false, length = 100)
     private String name;
     
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+    
+    @Column(name = "sort_order")
+    private Integer sortOrder = 0;
     
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)

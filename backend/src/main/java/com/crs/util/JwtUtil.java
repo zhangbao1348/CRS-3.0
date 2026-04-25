@@ -37,6 +37,20 @@ public class JwtUtil {
     }
     
     /**
+     * 生成JWT令牌（包含租户ID）
+     * @param username 用户名
+     * @param tenantId 租户ID
+     * @return JWT令牌
+     */
+    public String generateToken(String username, Integer tenantId) {
+        Map<String, Object> claims = new HashMap<>();
+        if (tenantId != null) {
+            claims.put("tenantId", tenantId);
+        }
+        return createToken(claims, username, expiration);
+    }
+    
+    /**
      * 生成刷新令牌
      * @param username 用户名
      * @return 刷新令牌
@@ -44,6 +58,31 @@ public class JwtUtil {
     public String generateRefreshToken(String username) {
         Map<String, Object> claims = new HashMap<>();
         return createToken(claims, username, refreshExpiration);
+    }
+    
+    /**
+     * 生成刷新令牌（包含租户ID）
+     * @param username 用户名
+     * @param tenantId 租户ID
+     * @return 刷新令牌
+     */
+    public String generateRefreshToken(String username, Integer tenantId) {
+        Map<String, Object> claims = new HashMap<>();
+        if (tenantId != null) {
+            claims.put("tenantId", tenantId);
+        }
+        return createToken(claims, username, refreshExpiration);
+    }
+    
+    /**
+     * 从JWT令牌中提取租户ID
+     * @param token JWT令牌
+     * @return 租户ID
+     */
+    public Integer extractTenantId(String token) {
+        Claims claims = extractAllClaims(token);
+        Object tenantId = claims.get("tenantId");
+        return tenantId != null ? Integer.parseInt(tenantId.toString()) : null;
     }
     
     /**

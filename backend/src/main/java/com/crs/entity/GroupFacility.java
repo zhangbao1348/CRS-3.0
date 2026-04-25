@@ -30,6 +30,9 @@ public class GroupFacility {
     @Column(name = "facility_code", nullable = false, length = 50, unique = true)
     private String facilityCode;
     
+    @Column(name = "scope", nullable = false, length = 20)
+    private String scope = "hotel";
+    
     @Column(name = "available", nullable = false)
     private Boolean available = true;
     

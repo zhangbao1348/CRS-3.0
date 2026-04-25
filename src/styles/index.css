@@ -35,26 +35,26 @@ body {
   bottom: 0;
   z-index: 100;
   transition: all 0.3s ease;
-  background: #fff;
+  background: #003366;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid #004488;
 }
 
 /* Logo样式优化 */
 .logo {
-  background: #1890ff !important;
+  background: #003366 !important;
   color: #fff !important;
   box-shadow: none !important;
-  border-bottom: 1px solid #e8e8e8 !important;
+  border-bottom: 1px solid #004488 !important;
   font-weight: 600;
 }
 
 /* 菜单样式优化 */
 .ant-menu {
   border-right: none;
-  background: #fff;
+  background: #003366;
   font-size: 14px;
-  color: #333 !important; /* 加深菜单文字颜色 */
+  color: #fff !important;
 }
 
 .ant-menu-item,
@@ -65,56 +65,58 @@ body {
   height: 40px;
   line-height: 40px;
   padding: 0 24px !important;
-  color: #333 !important; /* 加深菜单项文字颜色 */
+  color: #fff !important;
 }
 
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover {
-  background-color: #e6f7ff !important;
-  color: #1890ff !important;
+  background-color: #005599 !important;
+  color: #fff !important;
 }
 
 .ant-menu-item-selected {
-  background-color: #e6f7ff !important;
-  color: #1890ff !important;
+  background-color: #004488 !important;
+  color: #fff !important;
+  border-left: 4px solid #ff0000;
 }
 
 /* 二级菜单样式优化 */
 .ant-menu-submenu .ant-menu {
-  background-color: #fafafa !important; /* 二级菜单背景色 */
-  border-left: 2px solid #e8e8e8; /* 左侧边框，增强层次感 */
-  margin: 4px 0; /* 二级菜单与一级菜单之间的间距 */
+  background-color: #003366 !important;
+  border-left: 2px solid #004488;
+  margin: 4px 0;
   border-radius: 0 4px 4px 0;
 }
 
 .ant-menu-submenu .ant-menu-item {
-  color: #666 !important; /* 二级菜单项文字颜色，比一级菜单浅 */
-  font-size: 13px !important; /* 二级菜单项字体大小，比一级菜单小 */
-  padding-left: 48px !important; /* 增加二级菜单项的左侧缩进 */
-  margin: 2px 8px !important; /* 二级菜单项之间的间距 */
+  color: #fff !important;
+  font-size: 13px !important;
+  padding-left: 48px !important;
+  margin: 2px 8px !important;
   border-radius: 4px;
-  height: 36px !important; /* 调整二级菜单项高度 */
+  height: 36px !important;
   line-height: 36px !important;
 }
 
 .ant-menu-submenu .ant-menu-item:hover {
-  color: #1890ff !important;
-  background-color: #e6f7ff !important;
+  color: #fff !important;
+  background-color: #005599 !important;
 }
 
 .ant-menu-submenu .ant-menu-item-selected {
-  color: #1890ff !important;
-  background-color: #e6f7ff !important;
+  color: #fff !important;
+  background-color: #004488 !important;
+  border-left: 4px solid #ff0000;
 }
 
 /* 二级菜单展开/折叠图标样式 */
 .ant-menu-submenu-arrow {
-  color: #999 !important;
+  color: #fff !important;
   font-size: 12px !important;
 }
 
 .ant-menu-submenu:hover .ant-menu-submenu-arrow {
-  color: #1890ff !important;
+  color: #fff !important;
 }
 
 .ant-menu-item-selected::after {

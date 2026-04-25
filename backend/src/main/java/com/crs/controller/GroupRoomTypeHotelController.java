@@ -5,6 +5,7 @@ import com.crs.service.GroupRoomTypeHotelService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,7 +30,9 @@ public class GroupRoomTypeHotelController {
     private static class AllocationDTO {
         private Integer id;
         private Integer groupRoomTypeId;
+        private String groupRoomTypeCode;
         private Integer hotelId;
+        private String hotelCode;
         private Boolean allocated;
         private Boolean roomInfoEditable;
         private String createdAt;
@@ -38,7 +41,9 @@ public class GroupRoomTypeHotelController {
         public AllocationDTO(GroupRoomTypeHotel allocation) {
             this.id = allocation.getId();
             this.groupRoomTypeId = allocation.getGroupRoomTypeId();
+            this.groupRoomTypeCode = allocation.getGroupRoomTypeCode();
             this.hotelId = allocation.getHotelId();
+            this.hotelCode = allocation.getHotelCode();
             this.allocated = allocation.getAllocated();
             this.roomInfoEditable = allocation.getRoomInfoEditable();
             this.createdAt = allocation.getCreatedAt().toString();
@@ -48,7 +53,9 @@ public class GroupRoomTypeHotelController {
         // Getters
         public Integer getId() { return id; }
         public Integer getGroupRoomTypeId() { return groupRoomTypeId; }
+        public String getGroupRoomTypeCode() { return groupRoomTypeCode; }
         public Integer getHotelId() { return hotelId; }
+        public String getHotelCode() { return hotelCode; }
         public Boolean getAllocated() { return allocated; }
         public Boolean getRoomInfoEditable() { return roomInfoEditable; }
         public String getCreatedAt() { return createdAt; }
@@ -71,6 +78,30 @@ public class GroupRoomTypeHotelController {
             return ResponseEntity.ok(allocationDTOs);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    /**
+     * 获取酒店的集团房型分配列表
+     * @param hotelId 酒店ID
+     * @return 分配列表
+     */
+    @GetMapping("/hotel/{hotelId}")
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypeAllocations(@PathVariable Integer hotelId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getHotelRoomTypeAllocations(hotelId);
+            // 转换为DTO列表，避免序列化循环引用
+            List<AllocationDTO> allocationDTOs = allocations.stream()
+                    .map(AllocationDTO::new)
+                    .collect(Collectors.toList());
+            response.put("success", true);
+            response.put("data", allocationDTOs);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
     

@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.util.Date;
 
 /**
  * 酒店设施实体类
@@ -25,6 +26,9 @@ public class HotelFacility {
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
     
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
+    
     @Column(name = "facility_type", nullable = false, length = 50)
     private String facilityType;
     
@@ -37,9 +41,22 @@ public class HotelFacility {
     @Column(name = "available", nullable = false)
     private Boolean available = true;
     
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date createdAt = new Date();
+    
+    @Column(name = "updated_at", nullable = false)
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date updatedAt = new Date();
+    
     // 关联关系
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
     @JsonIgnore
     private Hotel hotel;
+    
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedAt = new Date();
+    }
 }

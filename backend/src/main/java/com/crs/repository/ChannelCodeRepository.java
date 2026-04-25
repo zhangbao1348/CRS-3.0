@@ -13,12 +13,27 @@ import java.util.List;
 public interface ChannelCodeRepository extends JpaRepository<ChannelCode, Integer> {
 
     /**
-     * 根据父ID查询渠道码
+     * 根据租户ID查询所有渠道码
      */
-    List<ChannelCode> findByParentId(Integer parentId);
+    List<ChannelCode> findByTenantId(Integer tenantId);
 
     /**
-     * 根据CODE查询渠道码
+     * 根据租户ID和父ID查询渠道码
      */
-    ChannelCode findByCode(String code);
+    List<ChannelCode> findByTenantIdAndParentId(Integer tenantId, Integer parentId);
+
+    /**
+     * 根据租户ID和CODE查询渠道码
+     */
+    ChannelCode findByTenantIdAndCode(Integer tenantId, String code);
+
+    /**
+     * 根据租户ID和ID查询渠道码
+     */
+    ChannelCode findByTenantIdAndId(Integer tenantId, Integer id);
+
+    /**
+     * 检查租户下CODE是否存在（排除指定ID）
+     */
+    boolean existsByTenantIdAndCodeAndIdNot(Integer tenantId, String code, Integer id);
 }

@@ -25,6 +25,9 @@ public class BasePrice {
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
     
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
+    
     @Column(name = "rate_type_id", nullable = false)
     private Integer rateTypeId;
     

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Form, Modal, Tabs, Input, Select, Radio, Checkbox, Button, message } from 'antd'
 import { SaveOutlined, CloseOutlined } from '@ant-design/icons'
-import axios from 'axios'
+import api from '../../utils/api'
 
 const { TabPane } = Tabs
 const { Option } = Select
@@ -11,20 +11,29 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('1')
+  const [quantityType, setQuantityType] = useState('')
+  const [priceType, setPriceType] = useState('group')
   
   // 包价类型选项
   const packageTypes = [
     { value: '早餐', label: '早餐' },
     { value: '午餐', label: '午餐' },
     { value: '晚餐', label: '晚餐' },
-    { value: '综合', label: '综合' }
+    { value: '下午茶', label: '下午茶' },
+    { value: '门票', label: '门票' },
+    { value: '其他', label: '其他' },
+    { value: '免费增早', label: '免费增早' },
+    { value: '延时退房', label: '延时退房' },
+    { value: '提前入住', label: '提前入住' }
   ]
   
   // 发放频率选项
   const frequencyOptions = [
-    { value: '每天出现一次', label: '每天出现一次' },
-    { value: '每次入住出现一次', label: '每次入住出现一次' },
-    { value: '每周出现一次', label: '每周出现一次' }
+    { value: 'daily', label: '每天1次' },
+    { value: 'per_stay', label: '每入住一次' },
+    { value: 'arrival_day', label: '到达当天发放一次' },
+    { value: 'departure_day', label: '最后一天发放一次' },
+    { value: 'except_departure', label: '除最后一天每天一次' }
   ]
   
   // 加载包价数据
@@ -41,8 +50,7 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
   const loadPackageData = async () => {
     setLoading(true)
     try {
-      const response = await axios.get(`http://localhost:8080/api/packages/${packageId}`)
-      const packageData = response.data
+      const packageData = await api.get(`/packages/${packageId}`)
       
       // 转换数据格式以匹配表单
       const formData = {
@@ -96,11 +104,11 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
       let response
       if (packageId) {
         // 更新包价
-        response = await axios.put(`http://localhost:8080/api/packages/${packageId}`, packageData)
+        response = await api.put(`/packages/${packageId}`, packageData)
         message.success('包价更新成功')
       } else {
         // 创建包价
-        response = await axios.post('http://localhost:8080/api/packages', packageData)
+        response = await api.post('/packages', packageData)
         message.success('包价创建成功')
       }
       
@@ -144,9 +152,12 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
             <Form.Item
               name="code"
               label="包价代码"
-              rules={[{ required: true, message: '请输入包价代码' }]}
+              rules={[
+                { required: true, message: '请输入包价代码' },
+                { pattern: /^[A-Za-z0-9_]+$/, message: '包价代码只能包含英文字母、数字和下划线' }
+              ]}
             >
-              <Input placeholder="请输入包价代码" />
+              <Input placeholder="请输入包价代码" disabled={!!packageId} />
             </Form.Item>
             
             <Form.Item
@@ -171,27 +182,76 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
             
             <Form.Item
               name="quantityType"
-              label="份数"
-              rules={[{ required: true, message: '请选择份数类型' }]}
+              label="计数方式"
+              rules={[{ required: true, message: '请选择计数方式' }]}
             >
-              <RadioGroup>
-                <Radio value="fixed">固定份数</Radio>
-                <Radio value="per_person">按人数</Radio>
-              </RadioGroup>
+              <Select 
+                placeholder="请选择计数方式"
+                onChange={(value) => setQuantityType(value)}
+              >
+                <Option value="fixed">固定份数</Option>
+                <Option value="per_order">按订单</Option>
+                <Option value="per_room">按房间</Option>
+                <Option value="per_person">按人数</Option>
+                <Option value="per_adult">按成人数</Option>
+                <Option value="per_child">按儿童数</Option>
+              </Select>
             </Form.Item>
             
-            <Form.Item
-              name="fixedQuantity"
-              label="固定份数"
-              rules={[
-                {
-                  required: ({ quantityType }) => quantityType === 'fixed',
-                  message: '请输入固定份数'
-                }
-              ]}
-            >
-              <Input type="number" min={1} placeholder="请输入固定份数" />
-            </Form.Item>
+            {quantityType === 'fixed' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="固定份数"
+                rules={[{ required: true, message: '请输入固定份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入固定份数" />
+              </Form.Item>
+            )}
+            {quantityType === 'per_order' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="每订单份数"
+                rules={[{ required: true, message: '请输入每订单份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入每订单份数" />
+              </Form.Item>
+            )}
+            {quantityType === 'per_room' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="每房间份数"
+                rules={[{ required: true, message: '请输入每房间份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入每房间份数" />
+              </Form.Item>
+            )}
+            {quantityType === 'per_person' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="每人份数"
+                rules={[{ required: true, message: '请输入每人份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入每人份数" />
+              </Form.Item>
+            )}
+            {quantityType === 'per_adult' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="每成人份数"
+                rules={[{ required: true, message: '请输入每成人份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入每成人份数" />
+              </Form.Item>
+            )}
+            {quantityType === 'per_child' && (
+              <Form.Item
+                name="fixedQuantity"
+                label="每儿童份数"
+                rules={[{ required: true, message: '请输入每儿童份数' }]}
+              >
+                <Input type="number" min={1} placeholder="请输入每儿童份数" />
+              </Form.Item>
+            )}
             
             <Form.Item
               name="frequency"
@@ -210,11 +270,31 @@ const AddEditPackage = ({ visible, onCancel, onOk, packageId }) => {
               label="价格"
               rules={[{ required: true, message: '请选择价格类型' }]}
             >
-              <RadioGroup onChange={handlePriceTypeChange}>
+              <RadioGroup 
+                onChange={(e) => {
+                  setPriceType(e.target.value)
+                  handlePriceTypeChange(e)
+                }}
+              >
                 <Radio value="group">集团统一价格</Radio>
-                <Radio value="hotel">酒店设置价格</Radio>
+                <Radio value="hotel">日历价格</Radio>
               </RadioGroup>
             </Form.Item>
+            
+            {priceType === 'group' && (
+              <Form.Item
+                name="fixedPrice"
+                label="价格"
+                rules={[
+                  {
+                    required: true,
+                    message: '请输入包价的价格'
+                  }
+                ]}
+              >
+                <Input type="number" min={0} step={0.01} placeholder="请输入包价的价格" />
+              </Form.Item>
+            )}
             
             <Form.Item
               name="description"

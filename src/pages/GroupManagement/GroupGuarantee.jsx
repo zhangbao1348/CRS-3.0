@@ -1,82 +1,65 @@
-import React from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, Radio } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Table, Button, Space, Card, Row, Col, Input, Select, Radio, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined, 
   EyeOutlined,
   LockOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import api from '../../utils/api'
 
 const { Option } = Select
 const { Group: RadioGroup } = Radio
 
-// 模拟集团担保政策数据
-const mockGuaranteePolicies = [
-  {
-    id: 1,
-    name: '无需担保',
-    code: 'NO_GUARANTEE',
-    type: '无担保',
-    status: '启用',
-    description: '无需支付担保金，支持免费取消',
-    cancellationPolicy: '可免费取消',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 2,
-    name: '信用卡担保',
-    code: 'CC_GUARANTEE',
-    type: '信用卡',
-    status: '启用',
-    description: '需提供信用卡担保，超时取消将收取首晚房费',
-    cancellationPolicy: '入住前24小时可取消',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 3,
-    name: '预付担保',
-    code: 'PREPAY_GUARANTEE',
-    type: '预付',
-    status: '启用',
-    description: '需全额预付房费，不可取消',
-    cancellationPolicy: '不可取消',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 4,
-    name: '公司担保',
-    code: 'CORP_GUARANTEE',
-    type: '公司',
-    status: '启用',
-    description: '需公司签署担保协议，挂账结算',
-    cancellationPolicy: '入住前48小时可取消',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 5,
-    name: '第三方担保',
-    code: 'THIRD_PARTY_GUARANTEE',
-    type: '第三方',
-    status: '启用',
-    description: '由第三方平台提供担保，按照平台规则执行',
-    cancellationPolicy: '按照平台规则',
-    validPeriod: '长期有效'
-  },
-  {
-    id: 6,
-    name: '特殊担保',
-    code: 'SPECIAL_GUARANTEE',
-    type: '特殊',
-    status: '停用',
-    description: '特殊情况下的担保政策，需单独审批',
-    cancellationPolicy: '协商解决',
-    validPeriod: '长期有效'
-  }
-]
-
 const GroupGuarantee = () => {
+  const [guaranteePolicies, setGuaranteePolicies] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [searchName, setSearchName] = useState('')
+  const [searchCode, setSearchCode] = useState('')
+  const [searchType, setSearchType] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
+  const navigate = useNavigate()
+  
+  // 加载数据
+  useEffect(() => {
+    loadGuaranteePolicies()
+  }, [])
+  
+  const loadGuaranteePolicies = async () => {
+    setLoading(true)
+    try {
+      const data = await api.get('/guarantee-policies')
+      setGuaranteePolicies(data)
+    } catch (error) {
+      console.error('加载担保政策数据失败:', error)
+      message.error('加载担保政策数据失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleAddGuarantee = () => {
+    navigate('/group-management/add-edit-guarantee')
+  }
+  
+  const handleEditGuarantee = (record) => {
+    navigate('/group-management/add-edit-guarantee', { state: { record } })
+  }
+  
+  // 搜索过滤
+  const filteredPolicies = guaranteePolicies.filter(item => {
+    if (searchName && !item.name?.includes(searchName)) return false
+    if (searchCode && !item.code?.includes(searchCode)) return false
+    if (searchType && item.type !== searchType) return false
+    if (searchStatus) {
+      const statusMap = { '启用': 'active', '停用': 'inactive' }
+      if (item.status !== statusMap[searchStatus]) return false
+    }
+    return true
+  })
+  
   const columns = [
     {
       title: '担保政策名称',
@@ -97,36 +80,28 @@ const GroupGuarantee = () => {
       width: 120
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status) => (
-        <span style={{ 
-          color: status === '启用' ? '#52c41a' : '#ff4d4f',
-          fontWeight: 500
-        }}>
-          {status}
-        </span>
-      )
-    },
-    {
-      title: '取消政策',
-      dataIndex: 'cancellationPolicy',
-      key: 'cancellationPolicy',
-      width: 180
-    },
-    {
-      title: '有效期',
-      dataIndex: 'validPeriod',
-      key: 'validPeriod',
-      width: 120
-    },
-    {
       title: '描述',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status) => {
+        const statusMap = { 'active': '启用', 'inactive': '停用' }
+        const displayStatus = statusMap[status] || status
+        return (
+          <span style={{ 
+            color: status === 'active' || status === '启用' ? '#52c41a' : '#ff4d4f',
+            fontWeight: 500
+          }}>
+            {displayStatus}
+          </span>
+        )
+      }
     },
     {
       title: '操作',
@@ -134,9 +109,7 @@ const GroupGuarantee = () => {
       width: 180,
       render: (_, record) => (
         <Space size="middle">
-          <Button type="link" size="small" icon={<EyeOutlined />}>查看</Button>
-          <Button type="link" size="small" icon={<EditOutlined />}>编辑</Button>
-          <Button type="link" size="small" icon={<DeleteOutlined />} danger>删除</Button>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditGuarantee(record)}>编辑</Button>
         </Space>
       )
     }
@@ -153,30 +126,60 @@ const GroupGuarantee = () => {
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="担保政策名称" prefix={<SearchOutlined />} allowClear />
+            <Input 
+              placeholder="担保政策名称" 
+              prefix={<SearchOutlined />} 
+              allowClear 
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Input placeholder="担保政策代码" allowClear />
+            <Input 
+              placeholder="担保政策代码" 
+              allowClear 
+              value={searchCode}
+              onChange={(e) => setSearchCode(e.target.value)}
+            />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="担保类型" allowClear style={{ width: '100%' }}>
+            <Select 
+              placeholder="担保类型" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchType}
+              onChange={setSearchType}
+            >
               <Option value="无担保">无担保</Option>
               <Option value="信用卡">信用卡</Option>
               <Option value="预付">预付</Option>
               <Option value="公司">公司</Option>
               <Option value="第三方">第三方</Option>
+              <Option value="积分">积分</Option>
+              <Option value="特殊">特殊</Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
-            <Select placeholder="状态" allowClear style={{ width: '100%' }}>
+            <Select 
+              placeholder="状态" 
+              allowClear 
+              style={{ width: '100%' }}
+              value={searchStatus}
+              onChange={setSearchStatus}
+            >
               <Option value="启用">启用</Option>
               <Option value="停用">停用</Option>
             </Select>
           </Col>
           <Col xs={24} sm={24} md={16} lg={12} style={{ textAlign: 'right' }}>
             <Space>
-              <Button type="default">重置</Button>
-              <Button type="primary" icon={<SearchOutlined />}>搜索</Button>
+              <Button type="default" onClick={() => {
+                setSearchName('')
+                setSearchCode('')
+                setSearchType('')
+                setSearchStatus('')
+              }}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={loadGuaranteePolicies}>搜索</Button>
             </Space>
           </Col>
         </Row>
@@ -184,7 +187,7 @@ const GroupGuarantee = () => {
 
       {/* 操作按钮区域 */}
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="primary" icon={<PlusOutlined />} size="large">
+        <Button type="primary" icon={<PlusOutlined />} size="large" onClick={handleAddGuarantee}>
           新增担保政策
         </Button>
       </div>
@@ -192,8 +195,9 @@ const GroupGuarantee = () => {
       {/* 担保政策列表表格 */}
       <Table
         columns={columns}
-        dataSource={mockGuaranteePolicies}
+        dataSource={filteredPolicies}
         rowKey="id"
+        loading={loading}
         pagination={{
           pageSize: 10,
           showSizeChanger: true,

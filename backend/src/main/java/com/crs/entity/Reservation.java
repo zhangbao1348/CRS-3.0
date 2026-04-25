@@ -28,20 +28,38 @@ public class Reservation {
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
     
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
+    
     @Column(name = "rate_plan_id", nullable = false)
     private Integer ratePlanId;
+    
+    @Column(name = "rate_plan_code", length = 50)
+    private String ratePlanCode;
     
     @Column(name = "room_type_id", nullable = false)
     private Integer roomTypeId;
     
+    @Column(name = "room_type_code", length = 50)
+    private String roomTypeCode;
+    
     @Column(name = "channel_id", nullable = false)
     private Integer channelId;
+    
+    @Column(name = "channel_code", length = 50)
+    private String channelCode;
     
     @Column(name = "market_code_id")
     private Integer marketCodeId;
     
+    @Column(name = "market_code", length = 50)
+    private String marketCode;
+    
     @Column(name = "source_code_id")
     private Integer sourceCodeId;
+    
+    @Column(name = "source_code", length = 50)
+    private String sourceCode;
     
     @Column(name = "guest_name", nullable = false, length = 100)
     private String guestName;

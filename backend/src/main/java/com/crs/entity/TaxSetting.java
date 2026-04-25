@@ -5,6 +5,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -22,21 +23,47 @@ public class TaxSetting {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "tax_type", nullable = false, length = 20)
-    private String taxType;
+    @Column(name = "tenant_id", nullable = false)
+    private Integer tenantId;
     
-    @Column(name = "tax_name", nullable = false, length = 100)
-    private String taxName;
+    @Column(name = "tax_code", nullable = false, unique = true, length = 50)
+    private String taxCode;
     
-    @Column(name = "tax_rate", nullable = false)
-    private Double taxRate;
+    @Column(name = "legal_name", nullable = false, length = 100)
+    private String legalName;
     
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @Column(name = "bearer", length = 20)
+    private String bearer;
     
-    @Column(name = "status", nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    private Status status = Status.active;
+    @Column(name = "base_type", length = 50)
+    private String baseType;
+    
+    @Column(name = "rate_amount", precision = 10, scale = 4)
+    private BigDecimal rateAmount;
+    
+    @Column(name = "rate_currency", length = 10)
+    private String rateCurrency;
+    
+    @Column(name = "calculation_rule", length = 20)
+    private String calculationRule;
+    
+    @Column(name = "deductible", length = 10)
+    private String deductible;
+    
+    @Column(name = "refundable", length = 20)
+    private String refundable;
+    
+    @Column(name = "settlement_rule", length = 50)
+    private String settlementRule;
+    
+    @Column(name = "compliance_requirements", columnDefinition = "TEXT")
+    private String complianceRequirements;
+    
+    @Column(name = "remarks", columnDefinition = "TEXT")
+    private String remarks;
+    
+    @Column(name = "status", length = 20)
+    private String status = "active";
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
@@ -45,11 +72,6 @@ public class TaxSetting {
     @Column(name = "updated_at", nullable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date updatedAt = new Date();
-    
-    // 状态枚举
-    public enum Status {
-        active, inactive
-    }
     
     @PreUpdate
     public void preUpdate() {

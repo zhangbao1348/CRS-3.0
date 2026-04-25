@@ -26,4 +26,9 @@ public interface GroupFacilityRepository extends JpaRepository<GroupFacility, In
      * @return 设施对象
      */
     GroupFacility findByFacilityCode(String facilityCode);
+    
+    /**
+     * 根据适用范围查询设施
+     */
+    List<GroupFacility> findByScope(String scope);
 }

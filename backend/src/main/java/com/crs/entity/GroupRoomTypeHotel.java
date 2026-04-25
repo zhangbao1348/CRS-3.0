@@ -24,8 +24,14 @@ public class GroupRoomTypeHotel {
     @Column(name = "group_room_type_id", nullable = false)
     private Integer groupRoomTypeId;
     
+    @Column(name = "group_room_type_code", length = 50)
+    private String groupRoomTypeCode;
+    
     @Column(name = "hotel_id", nullable = false)
     private Integer hotelId;
+    
+    @Column(name = "hotel_code", length = 50)
+    private String hotelCode;
     
     @Column(name = "allocated", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean allocated = false;
@@ -74,12 +80,28 @@ public class GroupRoomTypeHotel {
         this.groupRoomTypeId = groupRoomTypeId;
     }
     
+    public String getGroupRoomTypeCode() {
+        return groupRoomTypeCode;
+    }
+    
+    public void setGroupRoomTypeCode(String groupRoomTypeCode) {
+        this.groupRoomTypeCode = groupRoomTypeCode;
+    }
+    
     public Integer getHotelId() {
         return hotelId;
     }
     
     public void setHotelId(Integer hotelId) {
         this.hotelId = hotelId;
+    }
+    
+    public String getHotelCode() {
+        return hotelCode;
+    }
+    
+    public void setHotelCode(String hotelCode) {
+        this.hotelCode = hotelCode;
     }
     
     public Boolean getAllocated() {

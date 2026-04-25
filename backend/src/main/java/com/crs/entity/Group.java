@@ -1,13 +1,11 @@
 package com.crs.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
-import java.util.List;
 
 /**
  * 集团实体类
@@ -17,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "groups")
+@Table(name = "`groups`")
 public class Group {
     
     @Id
@@ -44,27 +42,6 @@ public class Group {
     @Column(name = "updated_at", nullable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date updatedAt = new Date();
-    
-    // 关联关系
-    @JsonIgnore
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Hotel> hotels;
-    
-    @JsonIgnore
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<GroupRoomType> groupRoomTypes;
-    
-    @JsonIgnore
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<GroupRateCode> groupRateCodes;
-    
-    @JsonIgnore
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<GroupGuaranteePolicy> groupGuaranteePolicies;
-    
-    @JsonIgnore
-    @OneToMany(mappedBy = "group", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<GroupCancellationPolicy> groupCancellationPolicies;
     
     // 状态枚举
     public enum Status {

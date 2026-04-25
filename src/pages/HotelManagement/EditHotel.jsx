@@ -3,7 +3,7 @@ import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbo
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
-import axios from 'axios'
+import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateCodeAllocationApi, groupRateCodeApi, groupRoomTypeApi, groupRoomTypeHotelApi } from '../../utils/api'
 
 const { Option } = Select
 
@@ -12,12 +12,27 @@ const EditHotel = () => {
   const [htmlContent, setHtmlContent] = useState('')
   const [hotelId, setHotelId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [supportMultiPrice, setSupportMultiPrice] = useState('no')
+  const [activeTabKey, setActiveTabKey] = useState('1')
+  const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
+  
+  // 集团设施数据状态
+  const [groupFacilities, setGroupFacilities] = useState([])
+  
+  // 集团房价码数据状态
+  const [groupRateCodes, setGroupRateCodes] = useState([])
+  
+  // 集团房型数据状态
+  const [groupRoomTypes, setGroupRoomTypes] = useState([])
   
   // 设施数据状态
   const [facilities, setFacilities] = useState({
     transportationServices: [],
     diningServices: [],
-    cleaningServices: []
+    cleaningServices: [],
+    businessServices: [],
+    recreationServices: [],
+    frontDeskServices: []
   })
   
   // 酒店图片状态
@@ -25,7 +40,8 @@ const EditHotel = () => {
     logo: [],
     external: [],
     restaurant: [],
-    lobby: []
+    lobby: [],
+    video: []
   })
   
   // 表单数据状态
@@ -38,6 +54,7 @@ const EditHotel = () => {
   ])
   
   // 房价码数据状态
+  const [filterRateCategory, setFilterRateCategory] = useState('')
   const [rateCodeData, setRateCodeData] = useState([
     { 
       key: '1', 
@@ -72,26 +89,8 @@ const EditHotel = () => {
   
   // 根据设施代码获取设施名称
   const getFacilityName = (code) => {
-    const facilityMap = {
-      // 交通服务
-      paidParking: '收费停车场',
-      freeParking: '免费停车场',
-      freeShuttle: '免费接送机',
-      paidShuttle: '收费接送机',
-      // 餐饮服务
-      buffetRestaurant: '自助早餐厅',
-      cafe: '咖啡厅',
-      chineseRestaurant: '中餐厅',
-      westernRestaurant: '西餐厅',
-      // 清洁服务
-      laundryService: '外送洗衣服务',
-      dryer: '干衣机',
-      iron: '熨斗/挂烫机',
-      laundryRoom: '洗衣房',
-      valetService: '熨衣服务',
-      washingService: '洗衣服务'
-    }
-    return facilityMap[code] || code
+    const facility = groupFacilities.find(f => f.facilityCode === code)
+    return facility ? facility.facilityName : code
   }
   
   // 从URL获取酒店ID并加载数据
@@ -99,8 +98,9 @@ const EditHotel = () => {
     const urlParams = new URLSearchParams(window.location.search)
     const id = urlParams.get('id')
     if (id) {
-      setHotelId(id)
-      loadHotelData(id)
+      const numericId = parseInt(id)
+      setHotelId(numericId)
+      loadHotelData(numericId)
     } else {
       setLoading(false)
       message.error('未找到酒店ID')
@@ -115,7 +115,10 @@ const EditHotel = () => {
         form.setFieldsValue({
           transportationServices: facilities.transportationServices,
           diningServices: facilities.diningServices,
-          cleaningServices: facilities.cleaningServices
+          cleaningServices: facilities.cleaningServices,
+          businessServices: facilities.businessServices,
+          recreationServices: facilities.recreationServices,
+          frontDeskServices: facilities.frontDeskServices
         })
         console.log('Facilities updated in form via useEffect')
       } catch (error) {
@@ -124,11 +127,30 @@ const EditHotel = () => {
     }
   }, [facilities, form, loading])
   
-  // 加载酒店数据
+  // 加载酒店基础数据
   const loadHotelData = async (id) => {
     try {
-      const response = await axios.get(`http://localhost:8080/api/hotels/${id}`)
+      console.log('开始加载酒店基础数据，ID:', id)
+      
+      // 先加载集团设施（因为设施Tab需要这个数据）
+      try {
+        const facilities = await groupFacilityApi.getAllGroupFacilities({
+          params: { scope: 'hotel' },
+          metadata: { skipAutoLogout: true }
+        })
+        setGroupFacilities(facilities)
+        console.log('集团设施加载成功:', facilities)
+      } catch (facilityError) {
+        console.error('加载集团设施失败:', facilityError)
+      }
+      
+      // 使用带skipAutoLogout标记的API调用，防止401时自动跳转
+      const response = await hotelApi.getHotelById(id, {
+        metadata: { skipAutoLogout: true }
+      })
+      console.log('API响应:', response)
       const hotel = response.data
+      console.log('酒店数据:', hotel)
       
       // 将星级转换为显示格式
       let starRatingDisplay = hotel.starRating
@@ -158,110 +180,315 @@ const EditHotel = () => {
           hotelPhone: hotel.phone,
           hotelEmail: hotel.email,
           hotelIntroduction: hotel.introduction,
-          hotelTotalRooms: hotel.totalRooms || 0
+          hotelTotalRooms: hotel.totalRooms || 0,
+          supportMultiPrice: hotel.supportMultiPrice || 'no',
+          multiPriceOptions: hotel.multiPriceOptions ? hotel.multiPriceOptions.split(',') : [],
+          supportRoomTypePriceDiff: hotel.supportRoomTypePriceDiff || 'no',
+          supportPersonPriceDiff: hotel.supportPersonPriceDiff || 'no',
+          allowCreateRateCode: hotel.allowCreateRateCode || 'allow',
+          allowCreateRoomType: hotel.allowCreateRoomType || 'allow'
         })
-      
-      // 加载酒店设施
-      try {
-        const facilitiesResponse = await axios.get(`http://localhost:8080/api/hotel-facilities/hotel/${id}`)
-        const hotelFacilities = facilitiesResponse.data
         
-        // 分类设施
-        const transportationServices = []
-        const diningServices = []
-        const cleaningServices = []
-        
-        // 处理返回的设施数据
-        if (Array.isArray(hotelFacilities)) {
-          hotelFacilities.forEach(facility => {
-            if (facility.facilityCode) {
-              const facilityCode = facility.facilityCode
-              
-              // 根据代码分类
-              if (['paidParking', 'freeParking', 'freeShuttle', 'paidShuttle'].includes(facilityCode)) {
-                transportationServices.push(facilityCode)
-              } else if (['buffetRestaurant', 'cafe', 'chineseRestaurant', 'westernRestaurant'].includes(facilityCode)) {
-                diningServices.push(facilityCode)
-              } else if (['laundryService', 'dryer', 'iron', 'laundryRoom', 'valetService', 'washingService'].includes(facilityCode)) {
-                cleaningServices.push(facilityCode)
-              }
-            }
-          })
-        }
-        
-        // 更新设施状态
-        setFacilities({
-          transportationServices,
-          diningServices,
-          cleaningServices
-        })
-      } catch (facilityError) {
-        console.error('加载酒店设施失败:', facilityError)
-        // 设施加载失败不影响酒店基本信息的显示
-      }
-      
-      // 加载酒店图片
-      try {
-        const imagesResponse = await axios.get(`http://localhost:8080/api/hotel-images/hotel/${id}`)
-        const images = imagesResponse.data
-        
-        if (Array.isArray(images)) {
-          // 分类图片
-          const logoImages = []
-          const externalImages = []
-          const restaurantImages = []
-          const lobbyImages = []
-          
-          images.forEach(image => {
-            const imageItem = {
-              uid: image.id,
-              name: image.imageName,
-              status: 'done',
-              url: `http://localhost:8080/api/hotel-images/view/${image.id}`
-            }
-            
-            switch (image.imageType) {
-              case 'logo':
-                logoImages.push(imageItem)
-                break
-              case 'external':
-                externalImages.push(imageItem)
-                break
-              case 'restaurant':
-                restaurantImages.push(imageItem)
-                break
-              case 'lobby':
-                lobbyImages.push(imageItem)
-                break
-            }
-          })
-          
-          // 更新图片状态
-          setHotelImages({
-            logo: logoImages,
-            external: externalImages,
-            restaurant: restaurantImages,
-            lobby: lobbyImages
-          })
-        }
-      } catch (imageError) {
-        console.error('加载酒店图片失败:', imageError)
-        // 图片加载失败不影响酒店基本信息的显示
-      }
+        // 设置支持多人价状态
+        setSupportMultiPrice(hotel.supportMultiPrice || 'no')
       
       setLoading(false)
     } catch (error) {
       console.error('加载酒店数据失败:', error)
+      console.error('错误详情:', error.response)
+      console.error('错误状态码:', error.response?.status)
       message.error('加载酒店数据失败，请稍后重试')
       setLoading(false)
     }
   }
   
-  // 处理保存酒店信息
-  const handleSave = async (values) => {
+  // 加载酒店设施
+  const loadHotelFacilities = async (id) => {
     try {
-      // 准备酒店基本信息
-      // 将星级转换为数字格式，以适应数据库字段长度限制
+      const hotelFacilities = await hotelFacilityApi.getHotelFacilities(id, {
+        metadata: { skipAutoLogout: true }
+      })
+      
+      // 分类设施
+      const transportationServices = []
+      const diningServices = []
+      const cleaningServices = []
+      const businessServices = []
+      const recreationServices = []
+      const frontDeskServices = []
+      
+      // 处理返回的设施数据
+      if (Array.isArray(hotelFacilities)) {
+        hotelFacilities.forEach(facility => {
+          if (facility.facilityCode) {
+            const facilityCode = facility.facilityCode
+            const facilityType = facility.facilityType
+            
+            // 根据类型分类
+            if (facilityType === '交通服务') {
+              transportationServices.push(facilityCode)
+            } else if (facilityType === '餐饮服务') {
+              diningServices.push(facilityCode)
+            } else if (facilityType === '清洁服务') {
+              cleaningServices.push(facilityCode)
+            } else if (facilityType === '商务服务') {
+              businessServices.push(facilityCode)
+            } else if (facilityType === '休闲娱乐') {
+              recreationServices.push(facilityCode)
+            } else if (facilityType === '前台服务') {
+              frontDeskServices.push(facilityCode)
+            }
+          }
+        })
+      }
+      
+      // 更新设施状态
+      setFacilities({
+        transportationServices,
+        diningServices,
+        cleaningServices,
+        businessServices,
+        recreationServices,
+        frontDeskServices
+      })
+      console.log('酒店设施加载成功')
+    } catch (facilityError) {
+      console.error('加载酒店设施失败:', facilityError)
+    }
+  }
+  
+  // 加载酒店图片
+  const loadHotelImages = async (id) => {
+    try {
+      const images = await hotelImageApi.getHotelImages(id, {
+        metadata: { skipAutoLogout: true }
+      })
+      
+      if (Array.isArray(images)) {
+        // 分类图片
+        const logoImages = []
+        const externalImages = []
+        const restaurantImages = []
+        const lobbyImages = []
+        const videoItems = []
+        
+        images.forEach(image => {
+          const imageItem = {
+            uid: image.id,
+            name: image.imageName,
+            status: 'done',
+            url: `/api/hotel-images/view/${image.id}`
+          }
+          
+          switch (image.imageType) {
+            case 'logo':
+              logoImages.push(imageItem)
+              break
+            case 'external':
+              externalImages.push(imageItem)
+              break
+            case 'restaurant':
+              restaurantImages.push(imageItem)
+              break
+            case 'lobby':
+              lobbyImages.push(imageItem)
+              break
+            case 'video':
+              videoItems.push(imageItem)
+              break
+          }
+        })
+        
+        // 更新图片状态
+        setHotelImages({
+          logo: logoImages,
+          external: externalImages,
+          restaurant: restaurantImages,
+          lobby: lobbyImages,
+          video: videoItems
+        })
+        console.log('酒店图片加载成功')
+      }
+    } catch (imageError) {
+      console.error('加载酒店图片失败:', imageError)
+    }
+  }
+  
+  // 加载酒店房价码分配
+  const loadRateCodeAllocations = async (id) => {
+    try {
+      console.log('开始加载酒店房价码分配，酒店ID:', id)
+      
+      // 先加载集团房价码
+      let activeRateCodes = []
+      try {
+        const rateCodes = await groupRateCodeApi.getActiveGroupRateCodes({
+          metadata: { skipAutoLogout: true }
+        })
+        activeRateCodes = Array.isArray(rateCodes) ? rateCodes : (rateCodes.data || [])
+        setGroupRateCodes(activeRateCodes)
+        console.log('集团房价码加载成功:', activeRateCodes)
+      } catch (rateCodeError) {
+        console.error('加载集团房价码失败:', rateCodeError)
+      }
+      
+      // 加载酒店房价码分配
+      let allocations = []
+      try {
+        allocations = await hotelRateCodeAllocationApi.getAllocationsByHotelId(id, {
+          metadata: { skipAutoLogout: true }
+        })
+        allocations = Array.isArray(allocations) ? allocations : (allocations.data || [])
+        console.log('酒店房价码分配原始数据:', allocations)
+      } catch (allocError) {
+        console.error('加载房价码分配失败:', allocError)
+      }
+      
+      // 创建分配映射
+      const allocationMap = {}
+      if (Array.isArray(allocations)) {
+        allocations.forEach(alloc => {
+          console.log('分配数据:', alloc, 'groupRateCodeId:', alloc.groupRateCodeId)
+          if (alloc.groupRateCodeId) {
+            allocationMap[alloc.groupRateCodeId] = alloc
+          }
+        })
+      }
+      console.log('分配映射:', allocationMap)
+      
+      // 基于集团房价码创建数据
+      const rateCodeData = []
+      if (activeRateCodes && activeRateCodes.length > 0) {
+        activeRateCodes.forEach(rateCode => {
+          console.log('处理集团房价码:', rateCode.id, rateCode.rateCode)
+          const existingAllocation = allocationMap[rateCode.id]
+          console.log('找到分配:', existingAllocation)
+          rateCodeData.push({
+            key: rateCode.id.toString(),
+            rateCodeId: rateCode.id,
+            rateCode: rateCode.rateName,
+            rateCodeValue: rateCode.rateCode,
+            rateCategory: rateCode.rateCategory || '',
+            derivativeLevel: rateCode.derivativeLevel,
+            allocated: existingAllocation ? existingAllocation.allocated : false,
+            basicInfoEditable: existingAllocation ? existingAllocation.basicInfoEditable : false,
+            priceInfoEditable: existingAllocation ? existingAllocation.priceInfoEditable : false,
+            bookingLimitEditable: existingAllocation ? existingAllocation.bookingLimitEditable : false,
+            guaranteeRuleEditable: existingAllocation ? existingAllocation.guaranteeRuleEditable : false,
+            promotionEditable: existingAllocation ? existingAllocation.promotionEditable : false
+          })
+        })
+      } else {
+        // 如果没有集团房价码，使用默认数据
+        rateCodeData.push(
+          { key: '1', rateCodeId: 1, rateCode: '房价码A', rateCodeValue: 'RACK1', derivativeLevel: 'basic', allocated: false, basicInfoEditable: false, priceInfoEditable: false, bookingLimitEditable: false, guaranteeRuleEditable: false, promotionEditable: false },
+          { key: '2', rateCodeId: 2, rateCode: '房价码B', rateCodeValue: 'WEEKEND', derivativeLevel: 'basic', allocated: false, basicInfoEditable: false, priceInfoEditable: false, bookingLimitEditable: false, guaranteeRuleEditable: false, promotionEditable: false }
+        )
+      }
+      
+      setRateCodeData(rateCodeData)
+      console.log('最终酒店房价码分配数据:', rateCodeData)
+    } catch (rateCodeError) {
+      console.error('加载酒店房价码分配失败:', rateCodeError)
+    }
+  }
+  
+  // 加载酒店房型分配
+  const loadRoomTypeAllocations = async (id) => {
+    try {
+      // 先加载集团房型
+      let activeRoomTypes = []
+      try {
+        const roomTypesResponse = await groupRoomTypeApi.getAllGroupRoomTypes({
+          metadata: { skipAutoLogout: true }
+        })
+        // 处理响应格式
+        const roomTypes = roomTypesResponse.success ? roomTypesResponse.data : []
+        activeRoomTypes = roomTypes.filter(type => type.status === 'active')
+        setGroupRoomTypes(activeRoomTypes)
+        console.log('集团房型加载成功:', activeRoomTypes)
+      } catch (roomTypeError) {
+        console.error('加载集团房型失败:', roomTypeError)
+      }
+      
+      let allocations = []
+      try {
+        const allocationsResponse = await groupRoomTypeHotelApi.getHotelRoomTypeAllocations(id, {
+          metadata: { skipAutoLogout: true }
+        })
+        // 处理响应格式
+        allocations = allocationsResponse.success ? allocationsResponse.data : []
+      } catch (allocError) {
+        console.error('加载房型分配失败:', allocError)
+        allocations = []
+      }
+      
+      // 创建分配映射
+      const allocationMap = {}
+      if (Array.isArray(allocations)) {
+        allocations.forEach(alloc => {
+          allocationMap[alloc.groupRoomTypeId] = alloc
+        })
+      }
+      
+      // 基于集团房型创建数据
+      const roomTypeData = []
+      if (activeRoomTypes && activeRoomTypes.length > 0) {
+        activeRoomTypes.forEach(roomType => {
+          const existingAllocation = allocationMap[roomType.id]
+          roomTypeData.push({
+            key: roomType.id.toString(),
+            groupRoomTypeId: roomType.id,
+            roomType: roomType.roomTypeName,
+            roomTypeCode: roomType.roomTypeCode,
+            allocated: existingAllocation ? existingAllocation.allocated : false,
+            roomInfoEditable: existingAllocation ? existingAllocation.roomInfoEditable : false
+          })
+        })
+      } else {
+        // 如果没有集团房型，使用默认数据
+        roomTypeData.push(
+          { key: '1', groupRoomTypeId: 1, roomType: '高级大床房', roomTypeCode: 'SUPERIOR_KING', allocated: false, roomInfoEditable: false },
+          { key: '2', groupRoomTypeId: 2, roomType: '高级双床房', roomTypeCode: 'SUPERIOR_TWIN', allocated: false, roomInfoEditable: false }
+        )
+      }
+      
+      setRoomTypeData(roomTypeData)
+      console.log('酒店房型分配数据:', roomTypeData)
+    } catch (roomTypeError) {
+      console.error('加载酒店房型分配失败:', roomTypeError)
+    }
+  }
+  
+  // 处理TAB切换，按需加载数据
+  const handleTabChange = async (key) => {
+    setActiveTabKey(key)
+    
+    if (!loadedTabs.has(key) && hotelId) {
+      console.log(`加载TAB ${key} 的数据`)
+      
+      switch (key) {
+        case '2':
+          await loadHotelFacilities(hotelId)
+          break
+        case '3':
+          await loadHotelImages(hotelId)
+          break
+        case '5':
+          await loadRateCodeAllocations(hotelId)
+          break
+        case '6':
+          await loadRoomTypeAllocations(hotelId)
+          break
+      }
+      
+      setLoadedTabs(prev => new Set([...prev, key]))
+    }
+  }
+  
+  // 保存酒店基本信息
+  const saveBasicInfo = async (values) => {
+    try {
       let starRatingValue = values.hotelStarRating;
       if (values.hotelStarRating === '一级') {
         starRatingValue = '1';
@@ -290,78 +517,291 @@ const EditHotel = () => {
         introduction: values.hotelIntroduction || '',
         totalRooms: values.hotelTotalRooms,
         status: 'active',
-        groupId: 1 // 默认集团ID，需要根据实际情况调整
+        supportMultiPrice: values.supportMultiPrice || 'no',
+        multiPriceOptions: values.multiPriceOptions ? values.multiPriceOptions.join(',') : '',
+        supportRoomTypePriceDiff: values.supportRoomTypePriceDiff || 'no',
+        supportPersonPriceDiff: values.supportPersonPriceDiff || 'no',
+        allowCreateRateCode: values.allowCreateRateCode || 'allow',
+        allowCreateRoomType: values.allowCreateRoomType || 'allow'
       }
       
-      // 调用后端API更新酒店
-      const response = await axios.put(`http://localhost:8080/api/hotels/${hotelId}`, hotelData)
+      await hotelApi.updateHotel(hotelId, hotelData, {
+        metadata: { skipAutoLogout: true }
+      })
       
-      console.log('酒店更新成功:', response.data)
+      console.log('酒店基本信息保存成功')
+      return true
+    } catch (error) {
+      console.error('保存酒店基本信息失败:', error)
+      message.error('保存酒店基本信息失败，请稍后重试')
+      return false
+    }
+  }
+  
+  // 保存酒店设施
+  const saveFacilities = async (values) => {
+    try {
+      const selectedFacilities = []
       
-      // 保存酒店设施
-      try {
-        // 收集所有选中的设施
-        const selectedFacilities = [];
-        
-        // 交通服务
-        if (values.transportationServices && Array.isArray(values.transportationServices)) {
-          values.transportationServices.forEach(service => {
-            selectedFacilities.push({
-              facilityName: getFacilityName(service),
-              facilityCode: service,
-              facilityType: '交通服务'
-            });
-          });
-        }
-        
-        // 餐饮服务
-        if (values.diningServices && Array.isArray(values.diningServices)) {
-          values.diningServices.forEach(service => {
-            selectedFacilities.push({
-              facilityName: getFacilityName(service),
-              facilityCode: service,
-              facilityType: '餐饮服务'
-            });
-          });
-        }
-        
-        // 清洁服务
-        if (values.cleaningServices && Array.isArray(values.cleaningServices)) {
-          values.cleaningServices.forEach(service => {
-            selectedFacilities.push({
-              facilityName: getFacilityName(service),
-              facilityCode: service,
-              facilityType: '清洁服务'
-            });
-          });
-        }
-        
-        // 先删除酒店原有的所有设施
-        await axios.delete(`http://localhost:8080/api/hotel-facilities/hotel/${hotelId}`);
-        
-        // 保存新的设施
-        if (selectedFacilities.length > 0) {
-          for (const facility of selectedFacilities) {
-            const facilityData = {
-              hotelId: hotelId,
-              facilityName: facility.facilityName,
-              facilityCode: facility.facilityCode,
-              facilityType: facility.facilityType
-            };
-            await axios.post('http://localhost:8080/api/hotel-facilities', facilityData);
+      if (values.transportationServices && Array.isArray(values.transportationServices)) {
+        values.transportationServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '交通服务'
+          })
+        })
+      }
+      
+      if (values.diningServices && Array.isArray(values.diningServices)) {
+        values.diningServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '餐饮服务'
+          })
+        })
+      }
+      
+      if (values.cleaningServices && Array.isArray(values.cleaningServices)) {
+        values.cleaningServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '清洁服务'
+          })
+        })
+      }
+      
+      if (values.businessServices && Array.isArray(values.businessServices)) {
+        values.businessServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '商务服务'
+          })
+        })
+      }
+      
+      if (values.recreationServices && Array.isArray(values.recreationServices)) {
+        values.recreationServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '休闲娱乐'
+          })
+        })
+      }
+      
+      if (values.frontDeskServices && Array.isArray(values.frontDeskServices)) {
+        values.frontDeskServices.forEach(service => {
+          selectedFacilities.push({
+            facilityName: getFacilityName(service),
+            facilityCode: service,
+            facilityType: '前台服务'
+          })
+        })
+      }
+      
+      await hotelFacilityApi.deleteHotelFacilities(hotelId, {
+        metadata: { skipAutoLogout: true }
+      })
+      
+      if (selectedFacilities.length > 0) {
+        for (const facility of selectedFacilities) {
+          const facilityData = {
+            hotelId: hotelId,
+            facilityName: facility.facilityName,
+            facilityCode: facility.facilityCode,
+            facilityType: facility.facilityType
           }
+          await hotelFacilityApi.createHotelFacility(facilityData, {
+            metadata: { skipAutoLogout: true }
+          })
         }
-        
-        console.log('酒店设施保存成功');
-      } catch (facilityError) {
-        console.error('保存酒店设施失败:', facilityError);
-        // 设施保存失败不影响酒店基本信息的保存
       }
       
-      message.success('保存成功！')
+      console.log('酒店设施保存成功')
+      return true
+    } catch (error) {
+      console.error('保存酒店设施失败:', error)
+      message.error('保存酒店设施失败，请稍后重试')
+      return false
+    }
+  }
+  
+  // 保存酒店房价码分配
+  const saveRateCodeAllocations = async () => {
+    try {
+      await hotelRateCodeAllocationApi.deleteAllocationsByHotelId(hotelId, {
+        metadata: { skipAutoLogout: true }
+      })
       
-      // 跳转到酒店列表页面
-      window.location.href = '/group-management/hotel-management'
+      for (const rateCode of rateCodeData) {
+        const allocationData = {
+          hotelId: hotelId,
+          rateCodeId: rateCode.rateCodeId || parseInt(rateCode.key),
+          allocated: rateCode.allocated,
+          basicInfoEditable: rateCode.basicInfoEditable,
+          priceInfoEditable: rateCode.priceInfoEditable,
+          bookingLimitEditable: rateCode.bookingLimitEditable,
+          guaranteeRuleEditable: rateCode.guaranteeRuleEditable,
+          promotionEditable: rateCode.promotionEditable
+        }
+        await hotelRateCodeAllocationApi.createAllocation(allocationData, {
+          metadata: { skipAutoLogout: true }
+        })
+      }
+      
+      console.log('酒店房价码分配保存成功')
+      return true
+    } catch (error) {
+      console.error('保存酒店房价码分配失败:', error)
+      message.error('保存酒店房价码分配失败，请稍后重试')
+      return false
+    }
+  }
+  
+  // 保存酒店房型分配
+  const saveRoomTypeAllocations = async () => {
+    try {
+      const roomTypeAllocations = roomTypeData.map(roomType => ({
+        groupRoomTypeId: roomType.groupRoomTypeId || parseInt(roomType.key),
+        hotelId: hotelId,
+        allocated: roomType.allocated,
+        roomInfoEditable: roomType.roomInfoEditable
+      }))
+      
+      await groupRoomTypeHotelApi.batchSaveRoomTypeAllocations(roomTypeAllocations, {
+        metadata: { skipAutoLogout: true }
+      })
+      
+      console.log('酒店房型分配保存成功')
+      return true
+    } catch (error) {
+      console.error('保存酒店房型分配失败:', error)
+      message.error('保存酒店房型分配失败，请稍后重试')
+      return false
+    }
+  }
+  
+  // 处理保存酒店信息 - 只保存当前TAB的数据
+  const handleSave = async (values) => {
+    let success = false
+    
+    try {
+      switch (activeTabKey) {
+        case '1':
+          // 酒店基本信息
+          success = await saveBasicInfo(values)
+          break
+        case '2':
+          // 酒店设施
+          success = await saveFacilities(values)
+          break
+        case '3':
+          // 酒店图片 - 图片是即时上传的，这里只显示成功消息
+          success = true
+          message.success('图片已保存')
+          break
+        case '4':
+          // 酒店管控 - 仅包含管控配置
+          success = await saveBasicInfo(values)
+          break
+        case '5':
+          // 分配房价码
+          success = await saveRateCodeAllocations()
+          break
+        case '6':
+          // 分配房型
+          success = await saveRoomTypeAllocations()
+          break
+        default:
+          success = await saveBasicInfo(values)
+      }
+      
+      if (success) {
+        message.success('保存成功！')
+      }
+    } catch (error) {
+      console.error('保存失败:', error)
+      message.error('保存失败，请稍后重试')
+    }
+  }
+  
+  // 保存并返回列表 - 只保存当前Tab
+  const handleSaveAndReturn = async (values) => {
+    let success = false
+    
+    try {
+      switch (activeTabKey) {
+        case '1':
+          success = await saveBasicInfo(values)
+          break
+        case '2':
+          success = await saveFacilities(values)
+          break
+        case '3':
+          success = true
+          message.success('图片已保存')
+          break
+        case '4':
+          success = await saveBasicInfo(values)
+          break
+        case '5':
+          success = await saveRateCodeAllocations()
+          break
+        case '6':
+          success = await saveRoomTypeAllocations()
+          break
+        default:
+          success = await saveBasicInfo(values)
+      }
+      
+      if (success) {
+        message.success('保存成功！')
+        window.location.href = '/group-management/hotel-management'
+      }
+    } catch (error) {
+      console.error('保存失败:', error)
+      message.error('保存失败，请稍后重试')
+    }
+  }
+  
+  // 保存并下一步
+  const handleSaveAndNext = async (values, nextTabKey) => {
+    let success = false
+    
+    try {
+      switch (activeTabKey) {
+        case '1':
+          success = await saveBasicInfo(values)
+          break
+        case '2':
+          success = await saveFacilities(values)
+          break
+        case '3':
+          success = true
+          break
+        case '4':
+          success = await saveBasicInfo(values)
+          break
+        case '5':
+          success = await saveRateCodeAllocations()
+          break
+        case '6':
+          success = await saveRoomTypeAllocations()
+          break
+        default:
+          success = await saveBasicInfo(values)
+      }
+      
+      if (success) {
+        message.success('保存成功！')
+        if (nextTabKey) {
+          setActiveTabKey(nextTabKey)
+        }
+      }
     } catch (error) {
       console.error('保存失败:', error)
       message.error('保存失败，请稍后重试')
@@ -439,13 +879,16 @@ const EditHotel = () => {
       label: '酒店基本信息',
       children: (
         <Card style={{ marginBottom: 24 }}>
-          <Form form={form} layout="vertical" style={{ maxWidth: 800 }} onFinish={handleSave}>
+          <Form form={form} layout="vertical" style={{ maxWidth: 800 }}>
             <Row gutter={[16, 16]}>
               <Col span={12}>
                 <Form.Item
                   name="hotelCode"
                   label="酒店代码"
-                  rules={[{ required: true, message: '请输入酒店代码' }]}
+                  rules={[
+                    { required: true, message: '请输入酒店代码' },
+                    { pattern: /^[A-Za-z0-9_]+$/, message: '酒店代码只能包含英文字母、数字和下划线' }
+                  ]}
                 >
                   <Input placeholder="请输入酒店代码" disabled />
                 </Form.Item>
@@ -583,22 +1026,10 @@ const EditHotel = () => {
                     <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
                       <LeftOutlined /> 返回
                     </Button>
-                    <Button type="primary" size="large" onClick={() => form.submit()}>
+                    <Button type="primary" size="large" onClick={() => form.validateFields().then(values => handleSaveAndReturn(values))}>
                       保存并返回列表
                     </Button>
-                    <Button type="default" size="large" onClick={() => {
-                      form.submit()
-                      // 保存后切换到酒店设施页面
-                      setTimeout(() => {
-                        const tabs = document.querySelector('.ant-tabs-nav')
-                        if (tabs) {
-                          const tabButtons = tabs.querySelectorAll('.ant-tabs-tab')
-                          if (tabButtons[1]) {
-                            tabButtons[1].click()
-                          }
-                        }
-                      }, 1000)
-                    }}>
+                    <Button type="default" size="large" onClick={() => form.validateFields().then(values => handleSaveAndNext(values, '2'))}>
                       保存，并下一步
                     </Button>
                   </Space>
@@ -614,7 +1045,7 @@ const EditHotel = () => {
       label: '酒店设施',
       children: (
         <Card style={{ marginBottom: 24, maxWidth: 800 }}>
-          <Form form={form} layout="vertical" onFinish={handleSave}>
+          <Form form={form} layout="vertical">
             {/* 交通服务 */}
             <Form.Item
               name="transportationServices"
@@ -622,10 +1053,13 @@ const EditHotel = () => {
             >
               <Checkbox.Group>
                 <Space wrap>
-                  <Checkbox value="paidParking">收费停车场</Checkbox>
-                  <Checkbox value="freeParking">免费停车场</Checkbox>
-                  <Checkbox value="freeShuttle">免费接送机</Checkbox>
-                  <Checkbox value="paidShuttle">收费接送机</Checkbox>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '交通服务')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
                 </Space>
               </Checkbox.Group>
             </Form.Item>
@@ -637,10 +1071,13 @@ const EditHotel = () => {
             >
               <Checkbox.Group>
                 <Space wrap>
-                  <Checkbox value="buffetRestaurant">自助早餐厅</Checkbox>
-                  <Checkbox value="cafe">咖啡厅</Checkbox>
-                  <Checkbox value="chineseRestaurant">中餐厅</Checkbox>
-                  <Checkbox value="westernRestaurant">西餐厅</Checkbox>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '餐饮服务')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
                 </Space>
               </Checkbox.Group>
             </Form.Item>
@@ -652,12 +1089,67 @@ const EditHotel = () => {
             >
               <Checkbox.Group>
                 <Space wrap>
-                  <Checkbox value="laundryService">外送洗衣服务</Checkbox>
-                  <Checkbox value="dryer">干衣机</Checkbox>
-                  <Checkbox value="iron">熨斗/挂烫机</Checkbox>
-                  <Checkbox value="laundryRoom">洗衣房</Checkbox>
-                  <Checkbox value="valetService">熨衣服务</Checkbox>
-                  <Checkbox value="washingService">洗衣服务</Checkbox>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '清洁服务')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
+                </Space>
+              </Checkbox.Group>
+            </Form.Item>
+            
+            {/* 商务服务 */}
+            <Form.Item
+              name="businessServices"
+              label="商务服务"
+            >
+              <Checkbox.Group>
+                <Space wrap>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '商务服务')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
+                </Space>
+              </Checkbox.Group>
+            </Form.Item>
+            
+            {/* 休闲娱乐 */}
+            <Form.Item
+              name="recreationServices"
+              label="休闲娱乐"
+            >
+              <Checkbox.Group>
+                <Space wrap>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '休闲娱乐')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
+                </Space>
+              </Checkbox.Group>
+            </Form.Item>
+            
+            {/* 前台服务 */}
+            <Form.Item
+              name="frontDeskServices"
+              label="前台服务"
+            >
+              <Checkbox.Group>
+                <Space wrap>
+                  {groupFacilities
+                    .filter(f => f.facilityType === '前台服务')
+                    .map(facility => (
+                      <Checkbox key={facility.facilityCode} value={facility.facilityCode}>
+                        {facility.facilityName}
+                      </Checkbox>
+                    ))}
                 </Space>
               </Checkbox.Group>
             </Form.Item>
@@ -669,22 +1161,10 @@ const EditHotel = () => {
                   <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
                     <LeftOutlined /> 返回
                   </Button>
-                  <Button type="primary" size="large" onClick={() => form.submit()}>
+                  <Button type="primary" size="large" onClick={() => form.validateFields().then(values => handleSaveAndReturn(values))}>
                     保存并返回列表
                   </Button>
-                  <Button type="default" size="large" onClick={() => {
-                    form.submit()
-                    // 保存后切换到酒店设施页面
-                    setTimeout(() => {
-                      const tabs = document.querySelector('.ant-tabs-nav')
-                      if (tabs) {
-                        const tabButtons = tabs.querySelectorAll('.ant-tabs-tab')
-                        if (tabButtons[2]) {
-                          tabButtons[2].click()
-                        }
-                      }
-                    }, 1000)
-                  }}>
+                  <Button type="default" size="large" onClick={() => form.validateFields().then(values => handleSaveAndNext(values, '3'))}>
                     保存，并下一步
                   </Button>
                 </Space>
@@ -699,40 +1179,49 @@ const EditHotel = () => {
       label: '酒店图片',
       children: (
         <Card style={{ marginBottom: 24, maxWidth: 800 }}>
-          <Form form={form} layout="vertical" onFinish={handleSave}>
+          <Form form={form} layout="vertical">
             {/* 酒店店图 */}
             <Form.Item
               name="hotelLogo"
               label="酒店店图"
             >
               <Upload
-                action="http://localhost:8080/api/hotel-images/upload"
+                customRequest={async (options) => {
+                  const { file, data } = options;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('hotelId', data.hotelId);
+                  formData.append('imageType', data.imageType);
+                  
+                  try {
+                    const response = await hotelImageApi.uploadHotelImage(formData, {
+                      metadata: { skipAutoLogout: true }
+                    });
+                    options.onSuccess(response);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: response.id,
+                      name: file.name,
+                      status: 'done',
+                      url: `/api/hotel-images/view/${response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      logo: [newImage]
+                    }));
+                    message.success(`${file.name} 上传成功`);
+                  } catch (error) {
+                    options.onError(error);
+                    message.error(`${file.name} 上传失败`);
+                    console.error('Upload error:', error);
+                  }
+                }}
                 name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
                 data={{ hotelId: parseInt(hotelId), imageType: 'logo' }}
                 fileList={hotelImages.logo}
-                onChange={(info) => {
-                  console.log('Upload info:', info);
-                  if (info.file.status === 'done') {
-                    message.success(`${info.file.name} 上传成功`);
-                    // 更新图片列表
-                    const newImage = {
-                      uid: info.file.response.id,
-                      name: info.file.name,
-                      status: 'done',
-                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
-                    };
-                    setHotelImages(prev => ({
-                      ...prev,
-                      logo: [newImage]
-                    }));
-                  } else if (info.file.status === 'error') {
-                    message.error(`${info.file.name} 上传失败`);
-                    console.error('Upload error:', info.file.error);
-                  }
-                }}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
                   // 从前端状态中移除图片
@@ -742,7 +1231,9 @@ const EditHotel = () => {
                   }));
                   // 调用后端 API 删除图片
                   if (file.uid) {
-                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                    hotelImageApi.deleteHotelImage(file.uid, {
+                      metadata: { skipAutoLogout: true }
+                    })
                       .then(() => {
                         message.success('图片删除成功');
                       })
@@ -766,31 +1257,42 @@ const EditHotel = () => {
               label="外观图片"
             >
               <Upload
-                action="http://localhost:8080/api/hotel-images/upload"
+                customRequest={async (options) => {
+                  const { file, data } = options;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('hotelId', data.hotelId);
+                  formData.append('imageType', data.imageType);
+                  
+                  try {
+                    const response = await hotelImageApi.uploadHotelImage(formData, {
+                      metadata: { skipAutoLogout: true }
+                    });
+                    options.onSuccess(response);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: response.id,
+                      name: file.name,
+                      status: 'done',
+                      url: `/api/hotel-images/view/${response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      external: [newImage]
+                    }));
+                    message.success(`${file.name} 上传成功`);
+                  } catch (error) {
+                    options.onError(error);
+                    message.error(`${file.name} 上传失败`);
+                    console.error('Upload error:', error);
+                  }
+                }}
                 name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
                 data={{ hotelId: parseInt(hotelId), imageType: 'external' }}
                 fileList={hotelImages.external}
-                onChange={(info) => {
-                  if (info.file.status === 'done') {
-                    message.success(`${info.file.name} 上传成功`);
-                    // 更新图片列表
-                    const newImage = {
-                      uid: info.file.response.id,
-                      name: info.file.name,
-                      status: 'done',
-                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
-                    };
-                    setHotelImages(prev => ({
-                      ...prev,
-                      external: [newImage]
-                    }));
-                  } else if (info.file.status === 'error') {
-                    message.error(`${info.file.name} 上传失败`);
-                  }
-                }}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
                   // 从前端状态中移除图片
@@ -800,7 +1302,9 @@ const EditHotel = () => {
                   }));
                   // 调用后端 API 删除图片
                   if (file.uid) {
-                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                    hotelImageApi.deleteHotelImage(file.uid, {
+                      metadata: { skipAutoLogout: true }
+                    })
                       .then(() => {
                         message.success('图片删除成功');
                       })
@@ -824,31 +1328,42 @@ const EditHotel = () => {
               label="餐厅图片"
             >
               <Upload
-                action="http://localhost:8080/api/hotel-images/upload"
+                customRequest={async (options) => {
+                  const { file, data } = options;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('hotelId', data.hotelId);
+                  formData.append('imageType', data.imageType);
+                  
+                  try {
+                    const response = await hotelImageApi.uploadHotelImage(formData, {
+                      metadata: { skipAutoLogout: true }
+                    });
+                    options.onSuccess(response);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: response.id,
+                      name: file.name,
+                      status: 'done',
+                      url: `/api/hotel-images/view/${response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      restaurant: [newImage]
+                    }));
+                    message.success(`${file.name} 上传成功`);
+                  } catch (error) {
+                    options.onError(error);
+                    message.error(`${file.name} 上传失败`);
+                    console.error('Upload error:', error);
+                  }
+                }}
                 name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
                 data={{ hotelId: parseInt(hotelId), imageType: 'restaurant' }}
                 fileList={hotelImages.restaurant}
-                onChange={(info) => {
-                  if (info.file.status === 'done') {
-                    message.success(`${info.file.name} 上传成功`);
-                    // 更新图片列表
-                    const newImage = {
-                      uid: info.file.response.id,
-                      name: info.file.name,
-                      status: 'done',
-                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
-                    };
-                    setHotelImages(prev => ({
-                      ...prev,
-                      restaurant: [newImage]
-                    }));
-                  } else if (info.file.status === 'error') {
-                    message.error(`${info.file.name} 上传失败`);
-                  }
-                }}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
                   // 从前端状态中移除图片
@@ -858,7 +1373,9 @@ const EditHotel = () => {
                   }));
                   // 调用后端 API 删除图片
                   if (file.uid) {
-                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                    hotelImageApi.deleteHotelImage(file.uid, {
+                      metadata: { skipAutoLogout: true }
+                    })
                       .then(() => {
                         message.success('图片删除成功');
                       })
@@ -882,31 +1399,42 @@ const EditHotel = () => {
               label="大堂图片"
             >
               <Upload
-                action="http://localhost:8080/api/hotel-images/upload"
+                customRequest={async (options) => {
+                  const { file, data } = options;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('hotelId', data.hotelId);
+                  formData.append('imageType', data.imageType);
+                  
+                  try {
+                    const response = await hotelImageApi.uploadHotelImage(formData, {
+                      metadata: { skipAutoLogout: true }
+                    });
+                    options.onSuccess(response);
+                    // 更新图片列表
+                    const newImage = {
+                      uid: response.id,
+                      name: file.name,
+                      status: 'done',
+                      url: `/api/hotel-images/view/${response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      lobby: [newImage]
+                    }));
+                    message.success(`${file.name} 上传成功`);
+                  } catch (error) {
+                    options.onError(error);
+                    message.error(`${file.name} 上传失败`);
+                    console.error('Upload error:', error);
+                  }
+                }}
                 name="file"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
                 data={{ hotelId: parseInt(hotelId), imageType: 'lobby' }}
                 fileList={hotelImages.lobby}
-                onChange={(info) => {
-                  if (info.file.status === 'done') {
-                    message.success(`${info.file.name} 上传成功`);
-                    // 更新图片列表
-                    const newImage = {
-                      uid: info.file.response.id,
-                      name: info.file.name,
-                      status: 'done',
-                      url: `http://localhost:8080/api/hotel-images/view/${info.file.response.id}`
-                    };
-                    setHotelImages(prev => ({
-                      ...prev,
-                      lobby: [newImage]
-                    }));
-                  } else if (info.file.status === 'error') {
-                    message.error(`${info.file.name} 上传失败`);
-                  }
-                }}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
                   // 从前端状态中移除图片
@@ -916,7 +1444,7 @@ const EditHotel = () => {
                   }));
                   // 调用后端 API 删除图片
                   if (file.uid) {
-                    axios.delete(`http://localhost:8080/api/hotel-images/${file.uid}`)
+                    hotelImageApi.deleteHotelImage(file.uid)
                       .then(() => {
                         message.success('图片删除成功');
                       })
@@ -934,6 +1462,77 @@ const EditHotel = () => {
               </Upload>
             </Form.Item>
             
+            {/* 酒店视频 */}
+            <Form.Item
+              name="hotelVideo"
+              label="酒店视频"
+            >
+              <Upload
+                customRequest={async (options) => {
+                  const { file, data } = options;
+                  const formData = new FormData();
+                  formData.append('file', file);
+                  formData.append('hotelId', data.hotelId);
+                  formData.append('imageType', data.imageType);
+                  
+                  try {
+                    const response = await hotelImageApi.uploadHotelImage(formData, {
+                      metadata: { skipAutoLogout: true }
+                    });
+                    options.onSuccess(response);
+                    // 更新视频列表
+                    const newVideo = {
+                      uid: response.id,
+                      name: file.name,
+                      status: 'done',
+                      url: `/api/hotel-images/view/${response.id}`
+                    };
+                    setHotelImages(prev => ({
+                      ...prev,
+                      video: [newVideo]
+                    }));
+                    message.success(`${file.name} 上传成功`);
+                  } catch (error) {
+                    options.onError(error);
+                    message.error(`${file.name} 上传失败`);
+                    console.error('Upload error:', error);
+                  }
+                }}
+                name="file"
+                listType="text"
+                maxCount={1}
+                accept="video/*"
+                data={{ hotelId: parseInt(hotelId), imageType: 'video' }}
+                fileList={hotelImages.video}
+                onRemove={(file) => {
+                  console.log('Remove file:', file);
+                  // 从前端状态中移除视频
+                  setHotelImages(prev => ({
+                    ...prev,
+                    video: prev.video.filter(item => item.uid !== file.uid)
+                  }));
+                  // 调用后端 API 删除视频
+                  if (file.uid) {
+                    hotelImageApi.deleteHotelImage(file.uid, {
+                      metadata: { skipAutoLogout: true }
+                    })
+                      .then(() => {
+                        message.success('视频删除成功');
+                      })
+                      .catch(error => {
+                        console.error('删除视频失败:', error);
+                        message.error('删除视频失败，请稍后重试');
+                      });
+                  }
+                }}
+              >
+                <div>
+                  <PlusOutlined />
+                  <div style={{ marginTop: 8 }}>上传视频</div>
+                </div>
+              </Upload>
+            </Form.Item>
+            
             {/* 保存按钮 */}
             <Form.Item style={{ marginTop: 32 }}>
               <div style={{ textAlign: 'center' }}>
@@ -941,22 +1540,10 @@ const EditHotel = () => {
                   <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
                     <LeftOutlined /> 返回
                   </Button>
-                  <Button type="primary" size="large" onClick={() => form.submit()}>
+                  <Button type="primary" size="large" onClick={() => handleSaveAndReturn({})}>
                     保存并返回列表
                   </Button>
-                  <Button type="default" size="large" onClick={() => {
-                    form.submit()
-                    // 保存后切换到酒店管控页面
-                    setTimeout(() => {
-                      const tabs = document.querySelector('.ant-tabs-nav')
-                      if (tabs) {
-                        const tabButtons = tabs.querySelectorAll('.ant-tabs-tab')
-                        if (tabButtons[3]) {
-                          tabButtons[3].click()
-                        }
-                      }
-                    }, 1000)
-                  }}>
+                  <Button type="default" size="large" onClick={() => handleSaveAndNext({}, '4')}>
                     保存，并下一步
                   </Button>
                 </Space>
@@ -971,7 +1558,7 @@ const EditHotel = () => {
       label: '酒店管控',
       children: (
         <Card style={{ marginBottom: 24, maxWidth: 1000 }}>
-          <Form form={form} layout="vertical" onFinish={handleSave}>
+          <Form form={form} layout="vertical">
             {/* 酒店创建权限 */}
             <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
               <Col span={12}>
@@ -998,16 +1585,169 @@ const EditHotel = () => {
               </Col>
             </Row>
             
+            {/* 多人价配置 */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              <Col span={12}>
+                <Form.Item
+                  name="supportMultiPrice"
+                  label="酒店支持多人价"
+                >
+                  <Radio.Group 
+                    defaultValue="no" 
+                    onChange={(e) => setSupportMultiPrice(e.target.value)}
+                  >
+                    <Radio value="yes">是</Radio>
+                    <Radio value="no">否</Radio>
+                  </Radio.Group>
+                </Form.Item>
+              </Col>
+            </Row>
+            {supportMultiPrice === 'yes' && (
+              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                <Col span={24}>
+                  <Form.Item
+                    name="multiPriceOptions"
+                    label="支持的多人价格"
+                  >
+                    <Checkbox.Group>
+                      <Space wrap>
+                        <Checkbox value="1P">1人价</Checkbox>
+                        <Checkbox value="2P">2人价</Checkbox>
+                        <Checkbox value="3P">3人价</Checkbox>
+                        <Checkbox value="4P">4人价</Checkbox>
+                        <Checkbox value="5P">5人价</Checkbox>
+                        <Checkbox value="1C">1儿童价</Checkbox>
+                        <Checkbox value="2C">2儿童价</Checkbox>
+                      </Space>
+                    </Checkbox.Group>
+                  </Form.Item>
+                </Col>
+              </Row>
+            )}
+            
+            {/* 价差配置 */}
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              <Col span={12}>
+                <Form.Item
+                  name="supportRoomTypePriceDiff"
+                  label="支持房型价差"
+                >
+                  <Radio.Group defaultValue="no">
+                    <Radio value="yes">是</Radio>
+                    <Radio value="no">否</Radio>
+                  </Radio.Group>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="supportPersonPriceDiff"
+                  label="支持人数价差"
+                >
+                  <Radio.Group defaultValue="no">
+                    <Radio value="yes">是</Radio>
+                    <Radio value="no">否</Radio>
+                  </Radio.Group>
+                </Form.Item>
+              </Col>
+            </Row>
+            
+            {/* 保存按钮 */}
+            <Form.Item style={{ marginTop: 32 }}>
+              <div style={{ textAlign: 'center' }}>
+                <Space>
+                  <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
+                    <LeftOutlined /> 返回
+                  </Button>
+                  <Button type="primary" size="large" onClick={() => form.validateFields().then(values => handleSaveAndReturn(values))}>
+                    保存并返回列表
+                  </Button>
+                  <Button type="default" size="large" onClick={() => form.validateFields().then(values => handleSaveAndNext(values, '5'))}>
+                    保存，并下一步
+                  </Button>
+                </Space>
+              </div>
+            </Form.Item>
+          </Form>
+        </Card>
+      )
+    },
+    {
+      key: '5',
+      label: '分配房价码',
+      children: (
+        <Card style={{ marginBottom: 24, maxWidth: 1200 }}>
+          <Form form={form} layout="vertical">
+            {/* 房价大类筛选 */}
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ marginRight: 8 }}>房价大类筛选：</span>
+              <Select
+                value={filterRateCategory}
+                onChange={setFilterRateCategory}
+                style={{ width: 250 }}
+                allowClear
+                placeholder="全部房价大类"
+              >
+                {[...new Set(rateCodeData.map(r => r.rateCategory).filter(Boolean))].map(cat => {
+                  const count = rateCodeData.filter(r => r.rateCategory === cat).length
+                  return (
+                    <Option key={cat} value={cat}>{cat}（{count}个）</Option>
+                  )
+                })}
+              </Select>
+            </div>
             {/* 分配房价码表格 */}
             <Form.Item style={{ marginBottom: 32 }}>
-              <h3 style={{ marginBottom: 16, fontWeight: 600 }}>分配房价码</h3>
               <Table
                 columns={[
                   {
                     title: '房价码',
                     dataIndex: 'rateCode',
                     key: 'rateCode',
-                    width: 150
+                    width: 250,
+                    render: (text, record) => {
+                      const getDerivativeLevelInfo = (level) => {
+                        switch (level) {
+                          case 'basic':
+                            return { label: '基础', color: 'blue' }
+                          case 'level1':
+                          case '一级衍生':
+                            return { label: '一级衍生', color: 'green' }
+                          case 'level2':
+                          case '二级衍生':
+                            return { label: '二级衍生', color: 'orange' }
+                          default:
+                            return { label: '基础', color: 'blue' }
+                        }
+                      }
+                      
+                      const levelInfo = getDerivativeLevelInfo(record.derivativeLevel)
+                      
+                      return (
+                        <div style={{ position: 'relative', display: 'inline-block', paddingTop: 12 }}>
+                          <span>
+                            <strong>{text}</strong>
+                            <span style={{ color: '#999', marginLeft: 4 }}>({record.rateCodeValue})</span>
+                          </span>
+                          <span style={{ 
+                            position: 'absolute',
+                            top: 0,
+                            right: -4,
+                            padding: '0px 3px', 
+                            borderRadius: 2, 
+                            backgroundColor: levelInfo.color === 'blue' ? '#e6f7ff' : 
+                                           levelInfo.color === 'green' ? '#f6ffed' : '#fff7e6',
+                            color: levelInfo.color === 'blue' ? '#1890ff' : 
+                                   levelInfo.color === 'green' ? '#52c41a' : '#fa8c16',
+                            fontSize: 8,
+                            fontWeight: 500,
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {levelInfo.label}
+                          </span>
+                        </div>
+                      )
+                    }
                   },
                   {
                     title: '是否分配到酒店',
@@ -1087,23 +1827,51 @@ const EditHotel = () => {
                     )
                   }
                 ]}
-                dataSource={rateCodeData}
+                dataSource={filterRateCategory ? rateCodeData.filter(r => r.rateCategory === filterRateCategory) : rateCodeData}
                 pagination={false}
                 bordered
                 size="middle"
               />
             </Form.Item>
             
+            {/* 保存按钮 */}
+            <Form.Item style={{ marginTop: 32 }}>
+              <div style={{ textAlign: 'center' }}>
+                <Space>
+                  <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
+                    <LeftOutlined /> 返回
+                  </Button>
+                  <Button type="primary" size="large" onClick={() => handleSaveAndReturn({})}>
+                    保存并返回列表
+                  </Button>
+                  <Button type="default" size="large" onClick={() => handleSaveAndNext({}, '6')}>
+                    保存，并下一步
+                  </Button>
+                </Space>
+              </div>
+            </Form.Item>
+          </Form>
+        </Card>
+      )
+    },
+    {
+      key: '6',
+      label: '分配房型',
+      children: (
+        <Card style={{ marginBottom: 24, maxWidth: 800 }}>
+          <Form form={form} layout="vertical">
             {/* 分配房型表格 */}
             <Form.Item style={{ marginBottom: 32 }}>
-              <h3 style={{ marginBottom: 16, fontWeight: 600 }}>分配房型</h3>
               <Table
                 columns={[
                   {
                     title: '房型',
                     dataIndex: 'roomType',
                     key: 'roomType',
-                    width: 150
+                    width: 250,
+                    render: (text, record) => (
+                      <span>{record.roomType}（{record.roomTypeCode}）</span>
+                    )
                   },
                   {
                     title: '是否分配到酒店',
@@ -1145,17 +1913,11 @@ const EditHotel = () => {
                   <Button size="large" onClick={() => window.location.href = '/group-management/hotel-management'}>
                     <LeftOutlined /> 返回
                   </Button>
-                  <Button type="primary" size="large" onClick={() => form.submit()}>
+                  <Button type="primary" size="large" onClick={() => handleSaveAndReturn({})}>
                     保存并返回列表
                   </Button>
-                  <Button type="default" size="large" onClick={() => {
-                    form.submit()
-                    // 保存后返回列表
-                    setTimeout(() => {
-                      window.location.href = '/group-management/hotel-management'
-                    }, 1000)
-                  }}>
-                    保存，并下一步
+                  <Button type="default" size="large" onClick={() => handleSave({})}>
+                    保存
                   </Button>
                 </Space>
               </div>
@@ -1178,7 +1940,11 @@ const EditHotel = () => {
     <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh', overflow: 'auto' }}>
       <h1 className="page-title">编辑酒店</h1>
       
-      <Tabs defaultActiveKey="1" items={tabItems} />
+      <Tabs 
+        activeKey={activeTabKey} 
+        onChange={handleTabChange}
+        items={tabItems} 
+      />
     </div>
   )
 }

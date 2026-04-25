@@ -111,3 +111,48 @@ build/
 .classpath
 .project
 .settings/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Project specific files
+.agents/
+.kiro/
+.trae/
+.mcp.json
+skills-lock.json
+graphify-out/
+
+# Temporary and backup files
+*.tmp
+*.tmp.*
+*~
+*.bak
+*.swp
+*.class
+
+# Password files and sensitive data
+PasswordEncoder.java
+generate_password.java
+generate_password.class
+
+# Uploads and media
+backend/uploads/
+
+# Test and temporary scripts
+test-skill.js
+delete_tenants.js
+delete_tenants_2_3_4_5.py
+example_export.json
+restore_tenant1_only.sh
+generate-test-data.js
+nginx.conf
+
+# Project documentation (optional, can be included if needed)
+# "CRS系统功能文档.md"
+# "集团CRS核心要求.MD"
+# "CRS项目SOW.xlsx"
+# "需求分析/"
+# "项目内部规范.md"

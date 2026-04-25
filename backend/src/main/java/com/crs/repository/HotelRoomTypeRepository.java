@@ -51,4 +51,33 @@ public interface HotelRoomTypeRepository extends JpaRepository<HotelRoomType, In
      * @return 是否存在
      */
     boolean existsByHotelIdAndRoomTypeCode(Integer hotelId, String roomTypeCode);
+    
+    /**
+     * 根据集团房型ID和酒店ID查询房型
+     * @param groupRoomTypeId 集团房型ID
+     * @param hotelId 酒店ID
+     * @return 房型信息
+     */
+    Optional<HotelRoomType> findByGroupRoomTypeIdAndHotelId(Integer groupRoomTypeId, Integer hotelId);
+    
+    /**
+     * 根据酒店ID按排序字段升序查询
+     * @param hotelId 酒店ID
+     * @return 房型列表
+     */
+    List<HotelRoomType> findByHotelIdOrderBySortOrderAsc(Integer hotelId);
+    
+    /**
+     * 统计某个酒店的房型数量
+     * @param hotelId 酒店ID
+     * @return 房型数量
+     */
+    long countByHotelId(Integer hotelId);
+    
+    /**
+     * 根据房型大类ID查询酒店房型列表
+     * @param roomTypeCategoryId 房型大类ID
+     * @return 房型列表
+     */
+    List<HotelRoomType> findByRoomTypeCategoryId(Integer roomTypeCategoryId);
 }

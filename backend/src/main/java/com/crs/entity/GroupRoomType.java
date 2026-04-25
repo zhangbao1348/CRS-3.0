@@ -33,8 +33,23 @@ public class GroupRoomType {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
+    @Column(name = "room_type_category_id")
+    private Integer roomTypeCategoryId;
+    
+    @Column(name = "max_occupancy")
+    private Integer maxOccupancy;
+    
+    @Column(name = "sort_order")
+    private Integer sortOrder;
+    
     @Column(name = "status", nullable = false, length = 20)
     private String status = "active";
+    
+    // 关联关系
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_type_category_id", insertable = false, updatable = false)
+    private RoomTypeCategory roomTypeCategory;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
@@ -43,12 +58,6 @@ public class GroupRoomType {
     @Column(name = "updated_at", nullable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date updatedAt = new Date();
-    
-    // 关联关系
-    @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_id", insertable = false, updatable = false)
-    private Group group;
     
     @PreUpdate
     public void preUpdate() {
@@ -96,6 +105,38 @@ public class GroupRoomType {
         this.description = description;
     }
     
+    public Integer getRoomTypeCategoryId() {
+        return roomTypeCategoryId;
+    }
+    
+    public void setRoomTypeCategoryId(Integer roomTypeCategoryId) {
+        this.roomTypeCategoryId = roomTypeCategoryId;
+    }
+    
+    public Integer getMaxOccupancy() {
+        return maxOccupancy != null ? maxOccupancy : 2;
+    }
+    
+    public void setMaxOccupancy(Integer maxOccupancy) {
+        this.maxOccupancy = maxOccupancy;
+    }
+    
+    public Integer getSortOrder() {
+        return sortOrder != null ? sortOrder : 0;
+    }
+    
+    public void setSortOrder(Integer sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+    
+    public RoomTypeCategory getRoomTypeCategory() {
+        return roomTypeCategory;
+    }
+    
+    public void setRoomTypeCategory(RoomTypeCategory roomTypeCategory) {
+        this.roomTypeCategory = roomTypeCategory;
+    }
+    
     public String getStatus() {
         return status;
     }
@@ -118,14 +159,6 @@ public class GroupRoomType {
     
     public void setUpdatedAt(Date updatedAt) {
         this.updatedAt = updatedAt;
-    }
-    
-    public Group getGroup() {
-        return group;
-    }
-    
-    public void setGroup(Group group) {
-        this.group = group;
     }
     
     // toString method without associations

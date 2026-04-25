@@ -2,9 +2,11 @@ package com.crs.controller;
 
 import com.crs.entity.HotelRoomType;
 import com.crs.service.HotelRoomTypeService;
+import com.crs.util.CodeValidator;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,12 +30,17 @@ public class HotelRoomTypeController {
      * @return 房型列表
      */
     @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<?> getHotelRoomTypes(@PathVariable Integer hotelId) {
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypes(@PathVariable Integer hotelId) {
+        Map<String, Object> response = new HashMap<>();
         try {
             List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypes(hotelId);
-            return ResponseEntity.ok(roomTypes);
+            response.put("success", true);
+            response.put("data", roomTypes);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
     
@@ -61,6 +68,9 @@ public class HotelRoomTypeController {
     @PostMapping
     public ResponseEntity<?> createHotelRoomType(@RequestBody HotelRoomType hotelRoomType) {
         try {
+            if (hotelRoomType.getRoomTypeCode() != null && !CodeValidator.isValid(hotelRoomType.getRoomTypeCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
             HotelRoomType createdRoomType = hotelRoomTypeService.createHotelRoomType(hotelRoomType);
             return ResponseEntity.ok(createdRoomType);
         } catch (Exception e) {
@@ -79,6 +89,9 @@ public class HotelRoomTypeController {
             @PathVariable Integer id,
             @RequestBody HotelRoomType hotelRoomType) {
         try {
+            if (hotelRoomType.getRoomTypeCode() != null && !CodeValidator.isValid(hotelRoomType.getRoomTypeCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
             HotelRoomType updatedRoomType = hotelRoomTypeService.updateHotelRoomType(id, hotelRoomType);
             return ResponseEntity.ok(updatedRoomType);
         } catch (Exception e) {

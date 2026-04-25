@@ -20,10 +20,18 @@ public class SourceCodeServiceImpl implements SourceCodeService {
     @Autowired
     private SourceCodeRepository sourceCodeRepository;
 
+    // 默认租户ID
+    private static final Integer DEFAULT_TENANT_ID = 1;
+
     @Override
     public List<Map<String, Object>> getAllSourceCodesAsTree() {
+        return getAllSourceCodesAsTreeByTenantId(DEFAULT_TENANT_ID);
+    }
+
+    @Override
+    public List<Map<String, Object>> getAllSourceCodesAsTreeByTenantId(Integer tenantId) {
         try {
-            List<SourceCode> allSourceCodes = sourceCodeRepository.findAll();
+            List<SourceCode> allSourceCodes = sourceCodeRepository.findByTenantId(tenantId);
             Map<Integer, SourceCode> sourceCodeMap = new HashMap<>();
             List<Map<String, Object>> treeData = new ArrayList<>();
 
@@ -161,7 +169,24 @@ public class SourceCodeServiceImpl implements SourceCodeService {
 
     @Override
     public List<SourceCode> getSourceCodesByParentId(Integer parentId) {
-        return sourceCodeRepository.findByParentId(parentId);
+        return sourceCodeRepository.findByTenantIdAndParentId(DEFAULT_TENANT_ID, parentId);
+    }
+
+    @Override
+    public List<SourceCode> getSourceCodesByTenantIdAndParentId(Integer tenantId, Integer parentId) {
+        return sourceCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
+    }
+
+    @Override
+    public List<SourceCode> getThirdLevelSourceCodes(Integer tenantId) {
+        try {
+            // 从数据库获取第三级来源码
+            List<SourceCode> thirdLevelCodes = sourceCodeRepository.findByTenantIdAndLevel(tenantId, 3);
+            return thirdLevelCodes;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
     }
 
     @Override
@@ -171,6 +196,9 @@ public class SourceCodeServiceImpl implements SourceCodeService {
 
     @Override
     public SourceCode createSourceCode(SourceCode sourceCode) {
+        if (sourceCode.getTenantId() == null) {
+            sourceCode.setTenantId(DEFAULT_TENANT_ID);
+        }
         return sourceCodeRepository.save(sourceCode);
     }
 
@@ -192,8 +220,13 @@ public class SourceCodeServiceImpl implements SourceCodeService {
 
     @Override
     public boolean isCodeUnique(String code, Integer excludeId) {
+        return isCodeUniqueByTenantId(DEFAULT_TENANT_ID, code, excludeId);
+    }
+
+    @Override
+    public boolean isCodeUniqueByTenantId(Integer tenantId, String code, Integer excludeId) {
         try {
-            SourceCode existing = sourceCodeRepository.findByCode(code);
+            SourceCode existing = sourceCodeRepository.findByTenantIdAndCode(tenantId, code);
             return existing == null || (excludeId != null && existing.getId().equals(excludeId));
         } catch (Exception e) {
             // 如果数据库操作失败，直接返回true

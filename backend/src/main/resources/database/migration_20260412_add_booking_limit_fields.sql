@@ -1,0 +1,10 @@
+ALTER TABLE group_rate_codes ADD COLUMN personal_membership JSON DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN company_membership JSON DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN advance_booking_min INT DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN advance_booking_max INT DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN minimum_stay_min INT DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN minimum_stay_max INT DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN booking_start_time VARCHAR(10) DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN booking_end_time VARCHAR(10) DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN checkin_start_time VARCHAR(10) DEFAULT NULL;
+ALTER TABLE group_rate_codes ADD COLUMN checkin_end_time VARCHAR(10) DEFAULT NULL;

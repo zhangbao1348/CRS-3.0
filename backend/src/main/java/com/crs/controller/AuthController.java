@@ -1,97 +1,193 @@
 package com.crs.controller;
 
-import com.crs.service.AuthService;
+import com.crs.entity.Menu;
+import com.crs.entity.User;
+import com.crs.service.PermissionService;
+import com.crs.service.UserService;
+import com.crs.util.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-/**
- * 认证控制器
- * 用于处理HTTP请求并调用认证服务
- */
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
 public class AuthController {
-    
-    private final AuthService authService;
-    
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
-    
-    /**
-     * 用户登录
-     * @param loginData 登录数据
-     * @return 登录响应
-     */
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private PermissionService permissionService;
+
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> loginData) {
-        String username = loginData.get("username");
-        String password = loginData.get("password");
-        
+    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
         try {
-            Map<String, Object> response = authService.login(username, password);
+            String username = request.get("username");
+            String password = request.get("password");
+            
+            System.out.println("[DEBUG] Login request received:");
+            System.out.println("[DEBUG] Username: " + username);
+            System.out.println("[DEBUG] Password: " + password);
+            System.out.println("[DEBUG] Request body: " + request.toString());
+
+            Optional<User> userOpt = userService.getUserByUsername(username);
+            if (!userOpt.isPresent()) {
+                System.out.println("[DEBUG] User not found: " + username);
+                response.put("success", false);
+                response.put("message", "用户名或密码错误");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            User user = userOpt.get();
+            System.out.println("[DEBUG] User found: " + user.getUsername());
+            System.out.println("[DEBUG] Stored password hash: " + user.getPassword());
+            System.out.println("[DEBUG] Attempting to match password: " + password);
+            boolean passwordMatch = passwordEncoder.matches(password, user.getPassword());
+            System.out.println("[DEBUG] Password match result: " + passwordMatch);
+            if (!passwordMatch) {
+                response.put("success", false);
+                response.put("message", "用户名或密码错误");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            if (user.getStatus() != User.Status.active) {
+                response.put("success", false);
+                response.put("message", "账户已被禁用");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String token = jwtUtil.generateToken(user.getUsername(), user.getTenantId());
+            String refreshToken = jwtUtil.generateRefreshToken(user.getUsername(), user.getTenantId());
+
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("tenantId", user.getTenantId());
+            userData.put("username", user.getUsername());
+            userData.put("name", user.getName());
+            userData.put("email", user.getEmail());
+            userData.put("avatar", user.getAvatar());
+
+            // 获取用户菜单
+            List<Menu> menus = permissionService.getUserMenus(user.getId(), "crs");
+            System.out.println("[DEBUG] User menus size: " + menus.size());
+            
+            Map<String, Object> data = new HashMap<>();
+            data.put("user", userData);
+            data.put("token", token);
+            data.put("refreshToken", refreshToken);
+            data.put("menus", menus);
+            
+            response.put("success", true);
+            response.put("data", data);
+            response.put("message", "登录成功");
+
             return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "登录失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
-    
-    /**
-     * 用户注册
-     * @param registerData 注册数据
-     * @return 注册响应
-     */
-    @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, String> registerData) {
-        String username = registerData.get("username");
-        String password = registerData.get("password");
-        String name = registerData.get("name");
-        String email = registerData.get("email");
-        String role = registerData.getOrDefault("role", "USER");
-        
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
         try {
-            var user = authService.register(username, password, name, email, role);
-            return ResponseEntity.ok(Map.of("message", "User registered successfully", "user", user));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            String refreshToken = request.get("refreshToken");
+            String username = jwtUtil.extractUsername(refreshToken);
+            if (jwtUtil.validateToken(refreshToken, username)) {
+                Integer tenantId = jwtUtil.extractTenantId(refreshToken);
+                String newToken = jwtUtil.generateToken(username, tenantId);
+                response.put("success", true);
+                response.put("token", newToken);
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "无效的刷新令牌");
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "刷新令牌失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
-    
-    /**
-     * 刷新令牌
-     * @param refreshData 刷新令牌数据
-     * @return 刷新响应
-     */
+
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> refreshData) {
-        String refreshToken = refreshData.get("refreshToken");
-        
+    public ResponseEntity<Map<String, Object>> refreshTokenOld(@RequestBody Map<String, String> request) {
+        return refreshToken(request);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
         try {
-            Map<String, String> response = authService.refreshToken(refreshToken);
+            String username = request.get("username");
+            String password = request.get("password");
+            String name = request.get("name");
+            String email = request.get("email");
+
+            User user = new User();
+            user.setUsername(username);
+            user.setPassword(password);
+            user.setName(name);
+            user.setEmail(email);
+
+            User createdUser = userService.createUser(user, null);
+            response.put("success", true);
+            response.put("data", createdUser);
+            response.put("message", "注册成功");
             return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "注册失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
-    
-    /**
-     * 获取当前用户信息
-     * @return 当前用户信息
-     */
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser() {
-        // 从SecurityContext中获取当前用户信息
-        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "User not authenticated"));
+
+    @GetMapping("/user/{userId}/menus/{systemType}")
+    public ResponseEntity<Map<String, Object>> getUserMenus(
+            @PathVariable Integer userId,
+            @PathVariable String systemType) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<Menu> menus = permissionService.getUserMenus(userId, systemType);
+            response.put("success", true);
+            response.put("data", menus);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "获取菜单失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
-        
-        var userDetails = (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
-        return ResponseEntity.ok(Map.of(
-                "username", userDetails.getUsername(),
-                "authorities", userDetails.getAuthorities()
-        ));
+    }
+
+    @GetMapping("/user/{userId}/permissions")
+    public ResponseEntity<Map<String, Object>> getUserPermissions(@PathVariable Integer userId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<String> permissions = permissionService.getUserPermissions(userId);
+            response.put("success", true);
+            response.put("data", permissions);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "获取权限失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 }

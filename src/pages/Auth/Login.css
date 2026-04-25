@@ -1,0 +1,58 @@
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-header h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+  color: #1a1a1a;
+}
+
+.login-header p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+/* 使输入框上下居中 */
+.ant-form-item {
+  margin-bottom: 16px;
+}
+
+.ant-input,
+.ant-input-password {
+  padding: 10px 11px;
+  height: auto;
+}
+
+.ant-input-prefix {
+  margin-right: 8px;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 24px;
+}
+
+.login-footer p {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
