@@ -33,6 +33,11 @@ public interface ChannelCodeRepository extends JpaRepository<ChannelCode, Intege
     ChannelCode findByTenantIdAndId(Integer tenantId, Integer id);
 
     /**
+     * 根据租户ID和层级查询渠道码（用于获取叶子节点）
+     */
+    List<ChannelCode> findByTenantIdAndLevel(Integer tenantId, Integer level);
+
+    /**
      * 检查租户下CODE是否存在（排除指定ID）
      */
     boolean existsByTenantIdAndCodeAndIdNot(Integer tenantId, String code, Integer id);

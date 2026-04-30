@@ -1,6 +1,7 @@
 package com.crs.controller;
 
 import com.crs.entity.ChannelCode;
+import com.crs.repository.ChannelCodeRepository;
 import com.crs.repository.ChannelHotelMappingRepository;
 import com.crs.service.ChannelCodeService;
 import com.crs.util.CodeValidator;
@@ -24,6 +25,9 @@ public class ChannelCodeController {
     private ChannelCodeService channelCodeService;
 
     @Autowired
+    private ChannelCodeRepository channelCodeRepository;
+
+    @Autowired
     private ChannelHotelMappingRepository channelHotelMappingRepository;
 
     /**
@@ -34,6 +38,28 @@ public class ChannelCodeController {
         try {
             List<Map<String, Object>> treeData = channelCodeService.getAllChannelCodesAsTree();
             return ResponseEntity.ok(treeData);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    /**
+     * 获取第三级（叶子节点）渠道码
+     */
+    @GetMapping("/third-level")
+    public ResponseEntity<List<ChannelCode>> getThirdLevelChannelCodes() {
+        try {
+            // 获取第3级渠道码，如果没有3级则获取第2级中没有子节点的
+            List<ChannelCode> level3 = channelCodeRepository.findByTenantIdAndLevel(1, 3);
+            if (level3.isEmpty()) {
+                // 回退到第2级
+                level3 = channelCodeRepository.findByTenantIdAndLevel(1, 2);
+            }
+            if (level3.isEmpty()) {
+                level3 = channelCodeRepository.findByTenantIdAndLevel(1, 1);
+            }
+            return ResponseEntity.ok(level3);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);

@@ -123,9 +123,31 @@ const RoomType = () => {
       windowType: record.windowType || undefined,
       bedType: record.bedType || undefined
     })
-    setRoomFacilities({})
+    // 加载已有房型设施
+    loadRoomFacilities(record.id)
     setActiveTab('1')
     setViewMode('edit')
+  }
+
+  // 加载房型设施
+  const loadRoomFacilities = async (roomTypeId) => {
+    try {
+      const res = await api.get('/room-type-facilities', { params: { roomTypeId } })
+      const list = res?.data || []
+      const grouped = {}
+      list.forEach(f => {
+        // 找到对应的分类 key
+        const cat = facilityCategories.find(c => c.label === f.facilityType)
+        if (cat) {
+          if (!grouped[cat.key]) grouped[cat.key] = []
+          grouped[cat.key].push(f.facilityCode)
+        }
+      })
+      setRoomFacilities(grouped)
+    } catch (err) {
+      console.error('加载房型设施失败:', err)
+      setRoomFacilities({})
+    }
   }
 
   // 返回列表
@@ -174,8 +196,41 @@ const RoomType = () => {
 
   // 保存设施信息
   const handleSaveFacilities = async () => {
-    // TODO: 后续对接后端保存房型设施关联
-    message.success('房型设施保存成功')
+    if (!isEditMode || !selectedRoomType) {
+      message.warning('请先保存基础信息')
+      return
+    }
+    try {
+      setSaving(true)
+      // 收集所有勾选的设施
+      const facilityList = []
+      facilityCategories.forEach(cat => {
+        const codes = roomFacilities[cat.key] || []
+        codes.forEach(code => {
+          const facility = groupFacilities.find(f => f.facilityCode === code)
+          if (facility) {
+            facilityList.push({
+              facilityType: facility.facilityType,
+              facilityName: facility.facilityName,
+              facilityCode: facility.facilityCode
+            })
+          }
+        })
+      })
+      await api.post('/room-type-facilities/batch', {
+        roomTypeId: selectedRoomType.id,
+        hotelId: selectedHotelId,
+        hotelCode: selectedHotel,
+        roomTypeCode: selectedRoomType.code,
+        facilities: facilityList
+      })
+      message.success('房型设施保存成功')
+    } catch (err) {
+      console.error('保存设施失败:', err)
+      message.error('保存设施失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
   // 设施勾选变更

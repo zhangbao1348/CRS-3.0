@@ -55,6 +55,7 @@ import RateCode from '../pages/HotelManagement/RateCode'
 import ChannelList from '../pages/ChannelManagement/ChannelList'
 import ChannelMapping from '../pages/ChannelManagement/ChannelMapping'
 import FliggySetting from '../pages/ChannelManagement/FliggySetting'
+import ChannelSetting from '../pages/ChannelManagement/ChannelSetting'
 import CtripSetting from '../pages/ChannelManagement/CtripSetting'
 import AddCtripPromotion from '../pages/ChannelManagement/AddCtripPromotion'
 import CtripPromotionRegistration from '../pages/ChannelManagement/CtripPromotionRegistration'
@@ -72,9 +73,6 @@ import PriceQuery from '../pages/RateManagement/PriceQuery'
 import UserManagement from '../pages/SystemSettings/UserManagement'
 import RoleManagement from '../pages/SystemSettings/RoleManagement'
 import GroupSettings from '../pages/SystemSettings/GroupSettings'
-import CustomChannelSetting from '../pages/SystemSettings/CustomChannelSetting'
-import AddCustomChannel from '../pages/SystemSettings/AddCustomChannel'
-
 // CRM页面
 import CrmDashboard from '../pages/Crm/CrmDashboard'
 
@@ -314,6 +312,10 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute><MainLayout><FliggySetting /></MainLayout></ProtectedRoute>
   },
   {
+    path: '/channel-management/channel-setting/:channelCode',
+    element: <ProtectedRoute><MainLayout><ChannelSetting /></MainLayout></ProtectedRoute>
+  },
+  {
     path: '/channel-management/ctrip-setting',
     element: <ProtectedRoute><MainLayout><CtripSetting /></MainLayout></ProtectedRoute>
   },
@@ -401,18 +403,7 @@ export const router = createBrowserRouter([
     path: '/system-settings/group-settings',
     element: <ProtectedRoute><MainLayout><GroupSettings /></MainLayout></ProtectedRoute>
   },
-  {
-    path: '/system-settings/custom-channel-setting',
-    element: <ProtectedRoute><MainLayout><CustomChannelSetting /></MainLayout></ProtectedRoute>
-  },
-  {
-    path: '/system-settings/custom-channel-setting/add',
-    element: <ProtectedRoute><MainLayout><AddCustomChannel /></MainLayout></ProtectedRoute>
-  },
-  {
-    path: '/system-settings/custom-channel-setting/edit/:id',
-    element: <ProtectedRoute><MainLayout><AddCustomChannel /></MainLayout></ProtectedRoute>
-  },
+
   {
     path: '/crm/dashboard',
     element: <ProtectedRoute><MainLayout><CrmDashboard /></MainLayout></ProtectedRoute>

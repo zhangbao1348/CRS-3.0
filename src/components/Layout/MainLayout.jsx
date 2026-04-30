@@ -375,7 +375,6 @@ const MainLayout = ({ children }) => {
       'user-management': '用户管理',
       'role-management': '角色管理',
       'group-settings': '集团设置',
-      'custom-channel-setting': '自定义渠道设置',
       'group-promotion-management': '集团促销管理',
       'ota-promotion-management': 'OTA促销管理',
       'ctrip-activity-management': '携程活动管理',

@@ -1,201 +1,209 @@
-import React, { useState } from 'react'
-import { Table, Select, Button, Modal, Form, Input, DatePicker, message, Row, Col, Card, Tabs } from 'antd'
-import { FilterOutlined, LeftOutlined, RightOutlined, EditOutlined, PlusOutlined, HomeOutlined, TagOutlined, LinkOutlined, DollarOutlined, GlobalOutlined } from '@ant-design/icons'
+import React, { useState, useEffect, useCallback, useContext } from 'react'
+import { Select, Button, Modal, Form, Input, DatePicker, message, Row, Col, Card, Tabs, Spin, Table, Tag } from 'antd'
+import { LeftOutlined, RightOutlined, EditOutlined, HistoryOutlined, HomeOutlined, TagOutlined, LinkOutlined, DollarOutlined, GlobalOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import api, { ratePlanApi } from '../../utils/api'
+import { useHotelContext } from '../../contexts/HotelContext'
+import { AuthContext } from '../../contexts/AuthContext'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
-const { TabPane } = Tabs
 
 const BookingControl = () => {
-  const [selectedMonth, setSelectedMonth] = useState('2025-12')
+  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { user } = useContext(AuthContext)
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [form] = Form.useForm()
   const [activeTab, setActiveTab] = useState('hotel')
-  const [selectedHotel, setSelectedHotel] = useState(undefined)
+  const [loading, setLoading] = useState(false)
+  const [controlData, setControlData] = useState({})
+
+  // 日志
+  const [logModalVisible, setLogModalVisible] = useState(false)
+  const [logs, setLogs] = useState([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
+
+  const getOperatorName = () => encodeURIComponent(user?.name || user?.username || '系统用户')
+
+  // 维度筛选值
   const [selectedRateCode, setSelectedRateCode] = useState(undefined)
   const [selectedChannel, setSelectedChannel] = useState(undefined)
   const [selectedRateCategory, setSelectedRateCategory] = useState(undefined)
   const [selectedMarket, setSelectedMarket] = useState(undefined)
 
+  // 下拉数据源（从后端 API 加载）
+  const [ratePlans, setRatePlans] = useState([])
+  const [cancellationPolicies, setCancellationPolicies] = useState([])
+  const [channelCodes, setChannelCodes] = useState([])
+  const [rateCategories, setRateCategories] = useState([])
+  const [marketCodes, setMarketCodes] = useState([])
+
+  // 取消规则名称映射（code -> name(code)）
+  const getCancelRuleDisplay = (code) => {
+    const policy = cancellationPolicies.find(p => p.code === code)
+    return policy ? `${policy.name}（${policy.code}）` : code
+  }
+
+  // 加载下拉数据
+  useEffect(() => {
+    if (!selectedHotelId) return
+    ratePlanApi.getRatePlans(selectedHotelId).then(res => setRatePlans(res?.data || [])).catch(() => {})
+  }, [selectedHotelId])
+
+  useEffect(() => {
+    // 加载集团取消政策
+    api.get('/cancellation-policies').then(res => {
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      setCancellationPolicies(list.map(p => ({ code: p.policyCode || p.code, name: p.policyName || p.name, id: p.id })))
+    }).catch(() => {})
+    // 加载三级渠道码
+    api.get('/channel-codes/third-level').then(res => {
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      setChannelCodes(list)
+    }).catch(() => setChannelCodes([]))
+    // 加载房价大类
+    api.get('/rate-types/active').then(res => {
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      setRateCategories(list)
+    }).catch(() => setRateCategories([]))
+    // 加载三级市场码
+    api.get('/market-codes/third-level').then(res => {
+      const list = Array.isArray(res) ? res : (res?.data || [])
+      setMarketCodes(list)
+    }).catch(() => setMarketCodes([]))
+  }, [])
+
+  const getDimensionCode = useCallback(() => {
+    if (activeTab === 'hotel') return ''
+    if (activeTab === 'rate') return selectedRateCode || ''
+    if (activeTab === 'channel') return selectedChannel || ''
+    if (activeTab === 'rateCategory') return selectedRateCategory || ''
+    if (activeTab === 'market') return selectedMarket || ''
+    return ''
+  }, [activeTab, selectedRateCode, selectedChannel, selectedRateCategory, selectedMarket])
+
   const isSelectionValid = () => {
     if (activeTab === 'hotel') return true
-    if (activeTab === 'rate' && selectedRateCode) return true
-    if (activeTab === 'channel' && selectedChannel) return true
-    if (activeTab === 'rateCategory' && selectedRateCategory) return true
-    if (activeTab === 'market' && selectedMarket) return true
+    if (activeTab === 'rate') return !!selectedRateCode
+    if (activeTab === 'channel') return !!selectedChannel
+    if (activeTab === 'rateCategory') return !!selectedRateCategory
+    if (activeTab === 'market') return !!selectedMarket
     return false
   }
 
-  const generateDates = (month) => {
-    const dates = []
-    const [year, mon] = month.split('-').map(Number)
-    const daysInMonth = new Date(year, mon, 0).getDate()
-    
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, mon - 1, i)
-      const dayOfWeek = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
-      dates.push({
-        date: date,
-        dateStr: `${mon}.${i.toString().padStart(2, '0')}`,
-        dayOfWeek: dayOfWeek,
-        day: i,
-        key: `date_${year}-${mon}-${i.toString().padStart(2, '0')}`
+  const fetchData = useCallback(async () => {
+    if (!hotelCode || !isSelectionValid()) return
+    setLoading(true)
+    try {
+      const [year, mon] = selectedMonth.split('-').map(Number)
+      const startDate = `${selectedMonth}-01`
+      const endDate = `${selectedMonth}-${new Date(year, mon, 0).getDate()}`
+      const res = await api.get('/booking-controls', {
+        params: { hotelCode, dimensionType: activeTab, dimensionCode: getDimensionCode(), startDate, endDate }
       })
+      const list = res?.data || []
+      const map = {}
+      list.forEach(item => { map[dayjs(item.controlDate).format('YYYY-MM-DD')] = item })
+      setControlData(map)
+    } catch (err) {
+      console.error('查询预订控制失败:', err)
+    } finally {
+      setLoading(false)
     }
-    return dates
-  }
+  }, [hotelCode, selectedMonth, activeTab, getDimensionCode])
 
-  const dates = generateDates(selectedMonth)
+  useEffect(() => { if (isSelectionValid()) fetchData() }, [selectedMonth, activeTab, selectedRateCode, selectedChannel, selectedRateCategory, selectedMarket, hotelCode])
 
-  const controlData = {}
-  dates.forEach(date => {
-    controlData[date.key] = {
-      cancellationRule: ['免费取消', '限时取消', '不可取消'][Math.floor(Math.random() * 3)],
-      advanceBooking: Math.floor(Math.random() * 14) + 1,
-      minStay: Math.floor(Math.random() * 3) + 1,
-      maxStay: Math.floor(Math.random() * 10) + 5
-    }
-  })
+  const handlePrevMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').subtract(1, 'month').format('YYYY-MM'))
+  const handleNextMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').add(1, 'month').format('YYYY-MM'))
 
-  const getDaysInMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon, 0).getDate()
-  }
-
-  const getFirstDayOfMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon - 1, 1).getDay()
-  }
-
-  const daysInMonth = getDaysInMonth(selectedMonth)
-  const firstDay = getFirstDayOfMonth(selectedMonth)
-
-  const handlePrevMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month - 1
-    if (newMonth < 1) {
-      newMonth = 12
-      newYear -= 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-
-  const handleNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month + 1
-    if (newMonth > 12) {
-      newMonth = 1
-      newYear += 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-
-  const handleDateClick = (date) => {
-    setSelectedDate(date)
-    const data = controlData[date.key] || {}
+  const handleDateClick = (dateStr) => {
+    setSelectedDate(dateStr)
+    const data = controlData[dateStr] || {}
     form.setFieldsValue({
-      cancellationRule: data.cancellationRule || '免费取消',
-      advanceBooking: data.advanceBooking || 1,
+      cancellationRule: data.cancellationRule || undefined,
+      advanceBooking: data.advanceBookingDays || 0,
       minStay: data.minStay || 1,
       maxStay: data.maxStay || 30
     })
     setIsModalVisible(true)
   }
 
-  const handleSubmit = () => {
-    form.validateFields().then(values => {
+  const handleBatchClick = () => {
+    setSelectedDate(null)
+    form.resetFields()
+    form.setFieldsValue({ advanceBooking: 0, minStay: 1, maxStay: 30 })
+    setIsModalVisible(true)
+  }
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
       if (selectedDate) {
-        controlData[selectedDate.key] = values
-        message.success(`${selectedDate.dateStr} 预订控制已更新`)
+        await api.post('/booking-controls', {
+          hotelCode, dimensionType: activeTab, dimensionCode: getDimensionCode(),
+          controlDate: selectedDate, cancellationRule: values.cancellationRule,
+          advanceBookingDays: parseInt(values.advanceBooking), minStay: parseInt(values.minStay), maxStay: parseInt(values.maxStay)
+        }, { headers: { 'X-Operator-Name': getOperatorName() } })
+        message.success('保存成功')
       } else {
-        message.success('批量修改成功')
+        const [start, end] = values.dateRange
+        const records = []
+        let cur = start.startOf('day')
+        while (cur.isBefore(end) || cur.isSame(end, 'day')) {
+          records.push({
+            hotelCode, dimensionType: activeTab, dimensionCode: getDimensionCode(),
+            controlDate: cur.format('YYYY-MM-DD'), cancellationRule: values.cancellationRule,
+            advanceBookingDays: parseInt(values.advanceBooking), minStay: parseInt(values.minStay), maxStay: parseInt(values.maxStay)
+          })
+          cur = cur.add(1, 'day')
+        }
+        await api.post('/booking-controls/batch', records, { headers: { 'X-Operator-Name': getOperatorName() } })
+        message.success(`批量保存成功，共 ${records.length} 天`)
       }
       setIsModalVisible(false)
-    })
+      fetchData()
+    } catch (err) {
+      if (err.errorFields) return
+      message.error('保存失败')
+    }
   }
 
   const renderCalendar = () => {
+    const [year, mon] = selectedMonth.split('-').map(Number)
+    const daysInMonth = new Date(year, mon, 0).getDate()
+    const firstDay = new Date(year, mon - 1, 1).getDay()
     const dayNames = ['日', '一', '二', '三', '四', '五', '六']
-
     return (
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {dayNames.map(day => (
-              <th key={day} style={{ 
-                padding: '8px', 
-                border: '1px solid #d9d9d9', 
-                backgroundColor: '#fafafa',
-                textAlign: 'center'
-              }}>
-                {day}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            const rows = []
-            let cells = []
-            
-            for (let i = 0; i < firstDay; i++) {
-              cells.push(<td key={`empty-${i}`} style={{ border: '1px solid #d9d9d9', minHeight: 80 }}></td>)
-            }
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-              const findDate = dates.find(d => d.day === i)
-              const data = controlData[findDate?.key] || {}
-              const dayOfWeek = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1] - 1, i).getDay()
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-
-              cells.push(
-                <td 
-                  key={i} 
-                  style={{ 
-                    border: '1px solid #d9d9d9', 
-                    padding: 8, 
-                    cursor: 'pointer',
-                    backgroundColor: isWeekend ? '#fffbf0' : '#fff',
-                    textAlign: 'center',
-                    minHeight: 100
-                  }}
-                  onClick={() => handleDateClick(findDate)}
-                >
-                  <div style={{ fontWeight: 500, marginBottom: 4 }}>{i}</div>
+        <thead><tr>{dayNames.map(d => <th key={d} style={{ padding: 8, border: '1px solid #d9d9d9', background: '#fafafa', textAlign: 'center' }}>{d}</th>)}</tr></thead>
+        <tbody>{(() => {
+          const rows = []; let cells = []
+          for (let i = 0; i < firstDay; i++) cells.push(<td key={`e${i}`} style={{ border: '1px solid #d9d9d9' }} />)
+          for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${selectedMonth}-${String(i).padStart(2, '0')}`
+            const data = controlData[dateStr] || {}
+            const wd = new Date(year, mon - 1, i).getDay()
+            cells.push(
+              <td key={i} style={{ border: '1px solid #d9d9d9', padding: 8, cursor: 'pointer', background: (wd === 0 || wd === 6) ? '#fffbf0' : '#fff', textAlign: 'center', verticalAlign: 'top' }}
+                onClick={() => handleDateClick(dateStr)}>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>{i}</div>
+                {data.cancellationRule && (
                   <div style={{ fontSize: 11, lineHeight: 1.6 }}>
-                    <div style={{ color: '#1890ff', marginBottom: 2 }}>
-                      {data.cancellationRule || '-'}
-                    </div>
-                    <div style={{ color: '#52c41a', marginBottom: 2 }}>
-                      提前: {data.advanceBooking || 0}天
-                    </div>
-                    <div style={{ color: '#faad14' }}>
-                      连住: {data.minStay || 1}-{data.maxStay || 30}晚
-                    </div>
+                    <div style={{ color: '#1890ff', marginBottom: 2 }}>{getCancelRuleDisplay(data.cancellationRule)}</div>
+                    <div style={{ color: '#52c41a', marginBottom: 2 }}>提前: {data.advanceBookingDays || 0}天</div>
+                    <div style={{ color: '#faad14' }}>连住: {data.minStay || 1}-{data.maxStay || 30}晚</div>
                   </div>
-                </td>
-              )
-
-              if ((firstDay + i) % 7 === 0) {
-                rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-                cells = []
-              }
-            }
-
-            if (cells.length > 0) {
-              while (cells.length < 7) {
-                cells.push(<td key={`empty-end-${cells.length}`} style={{ border: '1px solid #d9d9d9' }}></td>)
-              }
-              rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-            }
-
-            return rows
-          })()}
-        </tbody>
+                )}
+              </td>
+            )
+            if ((firstDay + i) % 7 === 0) { rows.push(<tr key={`r${rows.length}`}>{cells}</tr>); cells = [] }
+          }
+          if (cells.length > 0) { while (cells.length < 7) cells.push(<td key={`ee${cells.length}`} style={{ border: '1px solid #d9d9d9' }} />); rows.push(<tr key={`r${rows.length}`}>{cells}</tr>) }
+          return rows
+        })()}</tbody>
       </table>
     )
   }
@@ -203,176 +211,130 @@ const BookingControl = () => {
   return (
     <div className="fade-in">
       <h1 className="page-title">预订控制</h1>
-      
       <Card style={{ marginBottom: 16 }}>
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <TabPane tab="酒店预订控制" key="hotel" icon={<HomeOutlined />} />
-          <TabPane tab="房价预订控制" key="rate" icon={<TagOutlined />} />
-          <TabPane tab="渠道预订控制" key="channel" icon={<LinkOutlined />} />
-          <TabPane tab="房价大类预订控制" key="rateCategory" icon={<DollarOutlined />} />
-          <TabPane tab="市场预订控制" key="market" icon={<GlobalOutlined />} />
-        </Tabs>
+        <Tabs activeKey={activeTab} onChange={k => { setActiveTab(k); setControlData({}) }}
+          items={[
+            { key: 'hotel', label: <span><HomeOutlined /> 酒店预订控制</span> },
+            { key: 'rate', label: <span><TagOutlined /> 房价预订控制</span> },
+            { key: 'channel', label: <span><LinkOutlined /> 渠道预订控制</span> },
+            { key: 'rateCategory', label: <span><DollarOutlined /> 房价大类预订控制</span> },
+            { key: 'market', label: <span><GlobalOutlined /> 市场预订控制</span> }
+          ]} />
       </Card>
-
       <Card>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Row gutter={16} style={{ marginBottom: 16 }}>
           {activeTab === 'rate' && (
             <Col span={8}>
-              <Select
-                placeholder="请选择房价码"
-                style={{ width: '100%' }}
-                value={selectedRateCode}
-                onChange={setSelectedRateCode}
-              >
-                <Option value="RACK">牌价（RACK）</Option>
-                <Option value="WEB">网络价（WEB）</Option>
-                <Option value="CORP">企业价（CORP）</Option>
-                <Option value="MEMBER">会员价（MEMBER）</Option>
-                <Option value="PKG">套餐价（PKG）</Option>
+              <Select placeholder="请选择房价码" style={{ width: '100%' }} value={selectedRateCode} onChange={setSelectedRateCode} allowClear showSearch optionFilterProp="children">
+                {ratePlans.map(rp => <Option key={rp.rateCode} value={rp.rateCode}>{rp.rateName}（{rp.rateCode}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'channel' && (
             <Col span={8}>
-              <Select
-                placeholder="请选择渠道"
-                style={{ width: '100%' }}
-                value={selectedChannel}
-                onChange={setSelectedChannel}
-              >
-                <Option value="ctrip">携程</Option>
-                <Option value="meituan">美团</Option>
-                <Option value="fliggy">飞猪</Option>
-                <Option value="qunar">去哪儿</Option>
-                <Option value="elong">艺龙</Option>
-                <Option value="direct">直连</Option>
+              <Select placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannel} onChange={setSelectedChannel} allowClear showSearch optionFilterProp="children">
+                {channelCodes.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'rateCategory' && (
             <Col span={8}>
-              <Select
-                placeholder="请选择房价大类"
-                style={{ width: '100%' }}
-                value={selectedRateCategory}
-                onChange={setSelectedRateCategory}
-              >
-                <Option value="public">公开价</Option>
-                <Option value="member">会员价</Option>
-                <Option value="corporate">协议价</Option>
-                <Option value="promotion">促销价</Option>
+              <Select placeholder="请选择房价大类" style={{ width: '100%' }} value={selectedRateCategory} onChange={setSelectedRateCategory} allowClear showSearch optionFilterProp="children">
+                {rateCategories.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'market' && (
             <Col span={8}>
-              <Select
-                placeholder="请选择市场"
-                style={{ width: '100%' }}
-                value={selectedMarket}
-                onChange={setSelectedMarket}
-              >
-                <Option value="domestic">国内市场</Option>
-                <Option value="overseas">海外市场</Option>
-                <Option value="corporate">企业市场</Option>
-                <Option value="leisure">休闲市场</Option>
+              <Select placeholder="请选择市场码" style={{ width: '100%' }} value={selectedMarket} onChange={setSelectedMarket} allowClear showSearch optionFilterProp="children">
+                {marketCodes.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
         </Row>
-        
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 16, gap: 16 }}>
           <Button icon={<LeftOutlined />} onClick={handlePrevMonth}>上月</Button>
-          <span style={{ fontSize: 16, fontWeight: 500, minWidth: 80, textAlign: 'center' }}>
-            {selectedMonth}月
-          </span>
+          <span style={{ fontSize: 16, fontWeight: 500, minWidth: 100, textAlign: 'center' }}>{selectedMonth}</span>
           <Button icon={<RightOutlined />} onClick={handleNextMonth}>下月</Button>
-          <Button 
-            icon={<EditOutlined />} 
-            style={{ marginLeft: 24 }}
-            disabled={!isSelectionValid()}
-            onClick={() => {
-              setSelectedDate(null)
-              form.setFieldsValue({
-                cancellationRule: '免费取消',
-                advanceBooking: 1,
-                minStay: 1,
-                maxStay: 30
-              })
-              setIsModalVisible(true)
-            }}
-          >
-            批量修改
-          </Button>
+          <Button icon={<EditOutlined />} style={{ marginLeft: 24 }} disabled={!isSelectionValid()} onClick={handleBatchClick}>批量修改</Button>
+          <Button icon={<HistoryOutlined />} style={{ marginLeft: 8 }} disabled={!isSelectionValid()} onClick={async () => {
+            setLogModalVisible(true)
+            setLoadingLogs(true)
+            try {
+              const res = await api.get('/booking-controls/logs', { params: { hotelCode, dimensionType: activeTab, dimensionCode: getDimensionCode() } })
+              setLogs(res?.data || [])
+            } catch (err) { console.error(err) }
+            finally { setLoadingLogs(false) }
+          }}>日志</Button>
         </div>
+        <Spin spinning={loading}>
+          {isSelectionValid() ? renderCalendar() : (
+            <div style={{ textAlign: 'center', padding: 60, color: '#999', fontSize: 16 }}>
+              请先选择{activeTab === 'rate' ? '房价码' : activeTab === 'channel' ? '渠道' : activeTab === 'rateCategory' ? '房价大类' : '市场码'}
+            </div>
+          )}
+        </Spin>
 
-        {isSelectionValid() ? (
-          renderCalendar()
-        ) : (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: '60px 20px', 
-            color: '#999',
-            fontSize: '16px'
-          }}>
-            请先选择{activeTab === 'rate' ? '房价码' : activeTab === 'channel' ? '渠道' : activeTab === 'rateCategory' ? '房价大类' : '市场'}
-          </div>
-        )}
-
-        <Modal
-          title={selectedDate 
-            ? `维护 ${selectedDate.dateStr} 预订控制` 
-            : '批量修改预订控制'}
-          open={isModalVisible}
-          onOk={handleSubmit}
-          onCancel={() => setIsModalVisible(false)}
-          okText="确认"
-          cancelText="取消"
-          width={500}
-        >
+        <Modal title={selectedDate ? `维护 ${selectedDate} 预订控制` : '批量修改预订控制'}
+          open={isModalVisible} onOk={handleSubmit} onCancel={() => setIsModalVisible(false)}
+          okText="确认" cancelText="取消" width={500}>
           <Form form={form} layout="vertical">
             {!selectedDate && (
-              <Form.Item
-                name="dateRange"
-                label="选择日期范围"
-                rules={[{ required: true, message: '请选择日期范围' }]}
-              >
+              <Form.Item name="dateRange" label="选择日期范围" rules={[{ required: true, message: '请选择日期范围' }]}>
                 <RangePicker style={{ width: '100%' }} />
               </Form.Item>
             )}
-            <Form.Item
-              name="cancellationRule"
-              label="取消规则名称"
-              rules={[{ required: true, message: '请选择取消规则' }]}
-            >
-              <Select>
-                <Option value="免费取消">免费取消</Option>
-                <Option value="限时取消">限时取消</Option>
-                <Option value="不可取消">不可取消</Option>
+            <Form.Item name="cancellationRule" label="取消规则" rules={[{ required: true, message: '请选择取消规则' }]}>
+              <Select placeholder="请选择取消规则" showSearch optionFilterProp="children">
+                {cancellationPolicies.map(p => <Option key={p.code} value={p.code}>{p.name}（{p.code}）</Option>)}
               </Select>
             </Form.Item>
-            <Form.Item
-              name="advanceBooking"
-              label="提前预订天数"
-              rules={[{ required: true, message: '请输入提前预订天数' }]}
-            >
-              <Input type="number" min={0} placeholder="请输入提前预订天数" />
+            <Form.Item name="advanceBooking" label="提前预订天数" rules={[{ required: true }]}>
+              <Input type="number" min={0} placeholder="天数" />
             </Form.Item>
-            <Form.Item
-              name="minStay"
-              label="最小连住天数"
-              rules={[{ required: true, message: '请输入最小连住天数' }]}
-            >
-              <Input type="number" min={1} placeholder="请输入最小连住天数" />
+            <Form.Item name="minStay" label="最小连住天数" rules={[{ required: true }]}>
+              <Input type="number" min={1} placeholder="最小天数" />
             </Form.Item>
-            <Form.Item
-              name="maxStay"
-              label="最大连住天数"
-              rules={[{ required: true, message: '请输入最大连住天数' }]}
-            >
-              <Input type="number" min={1} placeholder="请输入最大连住天数" />
+            <Form.Item name="maxStay" label="最大连住天数" rules={[{ required: true }]}>
+              <Input type="number" min={1} placeholder="最大天数" />
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal title="预订控制操作日志" open={logModalVisible} onCancel={() => setLogModalVisible(false)} footer={null} width={900}>
+          <Table dataSource={logs} rowKey="id" loading={loadingLogs} size="small" pagination={{ pageSize: 10 }} scroll={{ y: 400 }}
+            columns={[
+              { title: '操作时间', dataIndex: 'operationTime', key: 'time', width: 170, render: v => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-' },
+              { title: '操作人', dataIndex: 'operatorName', key: 'operator', width: 100 },
+              { title: '操作类型', dataIndex: 'operationType', key: 'type', width: 100,
+                render: v => <Tag color={v === 'batch' ? 'blue' : 'green'}>{v === 'batch' ? '批量修改' : '单个修改'}</Tag> },
+              { title: '操作明细', dataIndex: 'detail', key: 'detail', render: v => {
+                if (!v) return '-'
+                try {
+                  const d = JSON.parse(v)
+                  if (d.dates) {
+                    return <div>
+                      <div>日期：{d.dates}</div>
+                      <div>取消规则：{getCancelRuleDisplay(d.values?.cancellationRule)}</div>
+                      <div>提前预订：{d.values?.advanceBookingDays}天，连住：{d.values?.minStay}-{d.values?.maxStay}晚</div>
+                    </div>
+                  }
+                  if (d.changes) {
+                    return <div>
+                      <div>日期：{d.date}</div>
+                      {Object.entries(d.changes).map(([k, val]) => {
+                        const labels = { cancellationRule: '取消规则', advanceBookingDays: '提前天数', minStay: '最小连住', maxStay: '最大连住' }
+                        const [oldV, newV] = val.split('→')
+                        const displayOld = k === 'cancellationRule' ? getCancelRuleDisplay(oldV) : oldV
+                        const displayNew = k === 'cancellationRule' ? getCancelRuleDisplay(newV) : newV
+                        return <div key={k}>{labels[k] || k}：{displayOld ? `${displayOld} → ${displayNew}` : displayNew}</div>
+                      })}
+                    </div>
+                  }
+                  return v
+                } catch { return v }
+              }}
+            ]} />
         </Modal>
       </Card>
     </div>

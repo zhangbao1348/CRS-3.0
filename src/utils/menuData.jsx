@@ -308,12 +308,6 @@ export const crsMenuData = [
         label: '集团设置',
         path: '/system-settings/group-settings',
         icon: <BuildOutlined />
-      },
-      {
-        key: 'custom-channel-setting',
-        label: '自定义渠道设置',
-        path: '/system-settings/custom-channel-setting',
-        icon: <LinkOutlined />
       }
     ]
   },

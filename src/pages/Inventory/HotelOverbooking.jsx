@@ -1,227 +1,149 @@
-import React, { useState } from 'react'
-import { Table, Select, Button, Modal, Form, Input, DatePicker, message } from 'antd'
-import { FilterOutlined, LeftOutlined, RightOutlined, EditOutlined } from '@ant-design/icons'
+import React, { useState, useEffect, useCallback, useContext } from 'react'
+import { Button, Modal, Form, Input, DatePicker, message, Spin, Table, Tag } from 'antd'
+import { LeftOutlined, RightOutlined, EditOutlined, HistoryOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import api from '../../utils/api'
+import { useHotelContext } from '../../contexts/HotelContext'
+import { AuthContext } from '../../contexts/AuthContext'
 
 const { RangePicker } = DatePicker
 
-const { Option } = Select
-
 const HotelOverbooking = () => {
-  const [selectedMonth, setSelectedMonth] = useState('2025-12')
+  const { selectedHotel: hotelCode } = useHotelContext()
+  const { user } = useContext(AuthContext)
+  const getOp = () => encodeURIComponent(user?.name || user?.username || '系统用户')
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+  const [overbookData, setOverbookData] = useState({})
+  const [logModalVisible, setLogModalVisible] = useState(false)
+  const [logs, setLogs] = useState([])
+  const [loadingLogs, setLoadingLogs] = useState(false)
 
-  const generateDates = (month) => {
-    const dates = []
-    const [year, mon] = month.split('-').map(Number)
-    const daysInMonth = new Date(year, mon, 0).getDate()
-    
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, mon - 1, i)
-      const dayOfWeek = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
-      dates.push({
-        date: date,
-        dateStr: `${mon}.${i.toString().padStart(2, '0')}`,
-        dayOfWeek: dayOfWeek,
-        day: i,
-        key: `date_${year}-${mon}-${i.toString().padStart(2, '0')}`
+  const fetchData = useCallback(async () => {
+    if (!hotelCode) return
+    setLoading(true)
+    try {
+      const [year, mon] = selectedMonth.split('-').map(Number)
+      const res = await api.get('/overbooking', {
+        params: { hotelCode, dimensionType: 'hotel', dimensionCode: '',
+          startDate: `${selectedMonth}-01`, endDate: `${selectedMonth}-${new Date(year, mon, 0).getDate()}` }
       })
-    }
-    return dates
-  }
+      const map = {}
+      ;(res?.data || []).forEach(item => { map[dayjs(item.overbookDate).format('YYYY-MM-DD')] = item.overbookCount })
+      setOverbookData(map)
+    } catch (err) { console.error(err) }
+    finally { setLoading(false) }
+  }, [hotelCode, selectedMonth])
 
-  const dates = generateDates(selectedMonth)
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const overbookData = {}
-  dates.forEach(date => {
-    overbookData[date.key] = Math.floor(Math.random() * 5)
-  })
+  const handlePrevMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').subtract(1, 'month').format('YYYY-MM'))
+  const handleNextMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').add(1, 'month').format('YYYY-MM'))
 
-  const getDaysInMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon, 0).getDate()
-  }
-
-  const getFirstDayOfMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon - 1, 1).getDay()
-  }
-
-  const daysInMonth = getDaysInMonth(selectedMonth)
-  const firstDay = getFirstDayOfMonth(selectedMonth)
-
-  const handlePrevMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month - 1
-    if (newMonth < 1) {
-      newMonth = 12
-      newYear -= 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-
-  const handleNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month + 1
-    if (newMonth > 12) {
-      newMonth = 1
-      newYear += 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-
-  const handleDateClick = (date) => {
-    setSelectedDate(date)
-    form.setFieldsValue({
-      overbookCount: overbookData[date.key] || 0
-    })
+  const handleDateClick = (dateStr) => {
+    setSelectedDate(dateStr)
+    form.setFieldsValue({ overbookCount: overbookData[dateStr] || 0 })
     setIsModalVisible(true)
   }
 
-  const handleSubmit = () => {
-    form.validateFields().then(values => {
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+      const count = parseInt(values.overbookCount)
       if (selectedDate) {
-        overbookData[selectedDate.key] = values.overbookCount
-        message.success(`${selectedDate.dateStr} 超预订数量已更新为 ${values.overbookCount}`)
+        await api.post('/overbooking', { hotelCode, dimensionType: 'hotel', dimensionCode: '', overbookDate: selectedDate, overbookCount: count },
+          { headers: { 'X-Operator-Name': getOp() } })
+        message.success('保存成功')
       } else {
-        message.success(`批量修改成功：${values.dateRange[0].format('MM.DD')}-${values.dateRange[1].format('MM.DD')} 超预订已更新为 ${values.overbookCount}`)
+        const [start, end] = values.dateRange
+        const records = []
+        let cur = start.startOf('day')
+        while (cur.isBefore(end) || cur.isSame(end, 'day')) {
+          records.push({ hotelCode, dimensionType: 'hotel', dimensionCode: '', overbookDate: cur.format('YYYY-MM-DD'), overbookCount: count })
+          cur = cur.add(1, 'day')
+        }
+        await api.post('/overbooking/batch', records, { headers: { 'X-Operator-Name': getOp() } })
+        message.success(`批量保存成功，共 ${records.length} 天`)
       }
       setIsModalVisible(false)
-    })
+      fetchData()
+    } catch (err) { if (!err.errorFields) message.error('保存失败') }
   }
 
   const renderCalendar = () => {
+    const [year, mon] = selectedMonth.split('-').map(Number)
+    const daysInMonth = new Date(year, mon, 0).getDate()
+    const firstDay = new Date(year, mon - 1, 1).getDay()
     const dayNames = ['日', '一', '二', '三', '四', '五', '六']
-
     return (
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {dayNames.map(day => (
-              <th key={day} style={{ 
-                padding: '8px', 
-                border: '1px solid #d9d9d9', 
-                backgroundColor: '#fafafa',
-                textAlign: 'center'
-              }}>
-                {day}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            const rows = []
-            let cells = []
-            
-            for (let i = 0; i < firstDay; i++) {
-              cells.push(<td key={`empty-${i}`} style={{ border: '1px solid #d9d9d9', minHeight: 60 }}></td>)
-            }
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-              const findDate = dates.find(d => d.day === i)
-              const overbookCount = overbookData[findDate?.key] || 0
-              const dayOfWeek = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1] - 1, i).getDay()
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-
-              cells.push(
-                <td 
-                  key={i} 
-                  style={{ 
-                    border: '1px solid #d9d9d9', 
-                    padding: 8, 
-                    cursor: 'pointer',
-                    backgroundColor: isWeekend ? '#fffbf0' : '#fff',
-                    textAlign: 'center'
-                  }}
-                  onClick={() => handleDateClick(findDate)}
-                >
-                  <div style={{ fontWeight: 500, marginBottom: 4 }}>{i}</div>
-                  <div style={{ 
-                    color: '#000',
-                    fontSize: 12
-                  }}>
-                    {overbookCount > 0 ? `超预订: ${overbookCount}` : '超预订: 0'}
-                  </div>
-                </td>
-              )
-
-              if ((firstDay + i) % 7 === 0) {
-                rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-                cells = []
-              }
-            }
-
-            if (cells.length > 0) {
-              while (cells.length < 7) {
-                cells.push(<td key={`empty-end-${cells.length}`} style={{ border: '1px solid #d9d9d9' }}></td>)
-              }
-              rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-            }
-
-            return rows
-          })()}
-        </tbody>
+        <thead><tr>{dayNames.map(d => <th key={d} style={{ padding: 8, border: '1px solid #d9d9d9', background: '#fafafa', textAlign: 'center' }}>{d}</th>)}</tr></thead>
+        <tbody>{(() => {
+          const rows = []; let cells = []
+          for (let i = 0; i < firstDay; i++) cells.push(<td key={`e${i}`} style={{ border: '1px solid #d9d9d9' }} />)
+          for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${selectedMonth}-${String(i).padStart(2, '0')}`
+            const count = overbookData[dateStr] || 0
+            const wd = new Date(year, mon - 1, i).getDay()
+            cells.push(
+              <td key={i} style={{ border: '1px solid #d9d9d9', padding: 8, cursor: 'pointer', background: (wd === 0 || wd === 6) ? '#fffbf0' : '#fff', textAlign: 'center', verticalAlign: 'top' }}
+                onClick={() => handleDateClick(dateStr)}>
+                <div style={{ fontWeight: 500, marginBottom: 4 }}>{i}</div>
+                <div style={{ color: count > 0 ? '#1890ff' : '#999', fontSize: 12 }}>超预订: {count}</div>
+              </td>
+            )
+            if ((firstDay + i) % 7 === 0) { rows.push(<tr key={`r${rows.length}`}>{cells}</tr>); cells = [] }
+          }
+          if (cells.length > 0) { while (cells.length < 7) cells.push(<td key={`ee${cells.length}`} style={{ border: '1px solid #d9d9d9' }} />); rows.push(<tr key={`r${rows.length}`}>{cells}</tr>) }
+          return rows
+        })()}</tbody>
       </table>
     )
   }
+
+  if (!hotelCode) return <div style={{ textAlign: 'center', padding: 60, color: '#999' }}>请先选择酒店</div>
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 16, gap: 16 }}>
         <Button icon={<LeftOutlined />} onClick={handlePrevMonth}>上月</Button>
-        <span style={{ fontSize: 16, fontWeight: 500, minWidth: 80, textAlign: 'center' }}>
-          {selectedMonth}月
-        </span>
+        <span style={{ fontSize: 16, fontWeight: 500, minWidth: 100, textAlign: 'center' }}>{selectedMonth}</span>
         <Button icon={<RightOutlined />} onClick={handleNextMonth}>下月</Button>
-        <Button 
-          icon={<EditOutlined />} 
-          style={{ marginLeft: 24 }}
-          onClick={() => {
-            setSelectedDate(null)
-            form.setFieldsValue({ overbookCount: 0 })
-            setIsModalVisible(true)
-          }}
-        >
-          批量修改
-        </Button>
+        <Button icon={<EditOutlined />} style={{ marginLeft: 24 }} onClick={() => { setSelectedDate(null); form.resetFields(); form.setFieldsValue({ overbookCount: 0 }); setIsModalVisible(true) }}>批量修改</Button>
+        <Button icon={<HistoryOutlined />} style={{ marginLeft: 8 }} onClick={async () => {
+          setLogModalVisible(true); setLoadingLogs(true)
+          try { const res = await api.get('/overbooking/logs', { params: { hotelCode, dimensionType: 'hotel', dimensionCode: '' } }); setLogs(res?.data || []) }
+          catch (e) { console.error(e) } finally { setLoadingLogs(false) }
+        }}>日志</Button>
       </div>
-
-      {renderCalendar()}
-
-      <Modal
-        title={selectedDate 
-          ? `维护 ${selectedDate.dateStr} 超预订数量` 
-          : '批量修改酒店超预订'}
-        open={isModalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setIsModalVisible(false)}
-        okText="确认"
-        cancelText="取消"
-        width={500}
-      >
+      <Spin spinning={loading}>{renderCalendar()}</Spin>
+      <Modal title={selectedDate ? `维护 ${selectedDate} 超预订数量` : '批量修改酒店超预订'}
+        open={isModalVisible} onOk={handleSubmit} onCancel={() => setIsModalVisible(false)} okText="确认" cancelText="取消" width={500}>
         <Form form={form} layout="vertical">
           {!selectedDate && (
-            <Form.Item
-              name="dateRange"
-              label="选择日期范围"
-              rules={[{ required: true, message: '请选择日期范围' }]}
-            >
+            <Form.Item name="dateRange" label="选择日期范围" rules={[{ required: true, message: '请选择日期范围' }]}>
               <RangePicker style={{ width: '100%' }} />
             </Form.Item>
           )}
-          <Form.Item
-            name="overbookCount"
-            label="超预订数量"
-            rules={[{ required: true, message: '请输入超预订数量' }]}
-          >
-            <Input type="number" placeholder="请输入超预订数量" />
+          <Form.Item name="overbookCount" label="超预订数量" rules={[{ required: true, message: '请输入超预订数量' }]}>
+            <Input type="number" min={0} placeholder="请输入超预订数量" />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal title="超预订操作日志" open={logModalVisible} onCancel={() => setLogModalVisible(false)} footer={null} width={700}>
+        <Table dataSource={logs} rowKey="id" loading={loadingLogs} size="small" pagination={{ pageSize: 10 }} scroll={{ y: 400 }}
+          columns={[
+            { title: '操作时间', dataIndex: 'operationTime', width: 170, render: v => v ? dayjs(v).format('YYYY-MM-DD HH:mm:ss') : '-' },
+            { title: '操作人', dataIndex: 'operatorName', width: 100 },
+            { title: '类型', dataIndex: 'operationType', width: 90, render: v => <Tag color={v === 'batch' ? 'blue' : 'green'}>{v === 'batch' ? '批量' : '单个'}</Tag> },
+            { title: '明细', dataIndex: 'detail', render: v => {
+              if (!v) return '-'
+              try { const d = JSON.parse(v); if (d.dates) return `${d.dates}，设为 ${d.count}`; return `${d.date}：${d.old} → ${d.new}` } catch { return v }
+            }}
+          ]} />
       </Modal>
     </div>
   )

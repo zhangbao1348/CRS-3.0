@@ -1,99 +1,97 @@
-import React, { useState } from 'react'
-import { Card, Tabs, Tag, Row, Col, Typography } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Card, Tabs, Tag, Row, Col, Typography, Spin, message } from 'antd'
 import { LinkOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { tenantChannelApi } from '../../utils/api'
 import ctripLogo from '../../assets/images/channels/ctrip.webp'
 import meituanLogo from '../../assets/images/channels/meituan.webp'
 import feizhuLogo from '../../assets/images/channels/feizhu.jpeg'
 import hongsejialiLogo from '../../assets/images/channels/hongsejiali.png'
 
 const { TabPane } = Tabs
-const { Title } = Typography
 
-// 模拟已连接渠道数据
-const connectedChannels = [
-  {
-    id: 4,
-    name: '携程',
-    icon: ctripLogo,
-    status: 'connected',
-    connectionTime: '20产品在售'
-  },
-  {
-    id: 1,
-    name: '飞猪',
-    icon: feizhuLogo,
-    status: 'connected',
-    connectionTime: '20产品在售'
-  },
-  {
-    id: 2,
-    name: '红色加力',
-    icon: hongsejialiLogo,
-    status: 'connected',
-    connectionTime: '20产品在售'
-  },
-  {
-    id: 3,
-    name: '美团',
-    icon: meituanLogo,
-    status: 'connected',
-    connectionTime: '20产品在售'
-  }
-]
+// 本地LOGO映射（渠道代码 -> 本地图片）
+const localLogoMap = {
+  'CTRIP': ctripLogo,
+  'MEITUAN': meituanLogo,
+  'FLIGGY': feizhuLogo,
+  'RED_POWER': hongsejialiLogo
+}
 
-// 模拟可连接渠道数据
-const availableChannels = [
-  {
-    id: 6,
-    name: 'Booking.com',
-    icon: 'https://www.booking.com/favicon.ico',
-    status: 'available'
-  },
-  {
-    id: 7,
-    name: 'Agoda',
-    icon: 'https://www.agoda.com/favicon.ico',
-    status: 'available'
-  },
-  {
-    id: 8,
-    name: 'Expedia',
-    icon: 'https://www.expedia.com/favicon.ico',
-    status: 'available'
-  },
-  {
-    id: 9,
-    name: 'Hotels.com',
-    icon: 'https://www.hotels.com/favicon.ico',
-    status: 'available'
-  }
-]
+// 渠道卡片背景色映射
+const channelStyleMap = {
+  'CTRIP': { bg: '#f0f9ff', border: '1px solid #e6f7ff' },
+  'MEITUAN': { bg: '#fff7e6', border: '1px solid #ffd591' },
+  'FLIGGY': { bg: '#f6ffed', border: '1px solid #b7eb8f' },
+  'RED_POWER': { bg: '#fff2f0', border: '1px solid #ffccc7' }
+}
+
+// 渠道代码 -> 设置页面路由映射
+const channelRouteMap = {
+  'FLIGGY': '/channel-management/fliggy-setting',
+  'CTRIP': '/channel-management/ctrip-setting'
+}
 
 const ChannelList = () => {
-  // 状态管理
-  const [channels, setChannels] = useState({
-    connected: connectedChannels,
-    available: availableChannels
-  })
+  const [channels, setChannels] = useState({ connected: [], available: [] })
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  // 渲染渠道卡片
+  useEffect(() => {
+    fetchChannels()
+  }, [])
+
+  const fetchChannels = async () => {
+    setLoading(true)
+    try {
+      const response = await tenantChannelApi.getChannelsGrouped(1)
+      const data = response
+      // 转换后端数据为前端卡片格式
+      const connected = (data.connected || []).map(ch => ({
+        id: ch.id,
+        name: ch.channelName,
+        code: ch.channelCode,
+        switchChannel: ch.switchChannel,
+        icon: localLogoMap[ch.channelCode] || ch.logoUrl,
+        status: 'connected',
+        connectionTime: '20产品在售'
+      }))
+      const available = (data.available || []).map(ch => ({
+        id: ch.id,
+        name: ch.channelName,
+        code: ch.channelCode,
+        switchChannel: ch.switchChannel,
+        icon: localLogoMap[ch.channelCode] || ch.logoUrl || '',
+        status: 'available'
+      }))
+      setChannels({ connected, available })
+    } catch (error) {
+      console.error('获取渠道列表失败:', error)
+      message.error('获取渠道列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const renderChannelCard = (channel) => {
-    // 处理卡片点击
+    // 确定路由：专属渠道用固定路由，Real_Time_API 渠道用通用路由
+    let route = channelRouteMap[channel.code]
+    if (!route && channel.switchChannel === 'Real_Time_API') {
+      route = `/channel-management/channel-setting/${channel.code}`
+    }
+    const style = channelStyleMap[channel.code] || { bg: '#fafafa', border: '1px solid #f0f0f0' }
+
     const handleCardClick = () => {
-      if (channel.name === '飞猪') {
-        navigate('/channel-management/fliggy-setting')
-      } else if (channel.name === '携程') {
-        navigate('/channel-management/ctrip-setting')
+      if (route) {
+        navigate(route)
       }
     }
 
     return (
       <Col xs={24} sm={12} md={8} lg={6} xl={6} key={channel.id}>
         <Card
-          hoverable
-          onClick={(channel.name === '飞猪' || channel.name === '携程') ? handleCardClick : undefined}
+          hoverable={!!route}
+          onClick={route ? handleCardClick : undefined}
           style={{
             borderRadius: 16,
             boxShadow: '0 6px 20px rgba(0, 0, 0, 0.08)',
@@ -105,60 +103,51 @@ const ChannelList = () => {
             justifyContent: 'center',
             padding: '40px 0',
             transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            cursor: (channel.name === '飞猪' || channel.name === '携程') ? 'pointer' : 'default',
+            cursor: route ? 'pointer' : 'default',
             backgroundColor: '#ffffff'
           }}
-          bodyStyle={{
-            padding: 0
-          }}
-          hoverable={!!((channel.name === '飞猪' || channel.name === '携程'))}
+          bodyStyle={{ padding: 0 }}
         >
-          <div style={{ 
-            width: 160, 
-            height: 160, 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            width: 160,
+            height: 160,
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 24,
-            backgroundColor: 
-              channel.name === '携程' ? '#f0f9ff' : 
-              channel.name === '美团' ? '#fff7e6' :
-              channel.name === '飞猪' ? '#f6ffed' :
-              channel.name === '红色加力' ? '#fff2f0' : '#fafafa',
+            backgroundColor: style.bg,
             borderRadius: 16,
-            border: 
-              channel.name === '携程' ? '1px solid #e6f7ff' : 
-              channel.name === '美团' ? '1px solid #ffd591' :
-              channel.name === '飞猪' ? '1px solid #b7eb8f' :
-              channel.name === '红色加力' ? '1px solid #ffccc7' : '1px solid #f0f0f0',
+            border: style.border,
             transition: 'all 0.3s ease',
             overflow: 'hidden'
           }}>
-            <img 
-              src={channel.icon} 
-              alt={channel.name} 
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'contain',
-                display: 'block',
-                transition: 'all 0.3s ease'
-              }} 
-            />
+            {channel.icon && (
+              <img
+                src={channel.icon}
+                alt={channel.name}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            )}
           </div>
-          <div style={{ 
-            fontSize: 20, 
-            fontWeight: 600, 
+          <div style={{
+            fontSize: 20,
+            fontWeight: 600,
             marginBottom: 16,
             textAlign: 'center',
             color: '#333333',
             transition: 'all 0.3s ease'
           }}>{channel.name}</div>
           {channel.status === 'connected' && (
-            <Tag 
-              color="green" 
-              icon={<CheckCircleOutlined />} 
-              style={{ 
+            <Tag
+              color="green"
+              icon={<CheckCircleOutlined />}
+              style={{
                 marginBottom: 8,
                 fontSize: 14,
                 padding: '6px 16px',
@@ -170,9 +159,9 @@ const ChannelList = () => {
             </Tag>
           )}
           {channel.status === 'available' && (
-            <Tag 
-              color="blue" 
-              style={{ 
+            <Tag
+              color="blue"
+              style={{
                 marginBottom: 8,
                 fontSize: 14,
                 padding: '6px 16px',
@@ -194,19 +183,21 @@ const ChannelList = () => {
         <LinkOutlined />
         渠道管理
       </h1>
-      
-      <Tabs defaultActiveKey="connected" type="card" size="large" style={{ marginBottom: 24 }}>
-        <TabPane tab="已连接渠道" key="connected">
-          <Row gutter={[16, 16]}>
-            {channels.connected.map(renderChannelCard)}
-          </Row>
-        </TabPane>
-        <TabPane tab="可连接渠道" key="available">
-          <Row gutter={[16, 16]}>
-            {channels.available.map(renderChannelCard)}
-          </Row>
-        </TabPane>
-      </Tabs>
+
+      <Spin spinning={loading}>
+        <Tabs defaultActiveKey="connected" type="card" size="large" style={{ marginBottom: 24 }}>
+          <TabPane tab="已连接渠道" key="connected">
+            <Row gutter={[16, 16]}>
+              {channels.connected.map(renderChannelCard)}
+            </Row>
+          </TabPane>
+          <TabPane tab="可连接渠道" key="available">
+            <Row gutter={[16, 16]}>
+              {channels.available.map(renderChannelCard)}
+            </Row>
+          </TabPane>
+        </Tabs>
+      </Spin>
     </div>
   )
 }

@@ -55,7 +55,6 @@ INSERT IGNORE INTO menus (parent_id, menu_code, menu_name, menu_type, path, icon
 (42, 'crs-role-management', '角色管理', 'menu', '/system-settings/role-management', 'SafetyCertificateOutlined', 2, 'active', 'crs', 'system:role:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (42, 'crs-menu-management', '菜单管理', 'menu', '/system-settings/menu-management', 'MenuOutlined', 3, 'active', 'crs', 'system:menu:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (42, 'crs-group-settings', '集团设置', 'menu', '/system-settings/group-settings', 'BuildOutlined', 4, 'active', 'crs', 'crs:groupsettings:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(42, 'crs-custom-channel', '自定义渠道设置', 'menu', '/system-settings/custom-channel-setting', 'LinkOutlined', 5, 'active', 'crs', 'crs:customchannel:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (1, 'crs-super-admin', '超管设置', 'directory', '/super-admin-settings', 'SafetyCertificateOutlined', 11, 'active', 'crs', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (48, 'crs-tenant-management', '租户管理', 'menu', '/super-admin-settings/tenant-management', 'BuildOutlined', 1, 'active', 'crs', 'superadmin:tenant:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (48, 'crs-platform-settings', '平台设置', 'menu', '/super-admin-settings/platform-settings', 'SettingOutlined', 2, 'active', 'crs', 'superadmin:platform:view', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),

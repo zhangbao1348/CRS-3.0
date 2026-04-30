@@ -324,4 +324,34 @@ export const hotelPriceApi = {
   }
 }
 
+export const tenantChannelApi = {
+  getChannelsGrouped: (tenantId, options = {}) => {
+    const params = tenantId ? { tenantId } : {}
+    return api.get('/tenant-channels', { params, ...options })
+  },
+  getAllChannels: (tenantId, options = {}) => {
+    const params = tenantId ? { tenantId } : {}
+    return api.get('/tenant-channels/all', { params, ...options })
+  },
+  getChannelById: (id, options = {}) => api.get(`/tenant-channels/${id}`, options),
+  getChannelByCode: (channelCode, tenantId, options = {}) => {
+    const params = tenantId ? { tenantId } : {}
+    return api.get(`/tenant-channels/code/${channelCode}`, { params, ...options })
+  },
+  updateChannel: (id, data, options = {}) => api.put(`/tenant-channels/${id}`, data, options),
+  updateChannelByCode: (channelCode, data, tenantId, options = {}) => {
+    const params = tenantId ? { tenantId } : {}
+    return api.put(`/tenant-channels/code/${channelCode}`, data, { params, ...options })
+  }
+}
+
+export const channelPublishApi = {
+  getRateCodesWithRoomTypes: (hotelId, options = {}) =>
+    api.get('/channel-publish/rate-codes', { params: { hotelId }, ...options }),
+  getPublishedRecords: (tenantId, hotelCode, channelCode, options = {}) =>
+    api.get('/channel-publish/records', { params: { tenantId, hotelCode, channelCode }, ...options }),
+  batchPublish: (data, options = {}) =>
+    api.post('/channel-publish/batch', data, options)
+}
+
 export default api
