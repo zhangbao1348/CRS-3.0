@@ -119,7 +119,11 @@ ENV/
 
 # Project specific files
 .agents/
-.kiro/
+!.kiro/
+.kiro/*
+!.kiro/specs/
+.kiro/specs/*
+!.kiro/specs/prd/
 .trae/
 .mcp.json
 skills-lock.json
