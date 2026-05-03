@@ -2,369 +2,134 @@ import React, { useState, useEffect } from 'react'
 import { Card, Typography, Form, Input, Select, Button, Table, Space, Tag, Checkbox, message, Badge } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, DownOutlined, PhoneOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, GlobalOutlined, ShoppingOutlined, HomeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { reservationApi } from '../../utils/api'
+import { getCurrentTenantId } from '../../utils/tenantUtils'
 
 const { Title, Text } = Typography
 const { Option } = Select
+
+const channelIconMap = {
+  CTRIP: <GlobalOutlined />,
+  FLIGGY: <ShoppingOutlined />,
+  MEITUAN: <HomeOutlined />,
+  BOOKING: <GlobalOutlined />,
+  QUNAR: <GlobalOutlined />,
+  RED_POWER: <HomeOutlined />,
+  PMS: <PhoneOutlined />
+}
+
+const statusFilterMap = {
+  '所有状态': '',
+  '已确认': 'confirmed',
+  '待确认': 'pending',
+  '已取消': 'cancelled',
+  '取消失败': 'cancel_failed',
+  '已入住': 'checked_in',
+  '已离店': 'checked_out',
+  'Noshow': 'noshow'
+}
+
+const channelFilterMap = {
+  '所有渠道': '',
+  '携程': 'CTRIP',
+  '飞猪': 'FLIGGY',
+  '美团': 'MEITUAN',
+  'PMS': 'PMS'
+}
 
 const ReservationList = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState([])
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const navigate = useNavigate()
 
-  // 模拟订单数据
-  const mockOrderData = [
-    {
-      key: '1',
-      channelOrderNumber: '112814479949077',
-      crsOrderNumber: 'CRS123456789',
-      pmsNumber: 'YFNJCC/0251231_YFNJCC_0001131198',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-31 00:01:11',
-      checkInDate: '2025-12-30',
-      checkOutDate: '2025-12-31',
-      totalPrice: 396.00,
-      isManual: false,
-      guestName: '张三'
-    },
-    {
-      key: '2',
-      channelOrderNumber: '112814479947981',
-      crsOrderNumber: 'CRS123456790',
-      pmsNumber: 'YFNJCC/0251230_YFNJCC_2359537115',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-30 23:59:52',
-      checkInDate: '2025-12-30',
-      checkOutDate: '2025-12-31',
-      totalPrice: 422.00,
-      isManual: false,
-      guestName: '李四'
-    },
-    {
-      key: '3',
-      channelOrderNumber: '5008013766286861837',
-      crsOrderNumber: 'CRS123456791',
-      pmsNumber: 'YFNJCC/0251230_YFNJCC_2358122150',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-30 23:58:10',
-      checkInDate: '2025-12-31',
-      checkOutDate: '2026-01-01',
-      totalPrice: 607.00,
-      isManual: false,
-      guestName: '王五'
-    },
-    {
-      key: '4',
-      channelOrderNumber: '4501815373003003933',
-      crsOrderNumber: 'CRS123456792',
-      pmsNumber: 'YFNJCC/0251230_YFNJCC_1554576767',
-      status: '取消失败',
-      statusColor: 'red',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-30 15:54:55',
-      checkInDate: '2025-12-30',
-      checkOutDate: '2025-12-31',
-      totalPrice: 578.00,
-      isManual: true,
-      guestName: '赵六'
-    },
-    {
-      key: '5',
-      channelOrderNumber: '1128144786236519',
-      crsOrderNumber: 'CRS123456793',
-      pmsNumber: 'YFNJCC/0251230_YFNJCC_0949503278',
-      status: '已取消',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-30 09:49:48',
-      checkInDate: '2026-01-02',
-      checkOutDate: '2026-01-03',
-      totalPrice: 668.00,
-      isManual: false,
-      guestName: '孙七'
-    },
-    {
-      key: '6',
-      channelOrderNumber: '1128144776236520',
-      crsOrderNumber: 'CRS123456794',
-      pmsNumber: 'YFNJCC/0251229_YFNJCC_1549503279',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-29 15:49:49',
-      checkInDate: '2026-01-03',
-      checkOutDate: '2026-01-04',
-      totalPrice: 598.00,
-      isManual: false,
-      guestName: '周八'
-    },
-    {
-      key: '7',
-      channelOrderNumber: '5008013766286861838',
-      crsOrderNumber: 'CRS123456795',
-      pmsNumber: 'YFNJCC/0251229_YFNJCC_1458122151',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-29 14:58:11',
-      checkInDate: '2026-01-04',
-      checkOutDate: '2026-01-05',
-      totalPrice: 628.00,
-      isManual: false,
-      guestName: '吴九'
-    },
-    {
-      key: '8',
-      channelOrderNumber: '4501815373003003934',
-      crsOrderNumber: 'CRS123456796',
-      pmsNumber: 'YFNJCC/0251229_YFNJCC_1354576768',
-      status: '已入住',
-      statusColor: 'blue',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-29 13:54:56',
-      checkInDate: '2025-12-31',
-      checkOutDate: '2026-01-02',
-      totalPrice: 798.00,
-      isManual: false,
-      guestName: '郑十'
-    },
-    {
-      key: '9',
-      channelOrderNumber: '1128144766236521',
-      crsOrderNumber: 'CRS123456797',
-      pmsNumber: 'YFNJCC/0251228_YFNJCC_1249503280',
-      status: '已离店',
-      statusColor: 'gray',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-28 12:49:50',
-      checkInDate: '2025-12-29',
-      checkOutDate: '2025-12-30',
-      totalPrice: 498.00,
-      isManual: false,
-      guestName: '王十一'
-    },
-    {
-      key: '10',
-      channelOrderNumber: '5008013766286861839',
-      crsOrderNumber: 'CRS123456798',
-      pmsNumber: 'YFNJCC/0251228_YFNJCC_1158122152',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-28 11:58:12',
-      checkInDate: '2026-01-05',
-      checkOutDate: '2026-01-06',
-      totalPrice: 568.00,
-      isManual: false,
-      guestName: '李十二'
-    },
-    {
-      key: '11',
-      channelOrderNumber: '4501815373003003935',
-      crsOrderNumber: 'CRS123456799',
-      pmsNumber: 'YFNJCC/0251228_YFNJCC_1054576769',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-28 10:54:57',
-      checkInDate: '2026-01-06',
-      checkOutDate: '2026-01-07',
-      totalPrice: 638.00,
-      isManual: false,
-      guestName: '张十三'
-    },
-    {
-      key: '12',
-      channelOrderNumber: '1128144756236522',
-      crsOrderNumber: 'CRS123456800',
-      pmsNumber: 'YFNJCC/0251227_YFNJCC_0949503281',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-27 09:49:51',
-      checkInDate: '2026-01-07',
-      checkOutDate: '2026-01-08',
-      totalPrice: 588.00,
-      isManual: false,
-      guestName: '刘十四'
-    },
-    {
-      key: '13',
-      channelOrderNumber: '5008013766286861840',
-      crsOrderNumber: 'CRS123456801',
-      pmsNumber: 'YFNJCC/0251227_YFNJCC_0858122153',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-27 08:58:13',
-      checkInDate: '2026-01-08',
-      checkOutDate: '2026-01-09',
-      totalPrice: 618.00,
-      isManual: false,
-      guestName: '陈十五'
-    },
-    {
-      key: '14',
-      channelOrderNumber: '4501815373003003936',
-      crsOrderNumber: 'CRS123456802',
-      pmsNumber: 'YFNJCC/0251227_YFNJCC_0754576770',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-27 07:54:58',
-      checkInDate: '2026-01-09',
-      checkOutDate: '2026-01-10',
-      totalPrice: 598.00,
-      isManual: false,
-      guestName: '杨十六'
-    },
-    {
-      key: '15',
-      channelOrderNumber: '1128144746236523',
-      crsOrderNumber: 'CRS123456803',
-      pmsNumber: 'YFNJCC/0251226_YFNJCC_0649503282',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-26 06:49:52',
-      checkInDate: '2026-01-10',
-      checkOutDate: '2026-01-11',
-      totalPrice: 628.00,
-      isManual: false,
-      guestName: '黄十七'
-    },
-    {
-      key: '16',
-      channelOrderNumber: '5008013766286861841',
-      crsOrderNumber: 'CRS123456804',
-      pmsNumber: 'YFNJCC/0251226_YFNJCC_0558122154',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-26 05:58:14',
-      checkInDate: '2026-01-11',
-      checkOutDate: '2026-01-12',
-      totalPrice: 578.00,
-      isManual: false,
-      guestName: '周十八'
-    },
-    {
-      key: '17',
-      channelOrderNumber: '4501815373003003937',
-      crsOrderNumber: 'CRS123456805',
-      pmsNumber: 'YFNJCC/0251226_YFNJCC_0454576771',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-26 04:54:59',
-      checkInDate: '2026-01-12',
-      checkOutDate: '2026-01-13',
-      totalPrice: 608.00,
-      isManual: false,
-      guestName: '吴十九'
-    },
-    {
-      key: '18',
-      channelOrderNumber: '1128144736236524',
-      crsOrderNumber: 'CRS123456806',
-      pmsNumber: 'YFNJCC/0251225_YFNJCC_0349503283',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '携程',
-      channelIcon: <GlobalOutlined />,
-      bookingTime: '2025-12-25 03:49:53',
-      checkInDate: '2026-01-13',
-      checkOutDate: '2026-01-14',
-      totalPrice: 588.00,
-      isManual: false,
-      guestName: '郑二十'
-    },
-    {
-      key: '19',
-      channelOrderNumber: '5008013766286861842',
-      crsOrderNumber: 'CRS123456807',
-      pmsNumber: 'YFNJCC/0251225_YFNJCC_0258122155',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '美团',
-      channelIcon: <HomeOutlined />,
-      bookingTime: '2025-12-25 02:58:15',
-      checkInDate: '2026-01-14',
-      checkOutDate: '2026-01-15',
-      totalPrice: 638.00,
-      isManual: false,
-      guestName: '王二十一'
-    },
-    {
-      key: '20',
-      channelOrderNumber: '4501815373003003938',
-      crsOrderNumber: 'CRS123456808',
-      pmsNumber: 'YFNJCC/0251225_YFNJCC_0154576772',
-      status: '已确认',
-      statusColor: 'green',
-      channel: '飞猪',
-      channelIcon: <ShoppingOutlined />,
-      bookingTime: '2025-12-25 01:54:00',
-      checkInDate: '2026-01-15',
-      checkOutDate: '2026-01-16',
-      totalPrice: 598.00,
-      isManual: false,
-      guestName: '李二十二'
-    }
-  ]
-
-  // 处理搜索
-  const handleSearch = () => {
+  const fetchOrders = async (page = 1, pageSize = 20) => {
     setLoading(true)
-    // 模拟API请求
-    setTimeout(() => {
-      setOrderData(mockOrderData)
-      setLoading(false)
+    try {
+      const tenantId = getCurrentTenantId()
+      const formValues = form.getFieldsValue()
+      const params = {
+        tenantId: tenantId || undefined,
+        page,
+        pageSize,
+        reservationStatus: statusFilterMap[formValues.status] || undefined,
+        channelId: channelFilterMap[formValues.channel] || undefined,
+        orderNo: formValues.orderNumber || undefined,
+        guestName: formValues.guestName || undefined
+      }
+
+      Object.keys(params).forEach(key => {
+        if (params[key] === undefined || params[key] === '') {
+          delete params[key]
+        }
+      })
+
+      const data = await reservationApi.list(params)
+      const items = (data.content || []).map(item => ({
+        key: item.id,
+        id: item.id,
+        channelOrderNumber: item.channelOrderNumber || '-',
+        crsOrderNumber: item.crsOrderNumber || '-',
+        pmsNumber: item.pmsNumber || '-',
+        status: item.status,
+        statusColor: item.statusColor,
+        channel: item.channel,
+        channelCode: item.channelCode,
+        channelIcon: channelIconMap[item.channelCode] || <GlobalOutlined />,
+        bookingTime: item.bookingTime,
+        checkInDate: item.checkInDate,
+        checkOutDate: item.checkOutDate,
+        nights: item.nights,
+        roomCount: item.roomCount,
+        totalPrice: item.totalPrice,
+        currency: item.currency || 'CNY',
+        guestName: item.guestName,
+        hotelName: item.hotelName,
+        roomTypeName: item.roomTypeName,
+        ratePlanName: item.ratePlanName,
+        isManual: item.isManual || false,
+        reservationStatus: item.reservationStatus
+      }))
+
+      setOrderData(items)
+      setPagination({
+        current: data.currentPage || page,
+        pageSize: data.pageSize || pageSize,
+        total: data.totalElements || 0
+      })
       message.success('查询成功')
-    }, 1000)
+    } catch (error) {
+      console.error('获取订单列表失败:', error)
+      message.error('获取订单列表失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // 处理重置
+  const handleSearch = () => {
+    fetchOrders(1, pagination.pageSize)
+  }
+
   const handleReset = () => {
     form.resetFields()
+    fetchOrders(1, pagination.pageSize)
   }
 
-  // 处理导出
   const handleExport = () => {
     message.info('导出功能开发中')
   }
 
-  // 处理查看订单
   const handleViewOrder = (record) => {
-    navigate('/reservation/reservation-detail')
+    navigate(`/reservation/reservation-detail?id=${record.id}`)
   }
 
-  // 初始化加载数据
+  const handleTableChange = (pag) => {
+    fetchOrders(pag.current, pag.pageSize)
+  }
+
   useEffect(() => {
-    handleSearch()
+    fetchOrders()
   }, [])
 
   return (
@@ -382,7 +147,7 @@ const ReservationList = () => {
             initialValues={{
               orderNumber: '',
               status: '所有状态',
-              channel: '携程',
+              channel: '所有渠道',
               guestName: ''
             }}
           >
@@ -393,10 +158,12 @@ const ReservationList = () => {
               <Select placeholder="所有状态" style={{ width: 120 }}>
                 <Option value="所有状态">所有状态</Option>
                 <Option value="已确认">已确认</Option>
+                <Option value="待确认">待确认</Option>
                 <Option value="已取消">已取消</Option>
                 <Option value="取消失败">取消失败</Option>
                 <Option value="已入住">已入住</Option>
                 <Option value="已离店">已离店</Option>
+                <Option value="Noshow">Noshow</Option>
               </Select>
             </Form.Item>
             <Form.Item name="channel">
@@ -435,7 +202,14 @@ const ReservationList = () => {
         {/* 订单列表 */}
         <Table
           loading={loading}
-          pagination={false}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`
+          }}
+          onChange={handleTableChange}
           scroll={{ x: 1000 }}
           dataSource={orderData}
           rowKey="key"
@@ -531,7 +305,7 @@ const ReservationList = () => {
               render: (text) => (
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <DollarOutlined style={{ marginRight: 4, fontSize: 12 }} />
-                  CNY {text.toFixed(2)}
+                  CNY {typeof text === 'number' ? text.toFixed(2) : '0.00'}
                 </div>
               )
             },

@@ -26,4 +26,9 @@ public interface TenantChannelRepository extends JpaRepository<TenantChannel, In
      * 根据租户ID和渠道代码查询
      */
     TenantChannel findByTenantIdAndChannelCode(Integer tenantId, String channelCode);
+
+    /**
+     * 根据 access_key 查询渠道（用于API认证）
+     */
+    TenantChannel findByAccessKey(String accessKey);
 }

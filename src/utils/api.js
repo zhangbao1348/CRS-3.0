@@ -354,4 +354,27 @@ export const channelPublishApi = {
     api.post('/channel-publish/batch', data, options)
 }
 
+export const reservationApi = {
+  list: (params = {}, options = {}) =>
+    api.get('/reservation', { params, ...options }),
+  getDetail: (id, options = {}) =>
+    api.get(`/reservation/${id}`, options),
+  getByCode: (code, options = {}) =>
+    api.get(`/reservation/code/${code}`, options),
+  create: (data, options = {}) =>
+    api.post('/reservation', data, options),
+  cancel: (id, data = {}, options = {}) =>
+    api.put(`/reservation/${id}/cancel`, data, options),
+  updateStatus: (id, data, options = {}) =>
+    api.put(`/reservation/${id}/status`, data, options),
+  manualIntervene: (id, data, options = {}) =>
+    api.put(`/reservation/${id}/manual-intervene`, data, options),
+  getByHotel: (hotelId, params = {}, options = {}) =>
+    api.get(`/reservation/hotel/${hotelId}`, { params, ...options }),
+  getToday: (params = {}, options = {}) =>
+    api.get('/reservation/today', { params, ...options }),
+  export: (params = {}, options = {}) =>
+    api.get('/reservation/export', { params, responseType: 'blob', ...options })
+}
+
 export default api

@@ -1,434 +1,349 @@
 package com.crs.service;
 
-import com.crs.entity.Reservation;
-import com.crs.repository.ReservationRepository;
-import com.crs.service.InventoryService;
+import com.crs.entity.*;
+import com.crs.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Date;
-import java.util.UUID;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * 预订服务类
- * 用于处理预订相关的业务逻辑
- */
 @Service
 public class ReservationService {
-    
+
     private final ReservationRepository reservationRepository;
+    private final ReservationDailyPriceRepository dailyPriceRepository;
+    private final ReservationGuestRepository guestRepository;
+    private final ReservationPaymentRepository paymentRepository;
+    private final ReservationPromotionRepository promotionRepository;
+    private final ReservationHistoryRepository historyRepository;
     private final InventoryService inventoryService;
-    
-    public ReservationService(ReservationRepository reservationRepository, InventoryService inventoryService) {
+
+    public ReservationService(
+            ReservationRepository reservationRepository,
+            ReservationDailyPriceRepository dailyPriceRepository,
+            ReservationGuestRepository guestRepository,
+            ReservationPaymentRepository paymentRepository,
+            ReservationPromotionRepository promotionRepository,
+            ReservationHistoryRepository historyRepository,
+            InventoryService inventoryService) {
         this.reservationRepository = reservationRepository;
+        this.dailyPriceRepository = dailyPriceRepository;
+        this.guestRepository = guestRepository;
+        this.paymentRepository = paymentRepository;
+        this.promotionRepository = promotionRepository;
+        this.historyRepository = historyRepository;
         this.inventoryService = inventoryService;
     }
-    
-    /**
-     * 获取所有预订列表
-     * @return 预订列表
-     */
-    public List<Reservation> getAllReservations() {
-        return reservationRepository.findAll();
+
+    public Page<Reservation> listReservations(Integer tenantId, Integer hotelId, String orderNo,
+                                               String reservationStatus, Integer channelId,
+                                               String guestName, Date startDate, Date endDate,
+                                               Date checkInStart, Date checkInEnd,
+                                               int page, int pageSize) {
+        Pageable pageable = PageRequest.of(page - 1, pageSize);
+        return reservationRepository.findWithFilters(tenantId, hotelId, orderNo,
+                reservationStatus, channelId, guestName, startDate, endDate,
+                checkInStart, checkInEnd, pageable);
     }
-    
-    /**
-     * 根据ID获取预订详情
-     * @param id 预订ID
-     * @return 预订详情
-     */
+
+    public List<Reservation> listReservationsForExport(Integer tenantId, Integer hotelId, String orderNo,
+                                                       String reservationStatus, Integer channelId,
+                                                       String guestName, Date startDate, Date endDate,
+                                                       Date checkInStart, Date checkInEnd) {
+        return reservationRepository.findListWithFilters(tenantId, hotelId, orderNo,
+                reservationStatus, channelId, guestName, startDate, endDate,
+                checkInStart, checkInEnd);
+    }
+
     public Optional<Reservation> getReservationById(Integer id) {
         return reservationRepository.findById(id);
     }
-    
-    /**
-     * 根据预订号获取预订详情
-     * @param reservationCode 预订号
-     * @return 预订详情
-     */
+
     public Reservation getReservationByCode(String reservationCode) {
         return reservationRepository.findByReservationCode(reservationCode);
     }
-    
-    /**
-     * 根据酒店ID获取预订列表
-     * @param hotelId 酒店ID
-     * @return 预订列表
-     */
+
+    public List<ReservationDailyPrice> getDailyPrices(Integer reservationId) {
+        return dailyPriceRepository.findByReservationIdOrderByPriceDateAsc(reservationId);
+    }
+
+    public List<ReservationGuest> getGuests(Integer reservationId) {
+        return guestRepository.findByReservationIdOrderBySortOrderAsc(reservationId);
+    }
+
+    public List<ReservationPayment> getPayments(Integer reservationId) {
+        return paymentRepository.findByReservationIdOrderByCreatedAtDesc(reservationId);
+    }
+
+    public List<ReservationPromotion> getPromotions(Integer reservationId) {
+        return promotionRepository.findByReservationId(reservationId);
+    }
+
+    public List<ReservationHistory> getHistory(Integer reservationId) {
+        return historyRepository.findByReservationIdOrderByOperationTimeDesc(reservationId);
+    }
+
+    @Transactional
+    public Reservation createReservation(Reservation reservation,
+                                          List<ReservationDailyPrice> dailyPrices,
+                                          List<ReservationGuest> guests,
+                                          List<ReservationPromotion> promotions) {
+        if (reservation.getReservationCode() == null || reservation.getReservationCode().isBlank()) {
+            reservation.setReservationCode(generateReservationCode());
+        }
+        if (reservation.getNights() == null && reservation.getCheckInDate() != null && reservation.getCheckOutDate() != null) {
+            long nights = (reservation.getCheckOutDate().getTime() - reservation.getCheckInDate().getTime()) / (1000 * 60 * 60 * 24);
+            reservation.setNights((int) nights);
+        }
+
+        checkAndReserveInventory(reservation);
+
+        Reservation saved = reservationRepository.save(reservation);
+
+        if (dailyPrices != null && !dailyPrices.isEmpty()) {
+            dailyPrices.forEach(dp -> dp.setReservationId(saved.getId()));
+            dailyPriceRepository.saveAll(dailyPrices);
+        }
+        if (guests != null && !guests.isEmpty()) {
+            guests.forEach(g -> g.setReservationId(saved.getId()));
+            guestRepository.saveAll(guests);
+        }
+        if (promotions != null && !promotions.isEmpty()) {
+            promotions.forEach(p -> p.setReservationId(saved.getId()));
+            promotionRepository.saveAll(promotions);
+        }
+
+        ReservationHistory history = new ReservationHistory();
+        history.setReservationId(saved.getId());
+        history.setAction("CREATE");
+        history.setContent("创建订单");
+        history.setResult("success");
+        history.setOperator(saved.getCreatedBy());
+        history.setOperatorType("channel".equals(saved.getOrderSource()) ? "channel" : "crs");
+        historyRepository.save(history);
+
+        return saved;
+    }
+
+    @Transactional
+    public Reservation cancelReservation(Integer id, String cancelledBy, String cancelReason) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (!"confirmed".equals(reservation.getReservationStatus())
+                && !"pending".equals(reservation.getReservationStatus())) {
+            throw new RuntimeException("当前状态不允许取消，仅 confirmed/pending 状态可取消");
+        }
+
+        releaseInventory(reservation);
+
+        reservation.setReservationStatus("cancelled");
+        reservation.setStatus(Reservation.Status.cancelled);
+        reservation.setCancelledBy(cancelledBy);
+        reservation.setCancelledAt(new Date());
+        reservation.setCancelReason(cancelReason);
+        reservation.setModifiedBy(cancelledBy);
+
+        Reservation saved = reservationRepository.save(reservation);
+
+        ReservationHistory history = new ReservationHistory();
+        history.setReservationId(saved.getId());
+        history.setAction("CANCEL");
+        history.setContent("取消订单：" + (cancelReason != null ? cancelReason : ""));
+        history.setResult("success");
+        history.setOperator(cancelledBy);
+        history.setOperatorType("crs");
+        historyRepository.save(history);
+
+        return saved;
+    }
+
+    @Transactional
+    public Reservation updateReservationStatus(Integer id, String newStatus, String operator) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        String oldStatus = reservation.getReservationStatus();
+        validateStatusTransition(oldStatus, newStatus);
+
+        reservation.setReservationStatus(newStatus);
+        reservation.setModifiedBy(operator);
+
+        if ("checked_out".equals(newStatus)) {
+            reservation.setStatus(Reservation.Status.completed);
+            reservation.setCompletedAt(new Date());
+        }
+
+        Reservation saved = reservationRepository.save(reservation);
+
+        String action = switch (newStatus) {
+            case "confirmed" -> "CONFIRM";
+            case "checked_in" -> "CHECK_IN";
+            case "checked_out" -> "CHECK_OUT";
+            case "no_show" -> "NO_SHOW";
+            default -> "STATUS_CHANGE";
+        };
+
+        String content = switch (newStatus) {
+            case "confirmed" -> "确认订单";
+            case "checked_in" -> "客人入住";
+            case "checked_out" -> "客人离店";
+            case "no_show" -> "客人未到";
+            default -> "状态变更：" + oldStatus + " → " + newStatus;
+        };
+
+        ReservationHistory history = new ReservationHistory();
+        history.setReservationId(saved.getId());
+        history.setAction(action);
+        history.setContent(content);
+        history.setResult("success");
+        history.setOperator(operator);
+        history.setOperatorType("crs");
+        historyRepository.save(history);
+
+        return saved;
+    }
+
+    @Transactional
+    public Reservation manualIntervene(Integer id, String reason, String operator) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        reservation.setIsManual(true);
+        reservation.setManualReason(reason);
+        reservation.setModifiedBy(operator);
+
+        Reservation saved = reservationRepository.save(reservation);
+
+        ReservationHistory history = new ReservationHistory();
+        history.setReservationId(saved.getId());
+        history.setAction("MANUAL_INTERVENE");
+        history.setContent("人工干预：" + reason);
+        history.setResult("success");
+        history.setOperator(operator);
+        history.setOperatorType("crs");
+        historyRepository.save(history);
+
+        return saved;
+    }
+
+    private void validateStatusTransition(String from, String to) {
+        Map<String, Set<String>> allowed = Map.of(
+                "pending", Set.of("confirmed", "cancelled"),
+                "confirmed", Set.of("checked_in", "cancelled", "no_show"),
+                "checked_in", Set.of("checked_out")
+        );
+        Set<String> allowedTargets = allowed.get(from);
+        if (allowedTargets == null || !allowedTargets.contains(to)) {
+            throw new RuntimeException("不允许的状态变更：" + from + " → " + to);
+        }
+    }
+
+    private void checkAndReserveInventory(Reservation reservation) {
+        Date current = reservation.getCheckInDate();
+        Date end = reservation.getCheckOutDate();
+        Calendar cal = Calendar.getInstance();
+
+        while (current.before(end)) {
+            boolean available = inventoryService.checkInventoryAvailability(
+                    reservation.getHotelId(), reservation.getRatePlanId(),
+                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
+            if (!available) {
+                throw new RuntimeException("库存不足，日期：" + new SimpleDateFormat("yyyy-MM-dd").format(current));
+            }
+            cal.setTime(current);
+            cal.add(Calendar.DATE, 1);
+            current = cal.getTime();
+        }
+
+        current = reservation.getCheckInDate();
+        while (current.before(end)) {
+            inventoryService.reserveInventory(
+                    reservation.getHotelId(), reservation.getRatePlanId(),
+                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
+            cal.setTime(current);
+            cal.add(Calendar.DATE, 1);
+            current = cal.getTime();
+        }
+    }
+
+    private void releaseInventory(Reservation reservation) {
+        Date current = reservation.getCheckInDate();
+        Date end = reservation.getCheckOutDate();
+        Calendar cal = Calendar.getInstance();
+
+        while (current.before(end)) {
+            inventoryService.releaseInventory(
+                    reservation.getHotelId(), reservation.getRatePlanId(),
+                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
+            cal.setTime(current);
+            cal.add(Calendar.DATE, 1);
+            current = cal.getTime();
+        }
+    }
+
+    private String generateReservationCode() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+        String datePart = sdf.format(new Date());
+        String seq = String.format("%06d", new Random().nextInt(999999) + 1);
+        return "CRS" + datePart + seq;
+    }
+
+    public String exportReservationsToCsv(List<Reservation> reservations) {
+        StringBuilder csv = new StringBuilder();
+        csv.append("CRS订单号,渠道订单号,状态,渠道,预订时间,入住日期,离店日期,晚数,房间数,总价,酒店,房型,价格计划,联系人,联系电话,成人,儿童\n");
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+
+        for (Reservation r : reservations) {
+            csv.append(r.getReservationCode()).append(",");
+            csv.append(r.getChannelOrderNumber() != null ? r.getChannelOrderNumber() : "").append(",");
+            csv.append(r.getReservationStatus()).append(",");
+            csv.append(r.getChannelName() != null ? r.getChannelName() : r.getChannelCode()).append(",");
+            csv.append(r.getCreatedAt() != null ? sdf.format(r.getCreatedAt()) : "").append(",");
+            csv.append(r.getCheckInDate() != null ? df.format(r.getCheckInDate()) : "").append(",");
+            csv.append(r.getCheckOutDate() != null ? df.format(r.getCheckOutDate()) : "").append(",");
+            csv.append(r.getNights() != null ? r.getNights() : "").append(",");
+            csv.append(r.getRoomCount()).append(",");
+            csv.append(r.getTotalPrice()).append(",");
+            csv.append(r.getHotelName() != null ? r.getHotelName() : "").append(",");
+            csv.append(r.getRoomTypeName() != null ? r.getRoomTypeName() : "").append(",");
+            csv.append(r.getRatePlanName() != null ? r.getRatePlanName() : "").append(",");
+            csv.append(r.getContactName() != null ? r.getContactName() : "").append(",");
+            csv.append(r.getContactPhone() != null ? r.getContactPhone() : "").append(",");
+            csv.append(r.getAdultCount()).append(",");
+            csv.append(r.getChildCount()).append("\n");
+        }
+        return csv.toString();
+    }
+
     public List<Reservation> getReservationsByHotelId(Integer hotelId) {
         return reservationRepository.findByHotelId(hotelId);
     }
-    
-    /**
-     * 根据酒店ID和状态获取预订列表
-     * @param hotelId 酒店ID
-     * @param status 状态
-     * @return 预订列表
-     */
-    public List<Reservation> getReservationsByHotelIdAndStatus(Integer hotelId, Reservation.Status status) {
-        return reservationRepository.findByHotelIdAndStatus(hotelId, status);
-    }
-    
-    /**
-     * 根据酒店ID和预订状态获取预订列表
-     * @param hotelId 酒店ID
-     * @param reservationStatus 预订状态
-     * @return 预订列表
-     */
+
     public List<Reservation> getReservationsByHotelIdAndReservationStatus(Integer hotelId, String reservationStatus) {
         return reservationRepository.findByHotelIdAndReservationStatus(hotelId, reservationStatus);
     }
-    
-    /**
-     * 根据入住日期范围获取预订列表
-     * @param hotelId 酒店ID
-     * @param startDate 开始日期
-     * @param endDate 结束日期
-     * @return 预订列表
-     */
-    public List<Reservation> getReservationsByCheckInDateRange(Integer hotelId, Date startDate, Date endDate) {
-        return reservationRepository.findByHotelIdAndCheckInDateBetween(hotelId, startDate, endDate);
-    }
-    
-    /**
-     * 根据离店日期范围获取预订列表
-     * @param hotelId 酒店ID
-     * @param startDate 开始日期
-     * @param endDate 结束日期
-     * @return 预订列表
-     */
-    public List<Reservation> getReservationsByCheckOutDateRange(Integer hotelId, Date startDate, Date endDate) {
-        return reservationRepository.findByHotelIdAndCheckOutDateBetween(hotelId, startDate, endDate);
-    }
-    
-    /**
-     * 获取在店客人预订列表
-     * @param hotelId 酒店ID
-     * @param date 日期
-     * @return 预订列表
-     */
+
     public List<Reservation> getInHouseReservations(Integer hotelId, Date date) {
         return reservationRepository.findByHotelIdAndCheckInDateLessThanEqualAndCheckOutDateGreaterThanAndStatus(
                 hotelId, date, date, Reservation.Status.active);
     }
-    
-    /**
-     * 创建预订
-     * @param reservation 预订信息
-     * @return 创建的预订信息
-     */
-    @Transactional
-    public Reservation createReservation(Reservation reservation) {
-        // 生成预订号
-        String reservationCode = generateReservationCode();
-        reservation.setReservationCode(reservationCode);
-        
-        // 检查库存
-        checkInventoryAvailability(reservation);
-        
-        // 预留库存
-        reserveInventory(reservation);
-        
-        // 保存预订
-        return reservationRepository.save(reservation);
-    }
-    
-    /**
-     * 更新预订
-     * @param id 预订ID
-     * @param reservation 预订信息
-     * @return 更新后的预订信息
-     */
-    @Transactional
-    public Reservation updateReservation(Integer id, Reservation reservation) {
-        Reservation existingReservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
-        
-        // 检查库存（如果日期或房间数量有变化）
-        if (!existingReservation.getCheckInDate().equals(reservation.getCheckInDate()) ||
-            !existingReservation.getCheckOutDate().equals(reservation.getCheckOutDate()) ||
-            existingReservation.getRoomCount() != reservation.getRoomCount()) {
-            
-            // 释放原有库存
-            releaseInventory(existingReservation);
-            
-            // 检查新库存
-            checkInventoryAvailability(reservation);
-            
-            // 预留新库存
-            reserveInventory(reservation);
-        }
-        
-        // 更新预订信息
-        existingReservation.setRatePlanId(reservation.getRatePlanId());
-        existingReservation.setRoomTypeId(reservation.getRoomTypeId());
-        existingReservation.setChannelId(reservation.getChannelId());
-        existingReservation.setMarketCodeId(reservation.getMarketCodeId());
-        existingReservation.setSourceCodeId(reservation.getSourceCodeId());
-        existingReservation.setGuestName(reservation.getGuestName());
-        existingReservation.setGuestEmail(reservation.getGuestEmail());
-        existingReservation.setGuestPhone(reservation.getGuestPhone());
-        existingReservation.setCheckInDate(reservation.getCheckInDate());
-        existingReservation.setCheckOutDate(reservation.getCheckOutDate());
-        existingReservation.setAdultCount(reservation.getAdultCount());
-        existingReservation.setChildCount(reservation.getChildCount());
-        existingReservation.setRoomCount(reservation.getRoomCount());
-        existingReservation.setTotalPrice(reservation.getTotalPrice());
-        existingReservation.setCurrency(reservation.getCurrency());
-        existingReservation.setPaymentStatus(reservation.getPaymentStatus());
-        existingReservation.setReservationStatus(reservation.getReservationStatus());
-        existingReservation.setGuaranteeType(reservation.getGuaranteeType());
-        existingReservation.setCreditCardInfo(reservation.getCreditCardInfo());
-        existingReservation.setSpecialRequest(reservation.getSpecialRequest());
-        existingReservation.setNotes(reservation.getNotes());
-        existingReservation.setModifiedBy(reservation.getModifiedBy());
-        existingReservation.setStatus(reservation.getStatus());
-        
-        return reservationRepository.save(existingReservation);
-    }
-    
-    /**
-     * 取消预订
-     * @param id 预订ID
-     * @param modifiedBy 修改人
-     * @return 取消后的预订信息
-     */
-    @Transactional
-    public Reservation cancelReservation(Integer id, String modifiedBy) {
-        Reservation existingReservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
-        
-        // 释放库存
-        releaseInventory(existingReservation);
-        
-        // 更新预订状态
-        existingReservation.setReservationStatus("cancelled");
-        existingReservation.setStatus(Reservation.Status.cancelled);
-        existingReservation.setModifiedBy(modifiedBy);
-        
-        return reservationRepository.save(existingReservation);
-    }
-    
-    /**
-     * 完成预订
-     * @param id 预订ID
-     * @param modifiedBy 修改人
-     * @return 完成后的预订信息
-     */
-    @Transactional
-    public Reservation completeReservation(Integer id, String modifiedBy) {
-        Reservation existingReservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
-        
-        // 更新预订状态
-        existingReservation.setReservationStatus("completed");
-        existingReservation.setStatus(Reservation.Status.completed);
-        existingReservation.setModifiedBy(modifiedBy);
-        
-        return reservationRepository.save(existingReservation);
-    }
-    
-    /**
-     * 删除预订
-     * @param id 预订ID
-     */
-    @Transactional
-    public void deleteReservation(Integer id) {
-        Reservation existingReservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found"));
-        
-        // 释放库存
-        releaseInventory(existingReservation);
-        
-        // 删除预订
-        reservationRepository.deleteById(id);
-    }
-    
-    /**
-     * 检查库存可用性
-     * @param reservation 预订信息
-     */
-    private void checkInventoryAvailability(Reservation reservation) {
-        Date currentDate = reservation.getCheckInDate();
-        Date endDate = reservation.getCheckOutDate();
-        
-        while (currentDate.before(endDate)) {
-            boolean isAvailable = inventoryService.checkInventoryAvailability(
-                    reservation.getHotelId(),
-                    reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(),
-                    currentDate,
-                    reservation.getRoomCount());
-            
-            if (!isAvailable) {
-                throw new RuntimeException("Inventory not available for date: " + currentDate);
-            }
-            
-            // 增加一天
-            currentDate = new Date(currentDate.getTime() + 86400000);
-        }
-    }
-    
-    /**
-     * 预留库存
-     * @param reservation 预订信息
-     */
-    private void reserveInventory(Reservation reservation) {
-        Date currentDate = reservation.getCheckInDate();
-        Date endDate = reservation.getCheckOutDate();
-        
-        while (currentDate.before(endDate)) {
-            inventoryService.reserveInventory(
-                    reservation.getHotelId(),
-                    reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(),
-                    currentDate,
-                    reservation.getRoomCount());
-            
-            // 增加一天
-            currentDate = new Date(currentDate.getTime() + 86400000);
-        }
-    }
-    
-    /**
-     * 释放库存
-     * @param reservation 预订信息
-     */
-    private void releaseInventory(Reservation reservation) {
-        Date currentDate = reservation.getCheckInDate();
-        Date endDate = reservation.getCheckOutDate();
-        
-        while (currentDate.before(endDate)) {
-            inventoryService.releaseInventory(
-                    reservation.getHotelId(),
-                    reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(),
-                    currentDate,
-                    reservation.getRoomCount());
-            
-            // 增加一天
-            currentDate = new Date(currentDate.getTime() + 86400000);
-        }
-    }
-    
-    /**
-     * 生成预订号
-     * @return 预订号
-     */
-    private String generateReservationCode() {
-        String prefix = "RES";
-        String timestamp = String.valueOf(System.currentTimeMillis());
-        String random = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
-        return prefix + timestamp + random;
-    }
-    
-    /**
-     * 筛选订单
-     * @param hotelId 酒店ID
-     * @param orderNo 订单号
-     * @param status 状态
-     * @param channelId 渠道ID
-     * @param startBookingDate 开始预订日期
-     * @param endBookingDate 结束预订日期
-     * @param startCheckInDate 开始入住日期
-     * @param endCheckInDate 结束入住日期
-     * @param startCheckOutDate 开始离店日期
-     * @param endCheckOutDate 结束离店日期
-     * @return 订单列表
-     */
-    public List<Reservation> filterReservations(
-            Integer hotelId,
-            String orderNo,
-            String status,
-            Integer channelId,
-            Date startBookingDate,
-            Date endBookingDate,
-            Date startCheckInDate,
-            Date endCheckInDate,
-            Date startCheckOutDate,
-            Date endCheckOutDate) {
-        // 这里实现订单筛选逻辑
-        // 由于JPA查询条件较多，这里使用基础实现
-        // 实际项目中可以使用Specification或QueryDSL实现复杂查询
-        List<Reservation> reservations = reservationRepository.findByHotelId(hotelId);
-        
-        // 内存中筛选
-        return reservations.stream()
-                .filter(reservation -> orderNo == null || reservation.getReservationCode().contains(orderNo))
-                .filter(reservation -> status == null || reservation.getReservationStatus().equals(status))
-                .filter(reservation -> channelId == null || reservation.getChannelId().equals(channelId))
-                .filter(reservation -> startBookingDate == null || !reservation.getCreatedAt().before(startBookingDate))
-                .filter(reservation -> endBookingDate == null || !reservation.getCreatedAt().after(endBookingDate))
-                .filter(reservation -> startCheckInDate == null || !reservation.getCheckInDate().before(startCheckInDate))
-                .filter(reservation -> endCheckInDate == null || !reservation.getCheckInDate().after(endCheckInDate))
-                .filter(reservation -> startCheckOutDate == null || !reservation.getCheckOutDate().before(startCheckOutDate))
-                .filter(reservation -> endCheckOutDate == null || !reservation.getCheckOutDate().after(endCheckOutDate))
-                .collect(java.util.stream.Collectors.toList());
-    }
-    
-    /**
-     * 导出订单为CSV格式
-     * @param reservations 订单列表
-     * @return CSV格式的订单数据
-     */
-    public String exportReservationsToCsv(List<Reservation> reservations) {
-        StringBuilder csv = new StringBuilder();
-        
-        // CSV表头
-        csv.append("订单号,状态,渠道,预订时间,入住日期,离店日期,总价,房型,客人姓名,联系电话,成人数量,儿童数量\n");
-        
-        // 填充数据
-        for (Reservation reservation : reservations) {
-            csv.append(reservation.getReservationCode()).append(",");
-            csv.append(reservation.getReservationStatus()).append(",");
-            csv.append(reservation.getChannelId()).append(",");
-            csv.append(reservation.getCreatedAt()).append(",");
-            csv.append(reservation.getCheckInDate()).append(",");
-            csv.append(reservation.getCheckOutDate()).append(",");
-            csv.append(reservation.getTotalPrice()).append(",");
-            csv.append(reservation.getRoomTypeId()).append(",");
-            csv.append(reservation.getGuestName()).append(",");
-            csv.append(reservation.getGuestPhone()).append(",");
-            csv.append(reservation.getAdultCount()).append(",");
-            csv.append(reservation.getChildCount()).append("\n");
-        }
-        
-        return csv.toString();
-    }
-    
-    /**
-     * 获取今日订单
-     * @param hotelId 酒店ID
-     * @return 今日订单列表
-     */
+
     public List<Reservation> getTodayReservations(Integer hotelId) {
-        Date today = new Date();
-        today.setHours(0);
-        today.setMinutes(0);
-        today.setSeconds(0);
-        
-        Date tomorrow = new Date(today.getTime() + 86400000);
-        
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        Date today = cal.getTime();
+        cal.add(Calendar.DATE, 1);
+        Date tomorrow = cal.getTime();
         return reservationRepository.findByHotelIdAndCreatedAtBetween(hotelId, today, tomorrow);
     }
-    
-    /**
-     * 获取明日入住订单
-     * @param hotelId 酒店ID
-     * @return 明日入住订单列表
-     */
-    public List<Reservation> getTomorrowCheckInReservations(Integer hotelId) {
-        Date tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(0);
-        tomorrow.setMinutes(0);
-        tomorrow.setSeconds(0);
-        
-        Date dayAfterTomorrow = new Date(tomorrow.getTime() + 86400000);
-        
-        return reservationRepository.findByHotelIdAndCheckInDateBetween(hotelId, tomorrow, dayAfterTomorrow);
-    }
 }
-
