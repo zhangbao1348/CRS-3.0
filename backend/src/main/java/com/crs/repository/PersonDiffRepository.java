@@ -52,4 +52,10 @@ public interface PersonDiffRepository extends JpaRepository<PersonDiff, Integer>
      * @return 人数差价列表
      */
     List<PersonDiff> findByStatus(PersonDiff.Status status);
+
+    List<PersonDiff> findBySystemCode(String systemCode);
+
+    List<PersonDiff> findBySystemCodeAndStatus(String systemCode, PersonDiff.Status status);
+
+    List<PersonDiff> findBySystemCodeAndPersonType(String systemCode, String personType);
 }

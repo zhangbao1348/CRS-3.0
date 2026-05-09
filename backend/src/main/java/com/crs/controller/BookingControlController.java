@@ -71,22 +71,22 @@ public class BookingControlController {
                 BookingControl old = existing.get();
                 // 记录变更明细（旧值 → 新值）
                 detail = String.format(
-                    "{\"date\":\"%s\",\"changes\":{\"cancellationRule\":\"%s→%s\",\"advanceBookingDays\":\"%d→%d\",\"minStay\":\"%d→%d\",\"maxStay\":\"%d→%d\"}}",
+                    "{\"date\":\"%s\",\"changes\":{\"cancellationPolicyCode\":\"%s→%s\",\"advanceBookingDays\":\"%d→%d\",\"minStay\":\"%d→%d\",\"maxStay\":\"%d→%d\"}}",
                     sdf.format(control.getControlDate()),
-                    old.getCancellationRule(), control.getCancellationRule(),
+                    old.getCancellationPolicyCode(), control.getCancellationPolicyCode(),
                     old.getAdvanceBookingDays(), control.getAdvanceBookingDays(),
                     old.getMinStay(), control.getMinStay(),
                     old.getMaxStay(), control.getMaxStay());
-                old.setCancellationRule(control.getCancellationRule());
+                old.setCancellationPolicyCode(control.getCancellationPolicyCode());
                 old.setAdvanceBookingDays(control.getAdvanceBookingDays());
                 old.setMinStay(control.getMinStay());
                 old.setMaxStay(control.getMaxStay());
                 repository.save(old);
             } else {
                 detail = String.format(
-                    "{\"date\":\"%s\",\"changes\":{\"cancellationRule\":\"→%s\",\"advanceBookingDays\":\"→%d\",\"minStay\":\"→%d\",\"maxStay\":\"→%d\"}}",
+                    "{\"date\":\"%s\",\"changes\":{\"cancellationPolicyCode\":\"→%s\",\"advanceBookingDays\":\"→%d\",\"minStay\":\"→%d\",\"maxStay\":\"→%d\"}}",
                     sdf.format(control.getControlDate()),
-                    control.getCancellationRule(), control.getAdvanceBookingDays(),
+                    control.getCancellationPolicyCode(), control.getAdvanceBookingDays(),
                     control.getMinStay(), control.getMaxStay());
                 repository.save(control);
             }
@@ -136,7 +136,7 @@ public class BookingControlController {
 
                 if (existing.isPresent()) {
                     BookingControl e = existing.get();
-                    e.setCancellationRule(control.getCancellationRule());
+                    e.setCancellationPolicyCode(control.getCancellationPolicyCode());
                     e.setAdvanceBookingDays(control.getAdvanceBookingDays());
                     e.setMinStay(control.getMinStay());
                     e.setMaxStay(control.getMaxStay());
@@ -151,9 +151,9 @@ public class BookingControlController {
             if (hotelCode != null && !controls.isEmpty()) {
                 BookingControl first = controls.get(0);
                 String detail = String.format(
-                    "{\"dates\":\"%s ~ %s（共%d天）\",\"values\":{\"cancellationRule\":\"%s\",\"advanceBookingDays\":%d,\"minStay\":%d,\"maxStay\":%d}}",
+                    "{\"dates\":\"%s ~ %s（共%d天）\",\"values\":{\"cancellationPolicyCode\":\"%s\",\"advanceBookingDays\":%d,\"minStay\":%d,\"maxStay\":%d}}",
                     dateList.get(0), dateList.get(dateList.size() - 1), dateList.size(),
-                    first.getCancellationRule(), first.getAdvanceBookingDays(),
+                    first.getCancellationPolicyCode(), first.getAdvanceBookingDays(),
                     first.getMinStay(), first.getMaxStay());
 
                 BookingControlLog log = new BookingControlLog();

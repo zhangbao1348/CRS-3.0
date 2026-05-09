@@ -19,7 +19,7 @@ const OP_TYPE_MAP = {
 }
 
 const RackRate = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
 
   // Filter state
@@ -50,27 +50,21 @@ const RackRate = () => {
 
   // Load rate plans when hotel changes
   useEffect(() => {
-    if (!selectedHotelId) {
+    if (!hotelCode) {
       setRatePlans([])
-      setSelectedRateCode(null)
       return
     }
-    ratePlanApi.getRatePlans(selectedHotelId).then(res => {
-      const list = (res?.data || []).filter(rp => rp.derivativeLevel === 'basic' || !rp.derivativeLevel)
-      setRatePlans(list)
-      if (list.length > 0) setSelectedRateCode(list[0].rateCode)
-      else setSelectedRateCode(null)
-    }).catch(() => setRatePlans([]))
-  }, [selectedHotelId])
+    ratePlanApi.getRatePlansByHotelCode(hotelCode).then(res => {
+      setRatePlans(res?.data || [])
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [hotelCode])
 
-  // Load room types when hotel changes
   useEffect(() => {
-    if (!selectedHotelId) { setRoomTypes([]); return }
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId).then(res => {
-      const list = (res?.data || []).filter(r => r.status === 'active')
-      setRoomTypes(list)
-    }).catch(() => setRoomTypes([]))
-  }, [selectedHotelId])
+    if (!hotelCode) { setRoomTypes([]); return }
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode).then(res => {
+      setRoomTypes((res?.data || []).filter(r => r.status === 'active'))
+    }).catch(() => {})
+  }, [hotelCode])
 
   // Build date columns from range
   const buildDates = useCallback((range) => {

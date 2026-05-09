@@ -185,20 +185,45 @@ public class HotelRoomTypeService {
      * @return 房型列表
      */
     public List<HotelRoomType> getHotelRoomTypesByStatus(Integer hotelId, String status) {
-        // 获取当前租户ID
         Integer tenantId = TenantContext.getTenantId();
         if (tenantId == null) {
             throw new RuntimeException("Tenant not found");
         }
-        
-        // 检查酒店是否存在且属于当前租户
         var hotel = hotelRepository.findById(hotelId)
                 .orElseThrow(() -> new RuntimeException("Hotel not found"));
-        
         if (!hotel.getTenantId().equals(tenantId)) {
             throw new RuntimeException("Access denied: Hotel does not belong to current tenant");
         }
-        
         return hotelRoomTypeRepository.findByHotelIdAndStatus(hotelId, status);
+    }
+
+    public List<HotelRoomType> getHotelRoomTypesByHotelCode(String hotelCode) {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not found");
+        }
+        var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
+        return hotelRoomTypeRepository.findByHotelCode(hotelCode);
+    }
+
+    public Optional<HotelRoomType> getHotelRoomTypeByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode) {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not found");
+        }
+        var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
+        return hotelRoomTypeRepository.findByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
+    }
+
+    public List<HotelRoomType> getHotelRoomTypesByHotelCodeAndStatus(String hotelCode, String status) {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not found");
+        }
+        var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
+        return hotelRoomTypeRepository.findByHotelCodeAndStatus(hotelCode, status);
     }
 }

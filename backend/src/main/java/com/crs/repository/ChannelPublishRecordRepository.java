@@ -16,10 +16,19 @@ public interface ChannelPublishRecordRepository extends JpaRepository<ChannelPub
     List<ChannelPublishRecord> findByTenantIdAndHotelCodeAndChannelCodeAndStatus(
             Integer tenantId, String hotelCode, String channelCode, String status);
 
+    boolean existsByTenantIdAndHotelCodeAndChannelCodeAndRateCodeAndRoomTypeCode(
+            Integer tenantId, String hotelCode, String channelCode, String rateCode, String roomTypeCode);
+
     @Modifying
     @Transactional
     @Query("DELETE FROM ChannelPublishRecord r WHERE r.tenantId = :tenantId AND r.hotelCode = :hotelCode AND r.channelCode = :channelCode AND r.rateCode = :rateCode AND r.roomTypeCode = :roomTypeCode")
     void deleteByKey(@Param("tenantId") Integer tenantId, @Param("hotelCode") String hotelCode,
                      @Param("channelCode") String channelCode, @Param("rateCode") String rateCode,
                      @Param("roomTypeCode") String roomTypeCode);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM ChannelPublishRecord r WHERE r.tenantId = :tenantId AND r.hotelCode = :hotelCode AND r.channelCode = :channelCode AND r.rateCode = :rateCode")
+    void deleteByRateCode(@Param("tenantId") Integer tenantId, @Param("hotelCode") String hotelCode,
+                          @Param("channelCode") String channelCode, @Param("rateCode") String rateCode);
 }

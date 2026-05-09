@@ -23,6 +23,9 @@ public class RoomTypeCategory {
     @Column(name = "group_id", nullable = false)
     private Integer groupId;
     
+    @Column(name = "group_code", length = 50)
+    private String groupCode;
+    
     @Column(name = "category_code", nullable = false, length = 50)
     private String categoryCode;
     
@@ -70,6 +73,14 @@ public class RoomTypeCategory {
     
     public void setGroupId(Integer groupId) {
         this.groupId = groupId;
+    }
+    
+    public String getGroupCode() {
+        return groupCode;
+    }
+    
+    public void setGroupCode(String groupCode) {
+        this.groupCode = groupCode;
     }
     
     public String getCategoryCode() {

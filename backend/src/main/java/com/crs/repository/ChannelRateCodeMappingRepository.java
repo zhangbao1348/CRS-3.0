@@ -34,4 +34,9 @@ public interface ChannelRateCodeMappingRepository extends JpaRepository<ChannelR
      * @return 映射列表
      */
     List<ChannelRateCodeMapping> findByChannelIdAndHotelId(Integer channelId, Integer hotelId);
+
+    List<ChannelRateCodeMapping> findByChannelCode(String channelCode);
+    List<ChannelRateCodeMapping> findByHotelCode(String hotelCode);
+    List<ChannelRateCodeMapping> findByChannelCodeAndHotelCode(String channelCode, String hotelCode);
+    List<ChannelRateCodeMapping> findByRateCode(String rateCode);
 }

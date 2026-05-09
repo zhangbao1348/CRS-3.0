@@ -340,8 +340,8 @@ public class HotelPriceController {
         try {
             Integer tenantId = getCurrentTenantId();
             
-            // 1. 先通过 hotelCode 获取 hotelId
-            Hotel hotel = hotelRepository.findByHotelCode(hotelCode).orElse(null);
+            // 1. 先通过 hotelCode+tenantId 获取 hotelId
+            Hotel hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId).orElse(null);
             if (hotel == null) {
                 return ResponseEntity.ok(Map.of("success", true, "data", Map.of(
                     "ratePlans", Collections.emptyList(),

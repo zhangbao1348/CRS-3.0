@@ -60,4 +60,19 @@ public interface GroupRoomTypeHotelRepository extends JpaRepository<GroupRoomTyp
     @Transactional
     @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeId = :groupRoomTypeId")
     void deleteByGroupRoomTypeId(@Param("groupRoomTypeId") Integer groupRoomTypeId);
+
+    List<GroupRoomTypeHotel> findByGroupRoomTypeCode(String groupRoomTypeCode);
+
+    List<GroupRoomTypeHotel> findByHotelCode(String hotelCode);
+
+    Optional<GroupRoomTypeHotel> findByGroupRoomTypeCodeAndHotelCode(String groupRoomTypeCode, String hotelCode);
+
+    List<GroupRoomTypeHotel> findByGroupRoomTypeCodeAndAllocated(String groupRoomTypeCode, Boolean allocated);
+
+    boolean existsByGroupRoomTypeCodeAndHotelCode(String groupRoomTypeCode, String hotelCode);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeCode = :groupRoomTypeCode")
+    void deleteByGroupRoomTypeCode(@Param("groupRoomTypeCode") String groupRoomTypeCode);
 }

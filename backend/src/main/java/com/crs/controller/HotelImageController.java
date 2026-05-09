@@ -1,7 +1,10 @@
 package com.crs.controller;
 
 import com.crs.entity.HotelImage;
+import com.crs.entity.Hotel;
 import com.crs.service.HotelImageService;
+import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,6 +15,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -21,6 +25,18 @@ public class HotelImageController {
     
     @Autowired
     private HotelImageService hotelImageService;
+    
+    @Autowired
+    private HotelRepository hotelRepository;
+    
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
+    }
+    
+    private boolean validateHotelTenant(String hotelCode) {
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
+    }
     
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<List<HotelImage>> getImagesByHotelId(@PathVariable Integer hotelId) {
@@ -90,13 +106,46 @@ public class HotelImageController {
         }
     }
     
+    @GetMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<List<HotelImage>> getImagesByHotelCode(@PathVariable String hotelCode) {
+        if (!validateHotelTenant(hotelCode)) {
+            return ResponseEntity.status(403).build();
+        }
+        List<HotelImage> images = hotelImageService.getImagesByHotelCode(hotelCode);
+        return ResponseEntity.ok(images);
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}/type/{type}")
+    public ResponseEntity<List<HotelImage>> getImagesByHotelCodeAndType(@PathVariable String hotelCode, @PathVariable String type) {
+        if (!validateHotelTenant(hotelCode)) {
+            return ResponseEntity.status(403).build();
+        }
+        List<HotelImage> images = hotelImageService.getImagesByHotelCodeAndType(hotelCode, type);
+        return ResponseEntity.ok(images);
+    }
+
+    @DeleteMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<Void> deleteImagesByHotelCode(@PathVariable String hotelCode) {
+        if (!validateHotelTenant(hotelCode)) {
+            return ResponseEntity.status(403).build();
+        }
+        hotelImageService.deleteImagesByHotelCode(hotelCode);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/upload")
     public ResponseEntity<HotelImage> uploadImage(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("hotelId") Integer hotelId,
+            @RequestParam(value = "hotelId", required = false) Integer hotelId,
+            @RequestParam(value = "hotelCode", required = false) String hotelCode,
             @RequestParam("imageType") String imageType) {
         try {
-            // 检查文件是否为空
+            if (hotelCode != null && !hotelCode.isEmpty()) {
+                if (!validateHotelTenant(hotelCode)) {
+                    return ResponseEntity.status(403).build();
+                }
+            }
+            
             if (file.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
             }
@@ -120,7 +169,17 @@ public class HotelImageController {
             
             // 创建HotelImage对象
             HotelImage hotelImage = new HotelImage();
-            hotelImage.setHotelId(hotelId);
+            if (hotelCode != null && !hotelCode.isEmpty()) {
+                hotelImage.setHotelCode(hotelCode);
+            }
+            if (hotelId != null) {
+                hotelImage.setHotelId(hotelId);
+            } else if (hotelCode != null && !hotelCode.isEmpty()) {
+                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId());
+                if (hotelOpt.isPresent()) {
+                    hotelImage.setHotelId(hotelOpt.get().getId());
+                }
+            }
             hotelImage.setImageType(imageType);
             hotelImage.setImagePath(filePath);
             hotelImage.setImageName(originalFilename);

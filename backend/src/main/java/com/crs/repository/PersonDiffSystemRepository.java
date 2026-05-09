@@ -43,4 +43,10 @@ public interface PersonDiffSystemRepository extends JpaRepository<PersonDiffSyst
      * @return 人数差价体系列表
      */
     List<PersonDiffSystem> findByStatus(PersonDiffSystem.Status status);
+
+    List<PersonDiffSystem> findByHotelCode(String hotelCode);
+
+    List<PersonDiffSystem> findByHotelCodeAndStatus(String hotelCode, PersonDiffSystem.Status status);
+
+    Optional<PersonDiffSystem> findByHotelCodeAndName(String hotelCode, String name);
 }

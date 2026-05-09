@@ -10,7 +10,7 @@ const { RangePicker } = DatePicker
 const { Option } = Select
 
 const BookingControl = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [isModalVisible, setIsModalVisible] = useState(false)
@@ -48,9 +48,9 @@ const BookingControl = () => {
 
   // 加载下拉数据
   useEffect(() => {
-    if (!selectedHotelId) return
-    ratePlanApi.getRatePlans(selectedHotelId).then(res => setRatePlans(res?.data || [])).catch(() => {})
-  }, [selectedHotelId])
+    if (!hotelCode) return
+    ratePlanApi.getRatePlansByHotelCode(hotelCode).then(res => setRatePlans(res?.data || [])).catch(() => {})
+  }, [hotelCode])
 
   useEffect(() => {
     // 加载集团取消政策

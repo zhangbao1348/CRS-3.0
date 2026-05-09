@@ -20,3 +20,4 @@ public interface ApiLogRepository extends JpaRepository<ApiLog, Integer> {
      */
     List<ApiLog> findByReservationId(Integer reservationId);
 }
+

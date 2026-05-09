@@ -17,6 +17,7 @@ const AddHotel = () => {
   const [currentTenantName, setCurrentTenantName] = useState('')
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [hotelId, setHotelId] = useState(null)
+  const [hotelCode, setHotelCode] = useState(null)
   
   // 集团房价码数据状态
   const [groupRateCodes, setGroupRateCodes] = useState([])
@@ -360,11 +361,14 @@ const AddHotel = () => {
       
       let response
       if (hotelId) {
-        response = await hotelApi.updateHotel(hotelId, hotelData)
+        response = await hotelApi.updateHotelByCode(hotelCode, hotelData)
       } else {
         response = await hotelApi.createHotel(hotelData)
         if (response.id) {
           setHotelId(response.id)
+        }
+        if (response.hotelCode) {
+          setHotelCode(response.hotelCode)
         }
       }
       
@@ -378,7 +382,7 @@ const AddHotel = () => {
   
   // 保存设施
   const saveFacilities = async (values) => {
-    if (!hotelId) {
+    if (!hotelCode) {
       message.warning('请先保存酒店基本信息')
       return false
     }
@@ -388,7 +392,7 @@ const AddHotel = () => {
       if (values.transportationServices) {
         values.transportationServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'transportation',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -399,7 +403,7 @@ const AddHotel = () => {
       if (values.diningServices) {
         values.diningServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'dining',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -410,7 +414,7 @@ const AddHotel = () => {
       if (values.cleaningServices) {
         values.cleaningServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'cleaning',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -421,7 +425,7 @@ const AddHotel = () => {
       if (values.recreationServices) {
         values.recreationServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'recreation',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -432,7 +436,7 @@ const AddHotel = () => {
       if (values.businessServices) {
         values.businessServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'business',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -443,7 +447,7 @@ const AddHotel = () => {
       if (values.frontDeskServices) {
         values.frontDeskServices.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'frontDesk',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -454,7 +458,7 @@ const AddHotel = () => {
       if (values.generalFacilities) {
         values.generalFacilities.forEach(value => {
           facilities.push({
-            hotelId: hotelId,
+            hotelCode: hotelCode,
             facilityType: 'general',
             facilityCode: value,
             facilityName: getFacilityName(value),
@@ -465,7 +469,7 @@ const AddHotel = () => {
       
       if (facilities.length > 0) {
         try {
-          await hotelFacilityApi.deleteHotelFacilities(hotelId)
+          await hotelFacilityApi.deleteHotelFacilitiesByCode(hotelCode)
         } catch (error) {
           console.log('删除现有设施失败（可能是首次添加）:', error.message)
         }
@@ -483,18 +487,18 @@ const AddHotel = () => {
   
   // 保存房价码分配
   const saveRateCodeAllocations = async () => {
-    if (!hotelId) {
+    if (!hotelCode) {
       message.warning('请先保存酒店基本信息')
       return false
     }
     
     try {
-      await hotelRateCodeAllocationApi.deleteAllocationsByHotelId(hotelId)
+      await hotelRateCodeAllocationApi.deleteAllocationsByHotelCode(hotelCode)
       
       const allocatedRateCodes = rateCodeData.filter(item => item.allocated)
       for (const item of allocatedRateCodes) {
         const allocation = {
-          hotelId: hotelId,
+          hotelCode: hotelCode,
           groupRateCodeId: parseInt(item.key),
           basicInfoEditable: item.basicInfoEditable || false,
           priceInfoEditable: item.priceInfoEditable || false,
@@ -514,7 +518,7 @@ const AddHotel = () => {
   
   // 保存房型分配
   const saveRoomTypeAllocations = async () => {
-    if (!hotelId) {
+    if (!hotelCode) {
       message.warning('请先保存酒店基本信息')
       return false
     }
@@ -523,7 +527,7 @@ const AddHotel = () => {
       const allocations = roomTypeData
         .filter(item => item.allocated)
         .map(item => ({
-          hotelId: hotelId,
+          hotelCode: hotelCode,
           groupRoomTypeId: parseInt(item.key),
           roomInfoEditable: item.roomInfoEditable || false
         }))

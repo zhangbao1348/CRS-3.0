@@ -22,7 +22,6 @@ const ChannelSetting = () => {
   const [publishedRecords, setPublishedRecords] = useState([])
 
   // 当前酒店ID和酒店代码（从页面顶部选择器获取）
-  const currentHotelId = localStorage.getItem('crs_selected_hotel_id') || '1'
   const currentHotelCode = localStorage.getItem('crs_selected_hotel_code') || 'JJSH001'
 
   const filteredRateCodes = rateCodes.filter(rc =>
@@ -58,7 +57,7 @@ const ChannelSetting = () => {
 
   const loadRateCodes = async () => {
     try {
-      const data = await channelPublishApi.getRateCodesWithRoomTypes(currentHotelId)
+      const data = await channelPublishApi.getRateCodesWithRoomTypesByCode(currentHotelCode)
       const formatted = (data || []).map(rc => ({
         code: rc.rateCode,
         name: rc.rateName,

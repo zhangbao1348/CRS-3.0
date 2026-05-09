@@ -13,4 +13,12 @@ public interface HotelImageRepository extends JpaRepository<HotelImage, Integer>
     List<HotelImage> findByHotelIdOrderBySortOrderAsc(Integer hotelId);
     
     void deleteByHotelId(Integer hotelId);
+
+    List<HotelImage> findByHotelCode(String hotelCode);
+
+    List<HotelImage> findByHotelCodeAndImageType(String hotelCode, String imageType);
+
+    List<HotelImage> findByHotelCodeOrderBySortOrderAsc(String hotelCode);
+
+    void deleteByHotelCode(String hotelCode);
 }

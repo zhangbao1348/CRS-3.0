@@ -36,10 +36,18 @@ public class HotelFacilityService {
         hotelFacilityRepository.deleteAll(getFacilitiesByHotelId(hotelId));
     }
     
-    /**
-     * 获取所有设施（集团管理用）
-     * @return 所有设施列表
-     */
+    public List<HotelFacility> getFacilitiesByHotelCode(String hotelCode) {
+        return hotelFacilityRepository.findByHotelCode(hotelCode);
+    }
+
+    public List<HotelFacility> getFacilitiesByHotelCodeAndType(String hotelCode, String facilityType) {
+        return hotelFacilityRepository.findByHotelCodeAndFacilityType(hotelCode, facilityType);
+    }
+
+    public void deleteFacilitiesByHotelCode(String hotelCode) {
+        hotelFacilityRepository.deleteAll(getFacilitiesByHotelCode(hotelCode));
+    }
+
     public List<HotelFacility> getAllFacilities() {
         return hotelFacilityRepository.findAll();
     }

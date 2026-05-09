@@ -64,6 +64,8 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @return 是否存在
      */
     boolean existsByRoomTypeCode(String roomTypeCode);
+
+    boolean existsByGroupIdAndRoomTypeCode(Integer groupId, String roomTypeCode);
     
     /**
      * 根据房型大类ID查询集团房型列表
@@ -100,4 +102,20 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @return 引用数量
      */
     long countByRoomTypeCategoryId(Integer roomTypeCategoryId);
+
+    List<GroupRoomType> findByGroupCode(String groupCode);
+
+    List<GroupRoomType> findByGroupCodeAndStatus(String groupCode, String status);
+
+    Optional<GroupRoomType> findByGroupCodeAndRoomTypeCode(String groupCode, String roomTypeCode);
+
+    List<GroupRoomType> findByGroupCodeAndRoomTypeCategoryCode(String groupCode, String roomTypeCategoryCode);
+
+    List<GroupRoomType> findByGroupCodeOrderBySortOrderAsc(String groupCode);
+
+    long countByGroupCode(String groupCode);
+
+    List<GroupRoomType> findByRoomTypeCategoryCode(String roomTypeCategoryCode);
+
+    long countByRoomTypeCategoryCode(String roomTypeCategoryCode);
 }

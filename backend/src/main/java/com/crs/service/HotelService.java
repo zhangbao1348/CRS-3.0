@@ -2,6 +2,7 @@ package com.crs.service;
 
 import com.crs.entity.Hotel;
 import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -43,7 +44,8 @@ public class HotelService {
      * @return 酒店信息
      */
     public Optional<Hotel> getHotelByCode(String hotelCode) {
-        return hotelRepository.findByHotelCode(hotelCode);
+        Integer tenantId = TenantContext.getTenantId();
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId != null ? tenantId : 1);
     }
     
     /**
@@ -71,8 +73,9 @@ public class HotelService {
      * @return 创建的酒店信息
      */
     public Hotel createHotel(Hotel hotel) {
-        // 检查酒店代码是否已存在
-        if (hotelRepository.existsByHotelCode(hotel.getHotelCode())) {
+        Integer tenantId = hotel.getTenantId() != null ? hotel.getTenantId() : TenantContext.getTenantId();
+        if (tenantId == null) tenantId = 1;
+        if (hotelRepository.existsByHotelCodeAndTenantId(hotel.getHotelCode(), tenantId)) {
             throw new RuntimeException("Hotel code already exists");
         }
         

@@ -171,6 +171,10 @@ public class Reservation {
     @Column(name = "reservation_status", nullable = false, length = 30)
     private String reservationStatus = "confirmed";
 
+    @Column(name = "payment_deadline")
+    @Temporal(TemporalType.TIMESTAMP)
+    private Date paymentDeadline;
+
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     private Status status = Status.active;

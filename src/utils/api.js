@@ -131,6 +131,7 @@ export const hotelApi = {
   getHotelsByGroupId: (groupId, options = {}) => api.get(`/hotels/group/${groupId}`, options),
   createHotel: (data, options = {}) => api.post('/hotels', data, options),
   updateHotel: (id, data, options = {}) => api.put(`/hotels/${id}`, data, options),
+  updateHotelByCode: (code, data, options = {}) => api.put(`/hotels/code/${code}`, data, options),
   deleteHotel: (id, options = {}) => api.delete(`/hotels/${id}`, options),
   getHotelsByCity: (city, options = {}) => api.get(`/hotels/city/${city}`, options),
   getHotelsByStatus: (status, options = {}) => api.get(`/hotels/status/${status}`, options),
@@ -138,7 +139,9 @@ export const hotelApi = {
 }
 
 export const hotelRoomTypeApi = {
-  getHotelRoomTypes: (hotelId, options = {}) => api.get(`/hotel-room-types/hotel/${hotelId}`, options)
+  getHotelRoomTypes: (hotelId, options = {}) => api.get(`/hotel-room-types/hotel/${hotelId}`, options),
+  getHotelRoomTypesByCode: (hotelCode, options = {}) => api.get(`/hotel-room-types/by-code/hotel/${hotelCode}`, options),
+  getHotelRoomTypesByCodeAndStatus: (hotelCode, status, options = {}) => api.get(`/hotel-room-types/by-code/hotel/${hotelCode}/status/${status}`, options)
 }
 
 export const channelCodeApi = {
@@ -164,12 +167,15 @@ export const groupFacilityApi = {
 
 export const hotelFacilityApi = {
   getHotelFacilities: (hotelId, options = {}) => api.get(`/hotel-facilities/hotel/${hotelId}`, options),
+  getHotelFacilitiesByCode: (hotelCode, options = {}) => api.get(`/hotel-facilities/by-code/hotel/${hotelCode}`, options),
   createHotelFacility: (data, options = {}) => api.post('/hotel-facilities', data, options),
-  deleteHotelFacilities: (hotelId, options = {}) => api.delete(`/hotel-facilities/hotel/${hotelId}`, options)
+  deleteHotelFacilities: (hotelId, options = {}) => api.delete(`/hotel-facilities/hotel/${hotelId}`, options),
+  deleteHotelFacilitiesByCode: (hotelCode, options = {}) => api.delete(`/hotel-facilities/by-code/hotel/${hotelCode}`, options)
 }
 
 export const hotelImageApi = {
   getHotelImages: (hotelId) => api.get(`/hotel-images/hotel/${hotelId}`),
+  getHotelImagesByCode: (hotelCode) => api.get(`/hotel-images/by-code/hotel/${hotelCode}`),
   uploadHotelImage: (formData) => api.post('/hotel-images/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -182,6 +188,7 @@ export const groupRateCodeApi = {
   getAllGroupRateCodes: (options = {}) => api.get('/group-rate-codes', options),
   getGroupRateCodeById: (id, options = {}) => api.get(`/group-rate-codes/${id}`, options),
   getGroupRateCodesByGroupId: (groupId, options = {}) => api.get(`/group-rate-codes/group/${groupId}`, options),
+  getGroupRateCodesByGroupCode: (groupCode, options = {}) => api.get(`/group-rate-codes/by-code/group/${groupCode}`, options),
   getActiveGroupRateCodes: (options = {}) => api.get('/group-rate-codes/active', options),
   getSelectableParentRateCodes: (targetDerivativeLevel, excludeId, options = {}) => {
     const params = {}
@@ -201,20 +208,24 @@ export const groupRateCodeApi = {
 
 export const hotelRateCodeAllocationApi = {
   getAllocationsByHotelId: (hotelId, options = {}) => api.get(`/hotel-rate-code-allocations/hotel/${hotelId}`, options),
+  getAllocationsByHotelCode: (hotelCode, options = {}) => api.get(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options),
   createAllocation: (data, options = {}) => api.post('/hotel-rate-code-allocations', data, options),
   updateAllocation: (id, data, options = {}) => api.put(`/hotel-rate-code-allocations/${id}`, data, options),
-  deleteAllocationsByHotelId: (hotelId, options = {}) => api.delete(`/hotel-rate-code-allocations/hotel/${hotelId}`, options)
+  deleteAllocationsByHotelId: (hotelId, options = {}) => api.delete(`/hotel-rate-code-allocations/hotel/${hotelId}`, options),
+  deleteAllocationsByHotelCode: (hotelCode, options = {}) => api.delete(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options)
 }
 
 export const groupRoomTypeApi = {
   getAllGroupRoomTypes: (options = {}) => api.get('/group-room-types', options),
   getGroupRoomTypeById: (id, options = {}) => api.get(`/group-room-types/${id}`, options),
   getGroupRoomTypesByGroupId: (groupId, options = {}) => api.get(`/group-room-types/group/${groupId}`, options),
+  getGroupRoomTypesByGroupCode: (groupCode, options = {}) => api.get(`/group-room-types/by-code/group/${groupCode}`, options),
   getActiveGroupRoomTypes: (options = {}) => api.get('/group-room-types/active', options)
 }
 
 export const groupRoomTypeHotelApi = {
   getHotelRoomTypeAllocations: (hotelId, options = {}) => api.get(`/group-room-type-hotels/hotel/${hotelId}`, options),
+  getHotelRoomTypeAllocationsByCode: (hotelCode, options = {}) => api.get(`/group-room-type-hotels/by-code/hotel/${hotelCode}`, options),
   batchSaveRoomTypeAllocations: (data, options = {}) => api.post('/group-room-type-hotels', data, options)
 }
 
@@ -279,6 +290,8 @@ export const ratePlanApi = {
     const params = hotelId ? { hotelId } : {}
     return api.get('/rate-plans', { params, ...options })
   },
+  getRatePlansByHotelCode: (hotelCode, options = {}) => api.get(`/rate-plans/by-code/hotel/${hotelCode}`, options),
+  getRatePlanByHotelCodeAndRateCode: (hotelCode, rateCode, options = {}) => api.get(`/rate-plans/by-code/hotel/${hotelCode}/rate-code/${rateCode}`, options),
   getRatePlanById: (id, options = {}) => api.get(`/rate-plans/${id}`, options),
   createRatePlan: (data, options = {}) => api.post('/rate-plans', data, options),
   updateRatePlan: (id, data, options = {}) => api.put(`/rate-plans/${id}`, data, options),
@@ -348,6 +361,8 @@ export const tenantChannelApi = {
 export const channelPublishApi = {
   getRateCodesWithRoomTypes: (hotelId, options = {}) =>
     api.get('/channel-publish/rate-codes', { params: { hotelId }, ...options }),
+  getRateCodesWithRoomTypesByCode: (hotelCode, options = {}) =>
+    api.get('/channel-publish/rate-codes', { params: { hotelCode }, ...options }),
   getPublishedRecords: (tenantId, hotelCode, channelCode, options = {}) =>
     api.get('/channel-publish/records', { params: { tenantId, hotelCode, channelCode }, ...options }),
   batchPublish: (data, options = {}) =>
@@ -371,10 +386,21 @@ export const reservationApi = {
     api.put(`/reservation/${id}/manual-intervene`, data, options),
   getByHotel: (hotelId, params = {}, options = {}) =>
     api.get(`/reservation/hotel/${hotelId}`, { params, ...options }),
+  getByHotelCode: (hotelCode, params = {}, options = {}) =>
+    api.get(`/reservation/by-code/hotel/${hotelCode}`, { params, ...options }),
   getToday: (params = {}, options = {}) =>
     api.get('/reservation/today', { params, ...options }),
   export: (params = {}, options = {}) =>
     api.get('/reservation/export', { params, responseType: 'blob', ...options })
+}
+
+export const dashboardApi = {
+  /** 获取集团首页数据 */
+  getGroupDashboard: (options = {}) =>
+    api.get('/dashboard/group', options),
+  /** 获取门店首页数据 */
+  getHotelDashboard: (hotelCode, options = {}) =>
+    api.get('/dashboard/hotel', { params: { hotelCode }, ...options })
 }
 
 export default api

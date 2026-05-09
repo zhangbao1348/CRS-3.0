@@ -1,0 +1,286 @@
+{
+	"info": {
+		"name": "CRS Open API - 实时查询接口",
+		"description": "CRS酒店中央预订系统 - 渠道开放API接口集合\n\n## 认证方式\n所有接口需在请求头中携带：\n- `X-Api-Key`: 渠道API Key\n- `X-Api-Secret`: 渠道API Secret\n\n## 测试环境\n- 基础URL: `http://localhost:8080`\n- 测试Key/Secret见下方变量配置",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:8080" },
+		{ "key": "apiKey", "value": "crs_ctrip_key_001" },
+		{ "key": "apiSecret", "value": "crs_ctrip_secret_001" },
+		{ "key": "hotelCode", "value": "JJSH001" },
+		{ "key": "roomTypeCode", "value": "ST1" },
+		{ "key": "ratePlanCode", "value": "BAR" },
+		{ "key": "checkInDate", "value": "2026-06-01" },
+		{ "key": "checkOutDate", "value": "2026-06-03" },
+		{ "key": "reservationCode", "value": "" }
+	],
+	"item": [
+		{
+			"name": "1. 查询酒店列表",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" }
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/open/hotels?cityId=&keyword=&checkInDate={{checkInDate}}&checkOutDate={{checkOutDate}}&page=1&pageSize=20",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "hotels"],
+					"query": [
+						{ "key": "cityId", "value": "", "description": "城市筛选" },
+						{ "key": "keyword", "value": "", "description": "搜索关键词（模糊匹配中/英文名称）" },
+						{ "key": "checkInDate", "value": "{{checkInDate}}", "description": "入住日期(yyyy-MM-dd)，用于计算起价" },
+						{ "key": "checkOutDate", "value": "{{checkOutDate}}", "description": "离店日期(yyyy-MM-dd)" },
+						{ "key": "page", "value": "1", "description": "页码，默认1" },
+						{ "key": "pageSize", "value": "20", "description": "每页数量，默认20，最大50" }
+					]
+				},
+				"description": "查询渠道可访问的酒店列表，支持按城市、关键词筛选，返回酒店基本信息、房型、设施等。\n\n**响应示例：**\n```json\n{\n  \"code\": 200,\n  \"message\": \"success\",\n  \"data\": {\n    \"total\": 15,\n    \"page\": 1,\n    \"pageSize\": 20,\n    \"list\": [{\n      \"hotelCode\": \"JJSH001\",\n      \"chineseName\": \"上海锦江饭店\",\n      \"city\": \"上海\",\n      \"startingPrice\": 688.00,\n      \"roomTypes\": [...]\n    }]\n  }\n}\n```"
+			},
+			"response": []
+		},
+		{
+			"name": "2. 查询酒店详情与价格",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" }
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/open/hotels/{{hotelCode}}?checkInDate={{checkInDate}}&checkOutDate={{checkOutDate}}&adultCount=2&childCount=0&roomCount=1",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "hotels", "{{hotelCode}}"],
+					"query": [
+						{ "key": "checkInDate", "value": "{{checkInDate}}", "description": "入住日期(yyyy-MM-dd)，必填" },
+						{ "key": "checkOutDate", "value": "{{checkOutDate}}", "description": "离店日期(yyyy-MM-dd)，必填" },
+						{ "key": "adultCount", "value": "2", "description": "成人数，默认2" },
+						{ "key": "childCount", "value": "0", "description": "儿童数，默认0" },
+						{ "key": "roomCount", "value": "1", "description": "房间数，默认1" },
+						{ "key": "memberNo", "value": "", "description": "会员编号（会员价时需要）", "disabled": true },
+						{ "key": "memberLevel", "value": "", "description": "会员等级(silver/gold/platinum/diamond)", "disabled": true }
+					]
+				},
+				"description": "查询指定酒店的详细信息，包括房型列表、每个房型下的价格计划、每日价格、取消政策、担保政策、包价信息等。\n\n**响应示例：**\n```json\n{\n  \"code\": 200,\n  \"data\": {\n    \"hotel\": { \"hotelCode\": \"JJSH001\", \"chineseName\": \"上海锦江饭店\", ... },\n    \"roomTypes\": [{\n      \"roomTypeCode\": \"ST1\",\n      \"roomTypeName\": \"标准双床房\",\n      \"ratePlans\": [{\n        \"ratePlanCode\": \"BAR\",\n        \"ratePlanName\": \"门市价\",\n        \"totalPrice\": 1376.00,\n        \"dailyPrices\": [{ \"date\": \"2026-06-01\", \"priceWithTax\": 688.00 }],\n        \"cancellationPolicy\": { \"type\": \"FREE_CANCEL\", \"freeCancelBeforeDays\": 1 },\n        \"guaranteePolicy\": { \"type\": \"GUARANTEE\", \"subType\": \"FIRST_NIGHT\" }\n      }]\n    }]\n  }\n}\n```"
+			},
+			"response": []
+		},
+		{
+			"name": "3. 可订检查",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" },
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"hotelCode\": \"{{hotelCode}}\",\n\t\"roomTypeCode\": \"{{roomTypeCode}}\",\n\t\"ratePlanCode\": \"{{ratePlanCode}}\",\n\t\"checkInDate\": \"{{checkInDate}}\",\n\t\"checkOutDate\": \"{{checkOutDate}}\",\n\t\"roomCount\": 1,\n\t\"adultCount\": 2,\n\t\"childCount\": 0\n}",
+					"options": { "raw": { "language": "json" } }
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/open/availability/check",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "availability", "check"]
+				},
+				"description": "检查指定酒店+房型+价格计划在指定日期是否可预订，返回可用房量、每日价格、取消/担保政策等。\n\n**可订响应(200)：**\n```json\n{\n  \"code\": 200,\n  \"data\": {\n    \"available\": true,\n    \"availableRooms\": 5,\n    \"totalPrice\": 1376.00,\n    \"dailyPrices\": [{ \"date\": \"2026-06-01\", \"priceWithTax\": 688.00 }],\n    \"cancellationPolicy\": { ... },\n    \"guaranteePolicy\": { ... }\n  }\n}\n```\n\n**不可订响应(409)：**\n```json\n{\n  \"code\": 409,\n  \"message\": \"库存不足\",\n  \"data\": {\n    \"available\": false,\n    \"reason\": \"INSUFFICIENT_INVENTORY\",\n    \"reasonDescription\": \"库存不足：2026-06-02(可用:0)\",\n    \"unavailableDates\": [\"2026-06-02(可用:0)\"]\n  }\n}\n```\n\n**不可订原因枚举：**\n| reason | 说明 |\n|--------|------|\n| HOTEL_INACTIVE | 酒店不存在或已停用 |\n| ROOM_TYPE_INACTIVE | 房型不存在或已停用 |\n| RATE_PLAN_INACTIVE | 价格计划不存在或已停用 |\n| ROOM_TYPE_NOT_APPLICABLE | 价格计划不适用该房型 |\n| MEMBER_INFO_REQUIRED | 会员价需提供会员等级 |\n| MEMBER_LEVEL_MISMATCH | 会员等级不满足 |\n| ROOM_CLOSED | 房态已关闭 |\n| INSUFFICIENT_INVENTORY | 库存不足 |\n| EXCEED_MAX_OCCUPANCY | 超出最大入住人数 |\n| ADVANCE_BOOKING_VIOLATION | 不满足提前预订天数 |\n| STAY_DURATION_VIOLATION | 不满足入住天数限制 |\n| PRICE_NOT_SET | 部分日期未设置价格 |"
+			},
+			"response": []
+		},
+		{
+			"name": "4. 创建订单",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"var resp = pm.response.json();",
+							"if (resp.code === 200 && resp.data && resp.data.reservationCode) {",
+							"    pm.collectionVariables.set('reservationCode', resp.data.reservationCode);",
+							"    console.log('已自动保存 reservationCode: ' + resp.data.reservationCode);",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" },
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"hotelCode\": \"{{hotelCode}}\",\n\t\"roomTypeCode\": \"{{roomTypeCode}}\",\n\t\"ratePlanCode\": \"{{ratePlanCode}}\",\n\t\"checkInDate\": \"{{checkInDate}}\",\n\t\"checkOutDate\": \"{{checkOutDate}}\",\n\t\"roomCount\": 1,\n\t\"adultCount\": 2,\n\t\"childCount\": 0,\n\t\"contact\": {\n\t\t\"name\": \"张三\",\n\t\t\"phone\": \"13800138001\",\n\t\t\"email\": \"zhangsan@test.com\"\n\t},\n\t\"guests\": [\n\t\t{\n\t\t\t\"name\": \"张三\",\n\t\t\t\"phone\": \"13800138001\",\n\t\t\t\"idType\": \"id_card\",\n\t\t\t\"idNumber\": \"310101199001011234\"\n\t\t},\n\t\t{\n\t\t\t\"name\": \"李四\",\n\t\t\t\"phone\": \"13900139000\",\n\t\t\t\"idType\": \"id_card\",\n\t\t\t\"idNumber\": \"310101199001015678\"\n\t\t}\n\t],\n\t\"memberNo\": \"M100001\",\n\t\"memberLevel\": \"gold\",\n\t\"guaranteeInfo\": {\n\t\t\"type\": \"credit_card\",\n\t\t\"creditCardInfo\": \"encrypted_credit_card_data\"\n\t},\n\t\"specialRequest\": \"高层无烟房\",\n\t\"notes\": \"预计下午3点到店\"\n}",
+					"options": { "raw": { "language": "json" } }
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/open/reservations",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "reservations"]
+				},
+				"description": "渠道创建订单。创建成功后自动将 reservationCode 保存到集合变量，供后续查询/取消使用。\n\n**成功响应(200)：**\n```json\n{\n  \"code\": 200,\n  \"data\": {\n    \"reservationId\": 9,\n    \"reservationCode\": \"CRS20260502000001\",\n    \"reservationStatus\": \"confirmed\",\n    \"hotelCode\": \"JJSH001\",\n    \"roomTypeCode\": \"ST1\",\n    \"ratePlanCode\": \"BAR\",\n    \"checkInDate\": \"2026-06-01\",\n    \"checkOutDate\": \"2026-06-03\",\n    \"nights\": 2,\n    \"roomCount\": 1,\n    \"totalPrice\": 1376.00,\n    \"currency\": \"CNY\",\n    \"createdAt\": \"2026-05-02 22:00:00\"\n  }\n}\n```"
+			},
+			"response": []
+		},
+		{
+			"name": "5. 查询订单详情",
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" }
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/open/reservations/{{reservationCode}}",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "reservations", "{{reservationCode}}"]
+				},
+				"description": "根据预订号查询订单详情。可使用创建订单返回的 reservationCode，或直接输入已知编号如 RES20260501001。\n\n**成功响应(200)：**\n```json\n{\n  \"code\": 200,\n  \"data\": {\n    \"reservationCode\": \"RES20260501001\",\n    \"reservationStatus\": \"confirmed\",\n    \"hotelCode\": \"JJSH001\",\n    \"hotelName\": \"上海锦江饭店\",\n    \"roomTypeCode\": \"ST1\",\n    \"roomTypeName\": \"标准双床房\",\n    \"ratePlanCode\": \"BAR\",\n    \"ratePlanName\": \"门市价\",\n    \"checkInDate\": \"2026-05-10\",\n    \"checkOutDate\": \"2026-05-12\",\n    \"nights\": 2,\n    \"roomCount\": 1,\n    \"totalPrice\": 800.00,\n    \"originalPrice\": 1000.00,\n    \"currency\": \"CNY\",\n    \"guaranteeType\": \"guarantee\",\n    \"paymentStatus\": \"paid\",\n    \"contactName\": \"张三\",\n    \"contactPhone\": \"13800138001\",\n    \"dailyPrices\": [...],\n    \"guests\": [...],\n    \"promotions\": [...]\n  }\n}\n```"
+			},
+			"response": []
+		},
+		{
+			"name": "6. 取消订单",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+					{ "key": "X-Api-Secret", "value": "{{apiSecret}}" },
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"cancelReason\": \"客人行程变更\"\n}",
+					"options": { "raw": { "language": "json" } }
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/open/reservations/{{reservationCode}}/cancel",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "open", "reservations", "{{reservationCode}}", "cancel"]
+				},
+				"description": "取消指定订单。仅渠道自己创建的订单可以取消。\n\n**成功响应(200)：**\n```json\n{\n  \"code\": 200,\n  \"data\": {\n    \"reservationCode\": \"RES20260501001\",\n    \"reservationStatus\": \"cancelled\",\n    \"cancelledAt\": \"2026-05-02 22:45:00\"\n  }\n}\n```\n\n**错误响应：**\n- 400: 订单已取消，不可重复取消\n- 403: 无权操作该订单（渠道不匹配）\n- 404: 订单不存在"
+			},
+			"response": []
+		},
+		{
+			"name": "=== 测试场景 ===",
+			"description": "以下为常见测试场景的请求示例，使用不同的参数组合",
+			"item": [
+				{
+					"name": "场景1: 查询上海酒店",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+							{ "key": "X-Api-Secret", "value": "{{apiSecret}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/open/hotels?keyword=锦江&checkInDate=2026-06-01&checkOutDate=2026-06-03&page=1&pageSize=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "open", "hotels"],
+							"query": [
+								{ "key": "keyword", "value": "锦江" },
+								{ "key": "checkInDate", "value": "2026-06-01" },
+								{ "key": "checkOutDate", "value": "2026-06-03" },
+								{ "key": "page", "value": "1" },
+								{ "key": "pageSize", "value": "10" }
+							]
+						},
+						"description": "按关键词\"锦江\"搜索酒店"
+					},
+					"response": []
+				},
+				{
+					"name": "场景2: 会员价查询",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+							{ "key": "X-Api-Secret", "value": "{{apiSecret}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/open/hotels/JJSH001?checkInDate=2026-06-01&checkOutDate=2026-06-03&memberNo=M100001&memberLevel=gold",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "open", "hotels", "JJSH001"],
+							"query": [
+								{ "key": "checkInDate", "value": "2026-06-01" },
+								{ "key": "checkOutDate", "value": "2026-06-03" },
+								{ "key": "memberNo", "value": "M100001" },
+								{ "key": "memberLevel", "value": "gold" }
+							]
+						},
+						"description": "使用金卡会员等级查询价格，可获取会员专属价格计划"
+					},
+					"response": []
+				},
+				{
+					"name": "场景3: 可订检查-库存不足",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-Api-Key", "value": "{{apiKey}}" },
+							{ "key": "X-Api-Secret", "value": "{{apiSecret}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\t\"hotelCode\": \"JJSH001\",\n\t\"roomTypeCode\": \"ST1\",\n\t\"ratePlanCode\": \"BAR\",\n\t\"checkInDate\": \"2026-06-01\",\n\t\"checkOutDate\": \"2026-06-03\",\n\t\"roomCount\": 999\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/open/availability/check",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "open", "availability", "check"]
+						},
+						"description": "请求999间房触发库存不足错误，验证409响应"
+					},
+					"response": []
+				},
+				{
+					"name": "场景4: 认证失败",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Api-Key", "value": "invalid_key" },
+							{ "key": "X-Api-Secret", "value": "invalid_secret" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/open/hotels",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "open", "hotels"]
+						},
+						"description": "使用无效的Key/Secret，验证401认证失败响应"
+					},
+					"response": []
+				},
+				{
+					"name": "场景5: 飞猪渠道查询",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-Api-Key", "value": "crs_fliggy_key_001" },
+							{ "key": "X-Api-Secret", "value": "crs_fliggy_secret_001" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/open/hotels?checkInDate=2026-06-01&checkOutDate=2026-06-03",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "open", "hotels"],
+							"query": [
+								{ "key": "checkInDate", "value": "2026-06-01" },
+								{ "key": "checkOutDate", "value": "2026-06-03" }
+							]
+						},
+						"description": "使用飞猪渠道的Key/Secret查询酒店，验证不同渠道的数据隔离"
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

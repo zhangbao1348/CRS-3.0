@@ -39,6 +39,10 @@ public class PmsInventory {
     @Column(name = "overbook_count", nullable = false)
     private Integer overbookCount = 0;
 
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt = new Date();

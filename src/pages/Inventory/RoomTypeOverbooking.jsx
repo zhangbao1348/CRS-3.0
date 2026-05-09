@@ -10,7 +10,7 @@ const { RangePicker } = DatePicker
 const { Option } = Select
 
 const RoomTypeOverbooking = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const getOp = () => encodeURIComponent(user?.name || user?.username || '系统用户')
 
@@ -30,11 +30,11 @@ const RoomTypeOverbooking = () => {
 
   // 加载房型
   useEffect(() => {
-    if (!selectedHotelId) return
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId).then(res => {
+    if (!hotelCode) return
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode).then(res => {
       setRoomTypes((res?.data || []).filter(r => r.status === 'active'))
     }).catch(() => {})
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 生成日期列
   const generateDates = useCallback((monthStr) => {

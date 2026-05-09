@@ -6,6 +6,7 @@ import com.crs.entity.GroupRateCode;
 import com.crs.repository.HotelRateCodeAllocationRepository;
 import com.crs.repository.HotelRepository;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,6 +26,15 @@ public class HotelRateCodeAllocationController {
 
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
+    }
+
+    private boolean validateHotelTenant(String hotelCode) {
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
+    }
 
     /**
      * 获取酒店的房价码分配列表
@@ -58,7 +68,7 @@ public class HotelRateCodeAllocationController {
                 item.put("promotionEditable", allocation.getPromotionEditable());
                 item.put("hotelId", hotelId);
 
-                GroupRateCode rateCode = groupRateCodeRepository.findByRateCode(allocation.getRateCode());
+                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), getCurrentTenantId());
                 if (rateCode != null) {
                     item.put("groupRateCodeId", rateCode.getId());
                 }
@@ -81,18 +91,29 @@ public class HotelRateCodeAllocationController {
     @PostMapping
     public ResponseEntity<HotelRateCodeAllocation> createAllocation(@RequestBody Map<String, Object> allocationData) {
         try {
-            Integer hotelId = (Integer) allocationData.get("hotelId");
-            Integer rateCodeId = (Integer) allocationData.get("rateCodeId");
+            Integer hotelId = allocationData.get("hotelId") instanceof Number ? ((Number) allocationData.get("hotelId")).intValue() : null;
+            String hotelCodeParam = allocationData.get("hotelCode") instanceof String ? (String) allocationData.get("hotelCode") : null;
+            Integer rateCodeId = allocationData.get("rateCodeId") instanceof Number ? ((Number) allocationData.get("rateCodeId")).intValue() : null;
 
-            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
-            Optional<GroupRateCode> rateCodeOpt = groupRateCodeRepository.findById(rateCodeId);
-
-            if (!hotelOpt.isPresent() || !rateCodeOpt.isPresent()) {
-                return ResponseEntity.badRequest().build();
+            Hotel hotel = null;
+            if (hotelCodeParam != null && !hotelCodeParam.isEmpty()) {
+                hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCodeParam, getCurrentTenantId()).orElse(null);
+            }
+            if (hotel == null && hotelId != null) {
+                hotel = hotelRepository.findById(hotelId).orElse(null);
             }
 
-            Hotel hotel = hotelOpt.get();
-            GroupRateCode rateCode = rateCodeOpt.get();
+            if (hotel == null) {
+                return ResponseEntity.status(403).build();
+            }
+
+            GroupRateCode rateCode = null;
+            if (rateCodeId != null) {
+                rateCode = groupRateCodeRepository.findById(rateCodeId).orElse(null);
+            }
+            if (rateCode == null) {
+                return ResponseEntity.badRequest().build();
+            }
 
             HotelRateCodeAllocation allocation = new HotelRateCodeAllocation();
             allocation.setTenantId(hotel.getTenantId());
@@ -173,6 +194,59 @@ public class HotelRateCodeAllocationController {
 
             Hotel hotel = hotelOpt.get();
             allocationRepository.deleteByHotelCode(hotel.getHotelCode());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<List<Map<String, Object>>> getAllocationsByHotelCode(@PathVariable String hotelCode) {
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                return ResponseEntity.status(403).build();
+            }
+
+            List<HotelRateCodeAllocation> allocations = allocationRepository.findByHotelCode(hotelCode);
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (HotelRateCodeAllocation allocation : allocations) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", allocation.getId());
+                item.put("tenantId", allocation.getTenantId());
+                item.put("hotelCode", allocation.getHotelCode());
+                item.put("rateCode", allocation.getRateCode());
+                item.put("allocated", allocation.getAllocated());
+                item.put("basicInfoEditable", allocation.getBasicInfoEditable());
+                item.put("priceInfoEditable", allocation.getPriceInfoEditable());
+                item.put("bookingLimitEditable", allocation.getBookingLimitEditable());
+                item.put("guaranteeRuleEditable", allocation.getGuaranteeRuleEditable());
+                item.put("promotionEditable", allocation.getPromotionEditable());
+
+                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), getCurrentTenantId());
+                if (rateCode != null) {
+                    item.put("groupRateCodeId", rateCode.getId());
+                }
+
+                result.add(item);
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    @DeleteMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<Void> deleteAllocationsByHotelCode(@PathVariable String hotelCode) {
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                return ResponseEntity.status(403).build();
+            }
+
+            allocationRepository.deleteByHotelCode(hotelCode);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             e.printStackTrace();

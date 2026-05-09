@@ -105,6 +105,7 @@ const AddGroupRoomType = () => {
         const formattedHotelData = response.data.map((hotel, index) => ({
           key: String(hotel.id || index),
           hotelId: hotel.id,
+          hotelCode: hotel.hotelCode,
           hotel: hotel.chineseName,
           region: hotel.province,
           city: hotel.city,
@@ -140,8 +141,8 @@ const AddGroupRoomType = () => {
       if (Array.isArray(allocations)) {
         if (baseData) {
           const merged = baseData.map(item => {
-            const alloc = allocations.find(a => a.hotelId === item.hotelId)
-            console.log(`处理酒店 ${item.hotelId} (${item.hotel}), 找到分配:`, alloc)
+            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
+            console.log(`处理酒店 ${item.hotelCode} (${item.hotel}), 找到分配:`, alloc)
             if (alloc) {
               return {
                 ...item,
@@ -155,7 +156,7 @@ const AddGroupRoomType = () => {
           setHotelData(merged)
         } else {
           setHotelData(prev => prev.map(item => {
-            const alloc = allocations.find(a => a.hotelId === item.hotelId)
+            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
             if (alloc) {
               return {
                 ...item,
@@ -255,6 +256,7 @@ const AddGroupRoomType = () => {
       const allocationData = hotelData.map(item => ({
         groupRoomTypeId: currentId,
         hotelId: item.hotelId,
+        hotelCode: item.hotelCode,
         allocated: item.allocated,
         roomInfoEditable: item.roomInfoEditable
       }))
@@ -301,6 +303,7 @@ const AddGroupRoomType = () => {
       const allocationData = hotelData.map(item => ({
         groupRoomTypeId: roomTypeId,
         hotelId: item.hotelId,
+        hotelCode: item.hotelCode,
         allocated: item.allocated,
         roomInfoEditable: item.roomInfoEditable
       }))

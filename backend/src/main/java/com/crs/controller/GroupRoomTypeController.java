@@ -5,6 +5,7 @@ import com.crs.entity.GroupRoomTypeHotel;
 import com.crs.repository.GroupRoomTypeRepository;
 import com.crs.service.GroupRoomTypeService;
 import com.crs.util.CodeValidator;
+import com.crs.util.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +23,11 @@ public class GroupRoomTypeController {
     public GroupRoomTypeController(GroupRoomTypeService groupRoomTypeService, GroupRoomTypeRepository groupRoomTypeRepository) {
         this.groupRoomTypeService = groupRoomTypeService;
         this.groupRoomTypeRepository = groupRoomTypeRepository;
+    }
+    
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
     }
     
     @GetMapping
@@ -108,12 +114,7 @@ public class GroupRoomTypeController {
     
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteGroupRoomType(@PathVariable Integer id) {
-        try {
-            groupRoomTypeService.deleteGroupRoomType(id);
-            return ResponseEntity.ok(Map.of("message", "Group room type deleted successfully"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        return ResponseEntity.badRequest().body(Map.of("error", "集团房型原则上不允许物理删除，如需废弃请进行停用操作"));
     }
     
     @PutMapping("/{id}/enable")
@@ -157,7 +158,7 @@ public class GroupRoomTypeController {
      */
     @GetMapping("/code/{code}")
     public ResponseEntity<?> getGroupRoomTypeByCode(@PathVariable String code) {
-        var groupRoomType = groupRoomTypeRepository.findByRoomTypeCode(code);
+        var groupRoomType = groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), code);
         if (groupRoomType.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -172,7 +173,7 @@ public class GroupRoomTypeController {
      */
     @PutMapping("/code/{code}")
     public ResponseEntity<?> updateGroupRoomTypeByCode(@PathVariable String code, @RequestBody GroupRoomType groupRoomType) {
-        var existing = groupRoomTypeRepository.findByRoomTypeCode(code);
+        var existing = groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), code);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -191,16 +192,7 @@ public class GroupRoomTypeController {
      */
     @DeleteMapping("/code/{code}")
     public ResponseEntity<?> deleteGroupRoomTypeByCode(@PathVariable String code) {
-        var existing = groupRoomTypeRepository.findByRoomTypeCode(code);
-        if (existing.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        try {
-            groupRoomTypeService.deleteGroupRoomType(existing.get().getId());
-            return ResponseEntity.ok(Map.of("message", "Group room type deleted successfully"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        return ResponseEntity.badRequest().body(Map.of("error", "集团房型原则上不允许物理删除，如需废弃请进行停用操作"));
     }
     
     /**
@@ -210,7 +202,7 @@ public class GroupRoomTypeController {
      */
     @PutMapping("/code/{code}/enable")
     public ResponseEntity<?> enableGroupRoomTypeByCode(@PathVariable String code) {
-        var existing = groupRoomTypeRepository.findByRoomTypeCode(code);
+        var existing = groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), code);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -229,7 +221,7 @@ public class GroupRoomTypeController {
      */
     @PutMapping("/code/{code}/disable")
     public ResponseEntity<?> disableGroupRoomTypeByCode(@PathVariable String code) {
-        var existing = groupRoomTypeRepository.findByRoomTypeCode(code);
+        var existing = groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), code);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -238,6 +230,48 @@ public class GroupRoomTypeController {
             return ResponseEntity.ok(disabledGroupRoomType);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/by-code/group/{groupCode}")
+    public ResponseEntity<Map<String, Object>> getGroupRoomTypesByGroupCode(
+            @PathVariable String groupCode,
+            @RequestParam(required = false) String categoryCode,
+            @RequestParam(required = false) String status) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<GroupRoomType> groupRoomTypes;
+            if (status != null) {
+                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupCodeAndStatus(groupCode, status);
+            } else if (categoryCode != null) {
+                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupCodeAndCategoryCode(groupCode, categoryCode);
+            } else {
+                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupCode(groupCode);
+            }
+            response.put("success", true);
+            response.put("data", groupRoomTypes);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/by-code/group/{groupCode}/room-type/{roomTypeCode}")
+    public ResponseEntity<Map<String, Object>> getGroupRoomTypeByGroupCodeAndRoomTypeCode(
+            @PathVariable String groupCode, @PathVariable String roomTypeCode) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var groupRoomType = groupRoomTypeService.getGroupRoomTypeByGroupCodeAndRoomTypeCode(groupCode, roomTypeCode)
+                    .orElseThrow(() -> new RuntimeException("Group room type not found"));
+            response.put("success", true);
+            response.put("data", groupRoomType);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 }

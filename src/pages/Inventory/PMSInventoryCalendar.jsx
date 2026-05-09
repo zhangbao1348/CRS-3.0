@@ -18,7 +18,7 @@ const INVENTORY_TYPES = [
 ]
 
 const PMSInventoryCalendar = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [selectedRoomType, setSelectedRoomType] = useState('全部房型')
   const [roomTypes, setRoomTypes] = useState([])
@@ -31,13 +31,13 @@ const PMSInventoryCalendar = () => {
 
   // 加载房型列表
   useEffect(() => {
-    if (!selectedHotelId) return
+    if (!hotelCode) return
     setRoomTypesLoading(true)
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId)
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode)
       .then(res => setRoomTypes((res?.data || []).filter(r => r.status === 'active')))
       .catch(() => {})
       .finally(() => setRoomTypesLoading(false))
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 生成当月日期列表
   const monthDays = useMemo(() => {

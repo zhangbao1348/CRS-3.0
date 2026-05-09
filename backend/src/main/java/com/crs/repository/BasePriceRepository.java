@@ -63,4 +63,14 @@ public interface BasePriceRepository extends JpaRepository<BasePrice, Integer> {
      * @return 基础价格列表
      */
     List<BasePrice> findByStatus(BasePrice.Status status);
+
+    List<BasePrice> findByHotelCode(String hotelCode);
+
+    List<BasePrice> findByHotelCodeAndDateBetween(String hotelCode, Date startDate, Date endDate);
+
+    List<BasePrice> findByHotelCodeAndRateTypeCodeAndRoomTypeCode(String hotelCode, String rateTypeCode, String roomTypeCode);
+
+    List<BasePrice> findByHotelCodeAndRateTypeCodeAndRoomTypeCodeAndDate(String hotelCode, String rateTypeCode, String roomTypeCode, Date date);
+
+    List<BasePrice> findByHotelCodeAndStatus(String hotelCode, BasePrice.Status status);
 }

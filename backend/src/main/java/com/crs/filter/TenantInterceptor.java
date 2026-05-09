@@ -16,9 +16,7 @@ public class TenantInterceptor implements HandlerInterceptor {
     
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 从请求头获取租户ID
         String tenantIdStr = request.getHeader("X-Tenant-Id");
-        Integer tenantId = 1;
         
         logger.info("=== TenantInterceptor preHandle 开始 ===");
         logger.info("请求路径: {}", request.getRequestURI());
@@ -26,15 +24,16 @@ public class TenantInterceptor implements HandlerInterceptor {
         
         if (tenantIdStr != null && !tenantIdStr.isEmpty()) {
             try {
-                tenantId = Integer.parseInt(tenantIdStr);
-                logger.info("解析到的租户ID: {}", tenantId);
-                // 暂时简单验证，后续需要完善
+                Integer tenantId = Integer.parseInt(tenantIdStr);
+                logger.info("从请求头解析到的租户ID: {}", tenantId);
                 if (tenantId <= 0) {
                     response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     response.getWriter().write("Invalid tenant ID");
                     logger.error("无效的租户ID: {}", tenantId);
                     return false;
                 }
+                TenantContext.setTenantId(tenantId);
+                request.setAttribute("tenantId", tenantId);
             } catch (NumberFormatException e) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 response.getWriter().write("Invalid tenant ID format");
@@ -42,13 +41,18 @@ public class TenantInterceptor implements HandlerInterceptor {
                 return false;
             }
         } else {
-            logger.info("未获取到X-Tenant-Id请求头，使用默认租户ID: {}", tenantId);
+            Integer existingTenantId = TenantContext.getTenantId();
+            if (existingTenantId != null) {
+                logger.info("X-Tenant-Id请求头不存在，使用JwtFilter从token中提取的租户ID: {}", existingTenantId);
+                request.setAttribute("tenantId", existingTenantId);
+            } else {
+                logger.info("X-Tenant-Id请求头不存在且token中无租户ID，使用默认租户ID: 1");
+                TenantContext.setTenantId(1);
+                request.setAttribute("tenantId", 1);
+            }
         }
         
-        // 将租户ID设置到TenantContext中
-        TenantContext.setTenantId(tenantId);
-        request.setAttribute("tenantId", tenantId);
-        logger.info("设置租户ID到TenantContext: {}", tenantId);
+        logger.info("最终租户ID: {}", TenantContext.getTenantId());
         logger.info("=== TenantInterceptor preHandle 结束 ===");
         return true;
     }

@@ -10,7 +10,7 @@ const { RangePicker } = DatePicker
 const { Option } = Select
 
 const RoomStatus = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [activeTab, setActiveTab] = useState('hotel')
@@ -56,19 +56,19 @@ const RoomStatus = () => {
 
   // 加载酒店房型
   useEffect(() => {
-    if (!selectedHotelId) return
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId).then(res => {
-      setRoomTypes(res?.data || [])
+    if (!hotelCode) return
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode).then(res => {
+      setRoomTypes((res?.data || []).filter(r => r.status === 'active'))
     }).catch(() => {})
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 加载房价码
   useEffect(() => {
-    if (!selectedHotelId) return
-    ratePlanApi.getRatePlans(selectedHotelId).then(res => {
+    if (!hotelCode) return
+    ratePlanApi.getRatePlansByHotelCode(hotelCode).then(res => {
       setRatePlans(res?.data || [])
     }).catch(() => {})
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 加载渠道、市场、房价大类
   useEffect(() => {

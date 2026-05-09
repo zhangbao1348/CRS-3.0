@@ -143,7 +143,8 @@ public class SourceCodeController {
     public ResponseEntity<?> deleteSourceCode(@PathVariable Integer id) {
         try {
             // 检查是否被房价码引用
-            long refCount = groupRateCodeRepository.countBySourceCodeId(id);
+            SourceCode existing = sourceCodeService.getSourceCodeById(id);
+            long refCount = existing != null ? groupRateCodeRepository.countBySourceCode(existing.getCode()) : 0;
             if (refCount > 0) {
                 return ResponseEntity.badRequest().body(Map.of("error", "该来源码已被 " + refCount + " 个房价码引用，无法删除"));
             }

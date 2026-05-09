@@ -32,6 +32,9 @@ public class RoomType {
     @Column(name = "group_room_type_id")
     private Integer groupRoomTypeId;
     
+    @Column(name = "group_room_type_code", length = 50)
+    private String groupRoomTypeCode;
+    
     @Column(name = "code", nullable = false, length = 50)
     private String code;
     

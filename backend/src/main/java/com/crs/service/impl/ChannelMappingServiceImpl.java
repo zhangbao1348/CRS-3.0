@@ -44,6 +44,18 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
         }
         return hotelMappingRepository.findAll();
     }
+
+    @Override
+    public List<ChannelHotelMapping> getHotelMappingsByCode(String channelCode, String hotelCode) {
+        if (channelCode != null && hotelCode != null) {
+            return hotelMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
+        } else if (channelCode != null) {
+            return hotelMappingRepository.findByChannelCode(channelCode);
+        } else if (hotelCode != null) {
+            return hotelMappingRepository.findByHotelCode(hotelCode);
+        }
+        return hotelMappingRepository.findAll();
+    }
     
     @Override
     public ChannelHotelMapping createHotelMapping(ChannelHotelMapping mapping) {
@@ -91,6 +103,18 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
         }
         return roomTypeMappingRepository.findAll();
     }
+
+    @Override
+    public List<ChannelRoomTypeMapping> getRoomTypeMappingsByCode(String channelCode, String hotelCode) {
+        if (channelCode != null && hotelCode != null) {
+            return roomTypeMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
+        } else if (channelCode != null) {
+            return roomTypeMappingRepository.findByChannelCode(channelCode);
+        } else if (hotelCode != null) {
+            return roomTypeMappingRepository.findByHotelCode(hotelCode);
+        }
+        return roomTypeMappingRepository.findAll();
+    }
     
     @Override
     public ChannelRoomTypeMapping createRoomTypeMapping(ChannelRoomTypeMapping mapping) {
@@ -135,6 +159,18 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
             return rateCodeMappingRepository.findByChannelId(channelId);
         } else if (hotelId != null) {
             return rateCodeMappingRepository.findByHotelId(hotelId);
+        }
+        return rateCodeMappingRepository.findAll();
+    }
+
+    @Override
+    public List<ChannelRateCodeMapping> getRateCodeMappingsByCode(String channelCode, String hotelCode) {
+        if (channelCode != null && hotelCode != null) {
+            return rateCodeMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
+        } else if (channelCode != null) {
+            return rateCodeMappingRepository.findByChannelCode(channelCode);
+        } else if (hotelCode != null) {
+            return rateCodeMappingRepository.findByHotelCode(hotelCode);
         }
         return rateCodeMappingRepository.findAll();
     }

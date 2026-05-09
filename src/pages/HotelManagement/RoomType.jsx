@@ -23,7 +23,7 @@ const RoomType = () => {
   const [groupFacilities, setGroupFacilities] = useState([])
   const [roomFacilities, setRoomFacilities] = useState({})
 
-  const { selectedHotel, selectedHotelId } = useHotelContext()
+  const { selectedHotel } = useHotelContext()
 
   // 房型设施分类（与集团设施管理中 room_type 范围的分类一致）
   const facilityCategories = [
@@ -41,10 +41,10 @@ const RoomType = () => {
 
   // 获取房型列表
   const fetchRoomTypes = async () => {
-    if (!selectedHotelId) { setRoomTypes([]); setFilteredRoomTypes([]); return }
+    if (!selectedHotel) { setRoomTypes([]); setFilteredRoomTypes([]); return }
     try {
       setLoading(true)
-      const response = await axios.get(`/api/hotel-room-types/hotel/${selectedHotelId}`)
+      const response = await axios.get(`/api/hotel-room-types/by-code/hotel/${selectedHotel}`)
       const responseData = response.data
       const roomTypeList = responseData.success ? (responseData.data || []) : (Array.isArray(responseData) ? responseData : [])
       const activeRoomTypes = roomTypeList.filter(item => item.status === 'active')
@@ -86,7 +86,7 @@ const RoomType = () => {
     }
   }
 
-  useEffect(() => { fetchRoomTypes() }, [selectedHotelId])
+  useEffect(() => { fetchRoomTypes() }, [selectedHotel])
   useEffect(() => { fetchGroupFacilities() }, [])
 
   // 搜索
@@ -124,15 +124,15 @@ const RoomType = () => {
       bedType: record.bedType || undefined
     })
     // 加载已有房型设施
-    loadRoomFacilities(record.id)
+    loadRoomFacilities(record.code)
     setActiveTab('1')
     setViewMode('edit')
   }
 
   // 加载房型设施
-  const loadRoomFacilities = async (roomTypeId) => {
+  const loadRoomFacilities = async (roomTypeCode) => {
     try {
-      const res = await api.get('/room-type-facilities', { params: { roomTypeId } })
+      const res = await api.get('/room-type-facilities', { params: { hotelCode: selectedHotel, roomTypeCode } })
       const list = res?.data || []
       const grouped = {}
       list.forEach(f => {
@@ -174,7 +174,7 @@ const RoomType = () => {
         maxChildren: values.maxChildren ? parseInt(values.maxChildren) : null,
         windowType: values.windowType || '',
         bedType: values.bedType || '',
-        hotelId: selectedHotelId
+        hotelCode: selectedHotel
       }
       if (isEditMode) {
         await axios.put(`/api/hotel-room-types/${selectedRoomType.id}`, submitData)
@@ -218,8 +218,6 @@ const RoomType = () => {
         })
       })
       await api.post('/room-type-facilities/batch', {
-        roomTypeId: selectedRoomType.id,
-        hotelId: selectedHotelId,
         hotelCode: selectedHotel,
         roomTypeCode: selectedRoomType.code,
         facilities: facilityList

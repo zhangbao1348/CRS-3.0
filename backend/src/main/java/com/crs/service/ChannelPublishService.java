@@ -1,15 +1,12 @@
 package com.crs.service;
 
-import com.crs.entity.ChannelPublishRecord;
-import com.crs.entity.RatePlan;
-import com.crs.entity.HotelRoomType;
-import com.crs.repository.ChannelPublishRecordRepository;
-import com.crs.repository.RatePlanRepository;
-import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.entity.*;
+import com.crs.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,6 +23,15 @@ public class ChannelPublishService {
     @Autowired
     private ChannelPublishRecordRepository publishRecordRepository;
 
+    @Autowired
+    private ChannelHotelMappingRepository channelHotelMappingRepository;
+
+    @Autowired
+    private HotelRepository hotelRepository;
+
+    @Autowired
+    private TenantChannelRepository tenantChannelRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -35,15 +41,9 @@ public class ChannelPublishService {
         List<RatePlan> ratePlans = ratePlanRepository.findByHotelIdAndStatus(hotelId, "active");
         List<HotelRoomType> allRoomTypes = hotelRoomTypeRepository.findByHotelIdAndStatus(hotelId, "active");
 
-        // 构建多维度映射：applicableRoomTypes 可能存的是 hotel_room_types.id 或 groupRoomTypeId
-        Map<String, HotelRoomType> idToRoomType = new HashMap<>();
+        Map<String, HotelRoomType> codeToRoomType = new HashMap<>();
         for (HotelRoomType rt : allRoomTypes) {
-            // 用自身 ID 映射
-            idToRoomType.put(String.valueOf(rt.getId()), rt);
-            // 用 groupRoomTypeId 映射（集团下发的房型）
-            if (rt.getGroupRoomTypeId() != null) {
-                idToRoomType.put(String.valueOf(rt.getGroupRoomTypeId()), rt);
-            }
+            codeToRoomType.put(rt.getRoomTypeCode(), rt);
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -52,16 +52,15 @@ public class ChannelPublishService {
             item.put("rateCode", rp.getRateCode());
             item.put("rateName", rp.getRateName());
 
-            List<String> applicableIds = parseApplicableRoomTypes(rp.getApplicableRoomTypes());
+            List<String> applicableCodes = parseApplicableRoomTypes(rp.getApplicableRoomTypes());
             List<Map<String, String>> roomTypes = new ArrayList<>();
-            if (applicableIds.isEmpty()) {
-                // 没有指定则关联所有房型
+            if (applicableCodes.isEmpty()) {
                 for (HotelRoomType rt : allRoomTypes) {
                     roomTypes.add(Map.of("code", rt.getRoomTypeCode(), "name", rt.getRoomTypeName()));
                 }
             } else {
-                for (String id : applicableIds) {
-                    HotelRoomType rt = idToRoomType.get(id);
+                for (String code : applicableCodes) {
+                    HotelRoomType rt = codeToRoomType.get(code);
                     if (rt != null) {
                         roomTypes.add(Map.of("code", rt.getRoomTypeCode(), "name", rt.getRoomTypeName()));
                     }
@@ -84,13 +83,21 @@ public class ChannelPublishService {
     /**
      * 批量发布（按房价码独立发布各自的房型）
      */
+    @Transactional
     public int batchPublish(Integer tenantId, String hotelCode, String channelCode,
                             Map<String, List<String>> rateCodeRoomTypesMap) {
+        // 自动建立渠道酒店映射（确保授权）
+        ensureChannelHotelMapping(tenantId, hotelCode, channelCode);
+
         int count = 0;
         Date now = new Date();
         for (Map.Entry<String, List<String>> entry : rateCodeRoomTypesMap.entrySet()) {
             String rateCode = entry.getKey();
             List<String> roomTypeCodes = entry.getValue();
+
+            // 先清理该房价码下原有的发布记录（覆盖式同步，支持取消勾选）
+            publishRecordRepository.deleteByRateCode(tenantId, hotelCode, channelCode, rateCode);
+
             for (String roomTypeCode : roomTypeCodes) {
                 try {
                     ChannelPublishRecord record = new ChannelPublishRecord();
@@ -104,11 +111,43 @@ public class ChannelPublishService {
                     publishRecordRepository.save(record);
                     count++;
                 } catch (Exception e) {
-                    // 唯一键冲突说明已发布，跳过
+                    // 唯一键冲突跳过（理论上由于已删除不会再冲突）
                 }
             }
         }
         return count;
+    }
+
+    /**
+     * 确保渠道与酒店的映射关系存在且激活
+     */
+    private void ensureChannelHotelMapping(Integer tenantId, String hotelCode, String channelCode) {
+        Hotel hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId).orElse(null);
+        TenantChannel channel = tenantChannelRepository.findByTenantIdAndChannelCode(tenantId, channelCode);
+
+        if (hotel != null && channel != null) {
+            List<ChannelHotelMapping> mappings = channelHotelMappingRepository.findByChannelIdAndHotelId(channel.getId(), hotel.getId());
+            if (mappings.isEmpty()) {
+                ChannelHotelMapping mapping = new ChannelHotelMapping();
+                mapping.setChannelId(channel.getId());
+                mapping.setChannelCode(channel.getChannelCode());
+                mapping.setChannelName(channel.getChannelName());
+                mapping.setHotelId(hotel.getId());
+                mapping.setHotelName(hotel.getChineseName());
+                mapping.setHotelCode(hotel.getHotelCode());
+                mapping.setChannelHotelCode(channel.getChannelCode() + "_" + hotel.getHotelCode());
+                mapping.setStatus("active");
+                channelHotelMappingRepository.save(mapping);
+            } else {
+                // 如果已存在但可能被停用，重新激活
+                for (ChannelHotelMapping mapping : mappings) {
+                    if (!"active".equals(mapping.getStatus())) {
+                        mapping.setStatus("active");
+                        channelHotelMappingRepository.save(mapping);
+                    }
+                }
+            }
+        }
     }
 
     private List<String> parseApplicableRoomTypes(String json) {

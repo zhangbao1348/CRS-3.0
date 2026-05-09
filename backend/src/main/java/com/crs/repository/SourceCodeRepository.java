@@ -41,4 +41,8 @@ public interface SourceCodeRepository extends JpaRepository<SourceCode, Integer>
      * 根据租户ID和级别查询来源码
      */
     List<SourceCode> findByTenantIdAndLevel(Integer tenantId, Integer level);
+
+    List<SourceCode> findByTenantIdAndParentCode(Integer tenantId, String parentCode);
+
+    SourceCode findByTenantIdAndCodeAndParentCode(Integer tenantId, String code, String parentCode);
 }

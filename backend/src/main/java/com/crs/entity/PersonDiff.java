@@ -25,6 +25,9 @@ public class PersonDiff {
     @Column(name = "system_id", nullable = false)
     private Integer systemId;
     
+    @Column(name = "system_code", length = 50)
+    private String systemCode;
+    
     @Column(name = "person_type", nullable = false, length = 50)
     private String personType;
     

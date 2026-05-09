@@ -19,6 +19,7 @@ public class InventoryQuota {
     @Column(name = "quota_date", nullable = false) @Temporal(TemporalType.DATE) private Date quotaDate;
     @Column(name = "quota_limit") private Integer quotaLimit; // NULL = 未设置
     @Column(name = "sold_count", nullable = false) private Integer soldCount = 0;
+    @Version @Column(name = "version", nullable = false) private Integer version = 0;
     @Column(name = "created_at", nullable = false, updatable = false) @Temporal(TemporalType.TIMESTAMP) private Date createdAt = new Date();
     @Column(name = "updated_at", nullable = false) @Temporal(TemporalType.TIMESTAMP) private Date updatedAt = new Date();
     @PreUpdate public void preUpdate() { this.updatedAt = new Date(); }

@@ -58,4 +58,12 @@ public interface RoomTypeDiffRepository extends JpaRepository<RoomTypeDiff, Inte
      * @param systemId 差价体系ID
      */
     void deleteBySystemId(Integer systemId);
+
+    List<RoomTypeDiff> findBySystemCode(String systemCode);
+
+    List<RoomTypeDiff> findBySystemCodeAndStatus(String systemCode, RoomTypeDiff.Status status);
+
+    List<RoomTypeDiff> findBySystemCodeAndRoomTypeCode(String systemCode, String roomTypeCode);
+
+    void deleteBySystemCode(String systemCode);
 }

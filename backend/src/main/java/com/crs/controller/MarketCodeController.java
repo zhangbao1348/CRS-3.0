@@ -111,7 +111,7 @@ public class MarketCodeController {
             // 检查是否被房价码引用
             MarketCode existing = marketCodeService.getMarketCodeById(DEFAULT_TENANT_ID, id);
             if (existing != null) {
-                long refCount = groupRateCodeRepository.countByMarketCodeId(id);
+                long refCount = groupRateCodeRepository.countByMarketCode(existing.getCode());
                 if (refCount > 0) {
                     return ResponseEntity.badRequest().body(Map.of("error", "该市场码已被 " + refCount + " 个房价码引用，无法删除"));
                 }

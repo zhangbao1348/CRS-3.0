@@ -7,7 +7,7 @@ import InventoryQuotaTable from './InventoryQuotaTable'
 const { Option } = Select
 
 const ChannelRoomTypeInventory = () => {
-  const { selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const [channels, setChannels] = useState([])
   const [roomTypes, setRoomTypes] = useState([])
   const [channelsLoading, setChannelsLoading] = useState(false)
@@ -24,13 +24,12 @@ const ChannelRoomTypeInventory = () => {
   }, [])
 
   useEffect(() => {
-    if (!selectedHotelId) return
-    setRoomTypesLoading(true)
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId)
+    if (!hotelCode) return
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode)
       .then(res => setRoomTypes(res?.data || []))
       .catch(() => {})
       .finally(() => setRoomTypesLoading(false))
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 生成交叉组合的 dimensionItems，根据筛选条件过滤
   const items = useMemo(() => {

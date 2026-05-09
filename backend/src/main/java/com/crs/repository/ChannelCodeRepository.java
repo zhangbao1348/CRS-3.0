@@ -41,4 +41,8 @@ public interface ChannelCodeRepository extends JpaRepository<ChannelCode, Intege
      * 检查租户下CODE是否存在（排除指定ID）
      */
     boolean existsByTenantIdAndCodeAndIdNot(Integer tenantId, String code, Integer id);
+
+    List<ChannelCode> findByTenantIdAndParentCode(Integer tenantId, String parentCode);
+
+    ChannelCode findByTenantIdAndCodeAndParentCode(Integer tenantId, String code, String parentCode);
 }

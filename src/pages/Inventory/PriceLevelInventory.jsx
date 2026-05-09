@@ -4,18 +4,18 @@ import { useHotelContext } from '../../contexts/HotelContext'
 import InventoryQuotaTable from './InventoryQuotaTable'
 
 const PriceLevelInventory = () => {
-  const { selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const [ratePlans, setRatePlans] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!selectedHotelId) return
+    if (!hotelCode) return
     setLoading(true)
-    ratePlanApi.getRatePlans(selectedHotelId)
+    ratePlanApi.getRatePlansByHotelCode(hotelCode)
       .then(res => setRatePlans(res?.data || []))
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   const items = ratePlans.map(rp => ({
     code: rp.rateCode,

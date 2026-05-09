@@ -21,4 +21,11 @@ public interface RoomTypeFacilityRepository extends JpaRepository<RoomTypeFacili
     @Transactional
     @Query("DELETE FROM RoomTypeFacility f WHERE f.roomTypeId = :roomTypeId")
     void deleteByRoomTypeId(@Param("roomTypeId") Integer roomTypeId);
+
+    List<RoomTypeFacility> findByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM RoomTypeFacility f WHERE f.hotelCode = :hotelCode AND f.roomTypeCode = :roomTypeCode")
+    void deleteByHotelCodeAndRoomTypeCode(@Param("hotelCode") String hotelCode, @Param("roomTypeCode") String roomTypeCode);
 }

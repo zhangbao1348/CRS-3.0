@@ -15,7 +15,7 @@ const { Option } = Select
 
 const RatePlan = () => {
   const navigate = useNavigate()
-  const { selectedHotel, selectedHotelId } = useHotelContext()
+  const { selectedHotel } = useHotelContext()
   const [ratePlans, setRatePlans] = useState([])
   const [loading, setLoading] = useState(false)
   
@@ -68,14 +68,14 @@ const RatePlan = () => {
   
   // 获取价格计划列表
   const fetchRatePlans = async () => {
-    if (!selectedHotelId) {
+    if (!selectedHotel) {
       setRatePlans([])
       return
     }
     
     setLoading(true)
     try {
-      const response = await ratePlanApi.getRatePlans(selectedHotelId)
+      const response = await ratePlanApi.getRatePlansByHotelCode(selectedHotel)
       if (response.success) {
         const data = response.data || []
         const formattedData = data.map(plan => {
@@ -90,11 +90,10 @@ const RatePlan = () => {
           const rateCategoryDisplay = cat ? `${cat.name}（${cat.code}）` : (plan.rateCategory || '')
           
           // 市场码名称映射
-          const mc = marketCodes.find(c => c.id === plan.marketCodeId)
+          const mc = marketCodes.find(c => c.code === plan.marketCode)
           const marketCodeDisplay = mc ? `${mc.name}（${mc.code}）` : (plan.marketCode || '')
           
-          // 来源码名称映射
-          const sc = sourceCodes.find(c => c.id === plan.sourceCodeId)
+          const sc = sourceCodes.find(c => c.code === plan.sourceCode)
           const sourceCodeDisplay = sc ? `${sc.name}（${sc.code}）` : (plan.sourceCode || '')
           
           // 包价名称映射
@@ -157,7 +156,7 @@ const RatePlan = () => {
   // 当酒店或引用数据变化时重新获取列表
   useEffect(() => {
     fetchRatePlans()
-  }, [selectedHotelId, marketCodes, sourceCodes, rateCategories, allPackages, guaranteePolicies, cancellationPolicies])
+  }, [selectedHotel, marketCodes, sourceCodes, rateCategories, allPackages, guaranteePolicies, cancellationPolicies])
   
   // 前端筛选
   const filteredData = ratePlans.filter(item => {

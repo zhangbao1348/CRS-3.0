@@ -2,6 +2,11 @@ package com.crs.service;
 
 import com.crs.entity.*;
 import com.crs.repository.*;
+import com.crs.service.inventory.AvailabilityResult;
+import com.crs.service.inventory.InventoryDeductionContext;
+import com.crs.service.inventory.InventoryDeductionService;
+import com.crs.service.inventory.InventoryReleaseContext;
+import com.crs.util.DisplayMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,7 +29,7 @@ public class ReservationService {
     private final ReservationPaymentRepository paymentRepository;
     private final ReservationPromotionRepository promotionRepository;
     private final ReservationHistoryRepository historyRepository;
-    private final InventoryService inventoryService;
+    private final InventoryDeductionService inventoryDeductionService;
 
     public ReservationService(
             ReservationRepository reservationRepository,
@@ -31,14 +38,14 @@ public class ReservationService {
             ReservationPaymentRepository paymentRepository,
             ReservationPromotionRepository promotionRepository,
             ReservationHistoryRepository historyRepository,
-            InventoryService inventoryService) {
+            InventoryDeductionService inventoryDeductionService) {
         this.reservationRepository = reservationRepository;
         this.dailyPriceRepository = dailyPriceRepository;
         this.guestRepository = guestRepository;
         this.paymentRepository = paymentRepository;
         this.promotionRepository = promotionRepository;
         this.historyRepository = historyRepository;
-        this.inventoryService = inventoryService;
+        this.inventoryDeductionService = inventoryDeductionService;
     }
 
     public Page<Reservation> listReservations(Integer tenantId, Integer hotelId, String orderNo,
@@ -137,11 +144,18 @@ public class ReservationService {
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
 
         if (!"confirmed".equals(reservation.getReservationStatus())
-                && !"pending".equals(reservation.getReservationStatus())) {
-            throw new RuntimeException("当前状态不允许取消，仅 confirmed/pending 状态可取消");
+                && !"pending".equals(reservation.getReservationStatus())
+                && !"pending_payment".equals(reservation.getReservationStatus())) {
+            throw new RuntimeException("当前状态不允许取消，仅 confirmed/pending/pending_payment 状态可取消");
         }
 
-        releaseInventory(reservation);
+        try {
+            releaseInventory(reservation);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ReservationService.class)
+                    .error("返还库存失败: reservationCode={}, error={}", reservation.getReservationCode(), e.getMessage(), e);
+            throw new RuntimeException("返还库存失败: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()), e);
+        }
 
         reservation.setReservationStatus("cancelled");
         reservation.setStatus(Reservation.Status.cancelled);
@@ -182,21 +196,11 @@ public class ReservationService {
 
         Reservation saved = reservationRepository.save(reservation);
 
-        String action = switch (newStatus) {
-            case "confirmed" -> "CONFIRM";
-            case "checked_in" -> "CHECK_IN";
-            case "checked_out" -> "CHECK_OUT";
-            case "no_show" -> "NO_SHOW";
-            default -> "STATUS_CHANGE";
-        };
-
-        String content = switch (newStatus) {
-            case "confirmed" -> "确认订单";
-            case "checked_in" -> "客人入住";
-            case "checked_out" -> "客人离店";
-            case "no_show" -> "客人未到";
-            default -> "状态变更：" + oldStatus + " → " + newStatus;
-        };
+        String action = DisplayMapper.historyAction(newStatus);
+        String content = DisplayMapper.historyContent(newStatus);
+        if ("STATUS_CHANGE".equals(action)) {
+            content = "状态变更：" + oldStatus + " → " + newStatus;
+        }
 
         ReservationHistory history = new ReservationHistory();
         history.setReservationId(saved.getId());
@@ -236,6 +240,7 @@ public class ReservationService {
     private void validateStatusTransition(String from, String to) {
         Map<String, Set<String>> allowed = Map.of(
                 "pending", Set.of("confirmed", "cancelled"),
+                "pending_payment", Set.of("confirmed", "cancelled"),
                 "confirmed", Set.of("checked_in", "cancelled", "no_show"),
                 "checked_in", Set.of("checked_out")
         );
@@ -246,46 +251,48 @@ public class ReservationService {
     }
 
     private void checkAndReserveInventory(Reservation reservation) {
-        Date current = reservation.getCheckInDate();
-        Date end = reservation.getCheckOutDate();
-        Calendar cal = Calendar.getInstance();
-
-        while (current.before(end)) {
-            boolean available = inventoryService.checkInventoryAvailability(
-                    reservation.getHotelId(), reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
-            if (!available) {
-                throw new RuntimeException("库存不足，日期：" + new SimpleDateFormat("yyyy-MM-dd").format(current));
-            }
-            cal.setTime(current);
-            cal.add(Calendar.DATE, 1);
-            current = cal.getTime();
-        }
-
-        current = reservation.getCheckInDate();
-        while (current.before(end)) {
-            inventoryService.reserveInventory(
-                    reservation.getHotelId(), reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
-            cal.setTime(current);
-            cal.add(Calendar.DATE, 1);
-            current = cal.getTime();
-        }
+        InventoryDeductionContext ctx = buildDeductionContext(reservation);
+        inventoryDeductionService.deductInventory(ctx);
     }
 
     private void releaseInventory(Reservation reservation) {
-        Date current = reservation.getCheckInDate();
-        Date end = reservation.getCheckOutDate();
-        Calendar cal = Calendar.getInstance();
+        InventoryReleaseContext ctx = buildReleaseContext(reservation);
+        inventoryDeductionService.releaseInventory(ctx);
+    }
 
-        while (current.before(end)) {
-            inventoryService.releaseInventory(
-                    reservation.getHotelId(), reservation.getRatePlanId(),
-                    reservation.getRoomTypeId(), current, reservation.getRoomCount());
-            cal.setTime(current);
-            cal.add(Calendar.DATE, 1);
-            current = cal.getTime();
+    private LocalDate toLocalDate(Date date) {
+        if (date instanceof java.sql.Date sqlDate) {
+            return sqlDate.toLocalDate();
         }
+        return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private InventoryDeductionContext buildDeductionContext(Reservation reservation) {
+        InventoryDeductionContext ctx = new InventoryDeductionContext();
+        ctx.setTenantId(reservation.getTenantId());
+        ctx.setHotelCode(reservation.getHotelCode());
+        ctx.setRoomTypeCode(reservation.getRoomTypeCode());
+        ctx.setRateCode(reservation.getRatePlanCode());
+        ctx.setChannelCode(reservation.getChannelCode());
+        ctx.setCheckInDate(toLocalDate(reservation.getCheckInDate()));
+        ctx.setCheckOutDate(toLocalDate(reservation.getCheckOutDate()));
+        ctx.setRoomCount(reservation.getRoomCount());
+        ctx.setReservationCode(reservation.getReservationCode());
+        return ctx;
+    }
+
+    private InventoryReleaseContext buildReleaseContext(Reservation reservation) {
+        InventoryReleaseContext ctx = new InventoryReleaseContext();
+        ctx.setTenantId(reservation.getTenantId());
+        ctx.setHotelCode(reservation.getHotelCode());
+        ctx.setRoomTypeCode(reservation.getRoomTypeCode());
+        ctx.setRateCode(reservation.getRatePlanCode());
+        ctx.setChannelCode(reservation.getChannelCode());
+        ctx.setCheckInDate(toLocalDate(reservation.getCheckInDate()));
+        ctx.setCheckOutDate(toLocalDate(reservation.getCheckOutDate()));
+        ctx.setRoomCount(reservation.getRoomCount());
+        ctx.setReservationCode(reservation.getReservationCode());
+        return ctx;
     }
 
     private String generateReservationCode() {

@@ -3,6 +3,7 @@ package com.crs.controller;
 import com.crs.entity.*;
 import com.crs.repository.TenantChannelRepository;
 import com.crs.service.ReservationService;
+import com.crs.util.DisplayMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -109,8 +110,8 @@ public class ReservationController {
         orderInfo.put("channelOrderNumber", reservation.getChannelOrderNumber());
         orderInfo.put("pmsNumber", reservation.getPmsNumber());
         orderInfo.put("sourceChannel", reservation.getChannelName() != null ? reservation.getChannelName() : reservation.getChannelCode());
-        orderInfo.put("status", mapStatusToDisplay(reservation.getReservationStatus()));
-        orderInfo.put("statusColor", mapStatusColor(reservation.getReservationStatus()));
+        orderInfo.put("status", DisplayMapper.reservationStatus(reservation.getReservationStatus()));
+        orderInfo.put("statusColor", DisplayMapper.statusColor(reservation.getReservationStatus()));
         orderInfo.put("reservationStatus", reservation.getReservationStatus());
         orderInfo.put("createTime", formatDateTime(reservation.getCreatedAt()));
         orderInfo.put("isManual", reservation.getIsManual());
@@ -146,7 +147,7 @@ public class ReservationController {
             gMap.put("name", g.getName());
             gMap.put("phone", g.getPhone());
             gMap.put("email", g.getEmail());
-            gMap.put("idType", g.getIdType());
+            gMap.put("idType", DisplayMapper.idType(g.getIdType()));
             gMap.put("idNumber", g.getIdNumber());
             gMap.put("memberLevel", g.getMemberLevel());
             gMap.put("memberNumber", g.getMemberNo());
@@ -181,32 +182,32 @@ public class ReservationController {
             Map<String, Object> pMap = new LinkedHashMap<>();
             pMap.put("id", p.getId());
             pMap.put("name", p.getPromotionName());
-            pMap.put("discountType", p.getDiscountType());
+            pMap.put("discountType", DisplayMapper.discountType(p.getDiscountType()));
             pMap.put("discountValue", p.getDiscountValue());
             pMap.put("discountAmount", p.getDiscountAmount());
             pMap.put("promotionCode", p.getPromotionCode());
-            pMap.put("provider", p.getProvider());
+            pMap.put("provider", DisplayMapper.promotionProvider(p.getProvider()));
             return pMap;
         }).collect(Collectors.toList());
         detail.put("promotionInfo", promotionList);
 
         Map<String, Object> paymentInfo = new LinkedHashMap<>();
-        paymentInfo.put("guaranteeType", mapGuaranteeType(reservation.getGuaranteeType()));
+        paymentInfo.put("guaranteeType", DisplayMapper.guaranteeType(reservation.getGuaranteeType()));
         paymentInfo.put("guaranteeTypeCode", reservation.getGuaranteeType());
         paymentInfo.put("guaranteeInfo", reservation.getGuaranteeInfo());
-        paymentInfo.put("paymentStatus", mapPaymentStatus(reservation.getPaymentStatus()));
+        paymentInfo.put("paymentStatus", DisplayMapper.paymentStatus(reservation.getPaymentStatus()));
         paymentInfo.put("paymentStatusCode", reservation.getPaymentStatus());
 
         List<Map<String, Object>> paymentList = payments.stream().map(pay -> {
             Map<String, Object> payMap = new LinkedHashMap<>();
             payMap.put("id", pay.getId());
-            payMap.put("method", pay.getPaymentMethod());
+            payMap.put("method", DisplayMapper.paymentMethod(pay.getPaymentMethod()));
             payMap.put("type", pay.getPaymentType());
             payMap.put("amount", pay.getPaymentAmount());
             payMap.put("transactionId", pay.getTransactionId());
             payMap.put("creditCardLast4", pay.getCreditCardLast4());
             payMap.put("creditCardExpiry", pay.getCreditCardExpiry());
-            payMap.put("status", mapPaymentRecordStatus(pay.getStatus()));
+            payMap.put("status", DisplayMapper.paymentRecordStatus(pay.getStatus()));
             payMap.put("paidAt", formatDateTime(pay.getPaidAt()));
             return payMap;
         }).collect(Collectors.toList());
@@ -418,12 +419,12 @@ public class ReservationController {
         item.put("channelOrderNumber", r.getChannelOrderNumber());
         item.put("crsOrderNumber", r.getReservationCode());
         item.put("pmsNumber", r.getPmsNumber());
-        item.put("status", mapStatusToDisplay(r.getReservationStatus()));
-        item.put("statusColor", mapStatusColor(r.getReservationStatus()));
+        item.put("status", DisplayMapper.reservationStatus(r.getReservationStatus()));
+        item.put("statusColor", DisplayMapper.statusColor(r.getReservationStatus()));
         item.put("reservationStatus", r.getReservationStatus());
         item.put("channel", r.getChannelName() != null ? r.getChannelName() : r.getChannelCode());
         item.put("channelCode", r.getChannelCode());
-        item.put("channelIcon", getChannelIcon(r.getChannelCode()));
+        item.put("channelIcon", DisplayMapper.channelIcon(r.getChannelCode()));
         item.put("bookingTime", formatDateTime(r.getCreatedAt()));
         item.put("checkInDate", formatDate(r.getCheckInDate()));
         item.put("checkOutDate", formatDate(r.getCheckOutDate()));
@@ -437,78 +438,6 @@ public class ReservationController {
         item.put("ratePlanName", r.getRatePlanName());
         item.put("isManual", r.getIsManual());
         return item;
-    }
-
-    private String mapStatusToDisplay(String reservationStatus) {
-        if (reservationStatus == null) return "未知";
-        return switch (reservationStatus) {
-            case "pending" -> "待确认";
-            case "confirmed" -> "已确认";
-            case "cancelled" -> "已取消";
-            case "checked_in" -> "已入住";
-            case "checked_out" -> "已离店";
-            case "no_show" -> "未到";
-            default -> reservationStatus;
-        };
-    }
-
-    private String mapStatusColor(String reservationStatus) {
-        if (reservationStatus == null) return "default";
-        return switch (reservationStatus) {
-            case "pending" -> "orange";
-            case "confirmed" -> "green";
-            case "cancelled" -> "red";
-            case "checked_in" -> "blue";
-            case "checked_out" -> "default";
-            case "no_show" -> "volcano";
-            default -> "default";
-        };
-    }
-
-    private String getChannelIcon(String channelCode) {
-        if (channelCode == null) return "🌐";
-        return switch (channelCode.toLowerCase()) {
-            case "ctrip", "ctripa" -> "🛫";
-            case "fliggy", "fliggya" -> "🐷";
-            case "meituan" -> "🟢";
-            default -> "🌐";
-        };
-    }
-
-    private String mapGuaranteeType(String guaranteeType) {
-        if (guaranteeType == null) return "-";
-        return switch (guaranteeType) {
-            case "none" -> "无担保";
-            case "guarantee" -> "担保";
-            case "prepay" -> "预付";
-            case "credit_card" -> "信用卡担保";
-            case "deposit" -> "押金担保";
-            default -> guaranteeType;
-        };
-    }
-
-    private String mapPaymentStatus(String paymentStatus) {
-        if (paymentStatus == null) return "-";
-        return switch (paymentStatus) {
-            case "unpaid" -> "未支付";
-            case "paid" -> "已支付";
-            case "partial" -> "部分支付";
-            case "refunded" -> "已退款";
-            case "pending_refund" -> "退款中";
-            default -> paymentStatus;
-        };
-    }
-
-    private String mapPaymentRecordStatus(String status) {
-        if (status == null) return "-";
-        return switch (status) {
-            case "pending" -> "待支付";
-            case "success" -> "支付成功";
-            case "failed" -> "支付失败";
-            case "refunding" -> "退款中";
-            case "refunded" -> "已退款";
-            default -> status;
-        };
     }
 
     private Date parseDate(String dateStr) {

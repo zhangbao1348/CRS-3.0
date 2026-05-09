@@ -446,11 +446,11 @@ const GroupRateCode = () => {
             return cat ? `${cat.name}（${cat.code}）` : (item.rateCategory || '')
           })(),
           marketCode: (() => {
-            const mc = marketCodes.find(c => c.id === item.marketCodeId)
+            const mc = marketCodes.find(c => c.code === item.marketCode)
             return mc ? `${mc.name}（${mc.code}）` : (item.marketCode || '')
           })(),
           sourceCode: (() => {
-            const sc = sourceCodes.find(c => c.id === item.sourceCodeId)
+            const sc = sourceCodes.find(c => c.code === item.sourceCode)
             return sc ? `${sc.name}（${sc.code}）` : (item.sourceCode || '')
           })(),
           type: typeText || '基础房价码',

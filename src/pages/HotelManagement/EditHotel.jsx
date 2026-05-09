@@ -203,9 +203,9 @@ const EditHotel = () => {
   }
   
   // 加载酒店设施
-  const loadHotelFacilities = async (id) => {
+  const loadHotelFacilities = async (code) => {
     try {
-      const hotelFacilities = await hotelFacilityApi.getHotelFacilities(id, {
+      const hotelFacilities = await hotelFacilityApi.getHotelFacilitiesByCode(code, {
         metadata: { skipAutoLogout: true }
       })
       
@@ -258,9 +258,9 @@ const EditHotel = () => {
   }
   
   // 加载酒店图片
-  const loadHotelImages = async (id) => {
+  const loadHotelImages = async (code) => {
     try {
-      const images = await hotelImageApi.getHotelImages(id, {
+      const images = await hotelImageApi.getHotelImagesByCode(code, {
         metadata: { skipAutoLogout: true }
       })
       
@@ -315,7 +315,7 @@ const EditHotel = () => {
   }
   
   // 加载酒店房价码分配
-  const loadRateCodeAllocations = async (id) => {
+  const loadRateCodeAllocations = async (code) => {
     try {
       console.log('开始加载酒店房价码分配，酒店ID:', id)
       
@@ -335,7 +335,7 @@ const EditHotel = () => {
       // 加载酒店房价码分配
       let allocations = []
       try {
-        allocations = await hotelRateCodeAllocationApi.getAllocationsByHotelId(id, {
+        allocations = await hotelRateCodeAllocationApi.getAllocationsByHotelCode(code, {
           metadata: { skipAutoLogout: true }
         })
         allocations = Array.isArray(allocations) ? allocations : (allocations.data || [])
@@ -394,7 +394,7 @@ const EditHotel = () => {
   }
   
   // 加载酒店房型分配
-  const loadRoomTypeAllocations = async (id) => {
+  const loadRoomTypeAllocations = async (code) => {
     try {
       // 先加载集团房型
       let activeRoomTypes = []
@@ -413,7 +413,7 @@ const EditHotel = () => {
       
       let allocations = []
       try {
-        const allocationsResponse = await groupRoomTypeHotelApi.getHotelRoomTypeAllocations(id, {
+        const allocationsResponse = await groupRoomTypeHotelApi.getHotelRoomTypeAllocationsByCode(code, {
           metadata: { skipAutoLogout: true }
         })
         // 处理响应格式
@@ -464,21 +464,21 @@ const EditHotel = () => {
   const handleTabChange = async (key) => {
     setActiveTabKey(key)
     
-    if (!loadedTabs.has(key) && hotelId) {
+    if (!loadedTabs.has(key) && hotel?.hotelCode) {
       console.log(`加载TAB ${key} 的数据`)
       
       switch (key) {
         case '2':
-          await loadHotelFacilities(hotelId)
+          await loadHotelFacilities(hotel.hotelCode)
           break
         case '3':
-          await loadHotelImages(hotelId)
+          await loadHotelImages(hotel.hotelCode)
           break
         case '5':
-          await loadRateCodeAllocations(hotelId)
+          await loadRateCodeAllocations(hotel.hotelCode)
           break
         case '6':
-          await loadRoomTypeAllocations(hotelId)
+          await loadRoomTypeAllocations(hotel.hotelCode)
           break
       }
       
@@ -525,7 +525,7 @@ const EditHotel = () => {
         allowCreateRoomType: values.allowCreateRoomType || 'allow'
       }
       
-      await hotelApi.updateHotel(hotelId, hotelData, {
+      await hotelApi.updateHotelByCode(hotel.hotelCode, hotelData, {
         metadata: { skipAutoLogout: true }
       })
       
@@ -603,14 +603,14 @@ const EditHotel = () => {
         })
       }
       
-      await hotelFacilityApi.deleteHotelFacilities(hotelId, {
+      await hotelFacilityApi.deleteHotelFacilitiesByCode(hotel.hotelCode, {
         metadata: { skipAutoLogout: true }
       })
       
       if (selectedFacilities.length > 0) {
         for (const facility of selectedFacilities) {
           const facilityData = {
-            hotelId: hotelId,
+            hotelCode: hotel.hotelCode,
             facilityName: facility.facilityName,
             facilityCode: facility.facilityCode,
             facilityType: facility.facilityType
@@ -633,13 +633,13 @@ const EditHotel = () => {
   // 保存酒店房价码分配
   const saveRateCodeAllocations = async () => {
     try {
-      await hotelRateCodeAllocationApi.deleteAllocationsByHotelId(hotelId, {
+      await hotelRateCodeAllocationApi.deleteAllocationsByHotelCode(hotel.hotelCode, {
         metadata: { skipAutoLogout: true }
       })
       
       for (const rateCode of rateCodeData) {
         const allocationData = {
-          hotelId: hotelId,
+          hotelCode: hotel.hotelCode,
           rateCodeId: rateCode.rateCodeId || parseInt(rateCode.key),
           allocated: rateCode.allocated,
           basicInfoEditable: rateCode.basicInfoEditable,
@@ -667,7 +667,7 @@ const EditHotel = () => {
     try {
       const roomTypeAllocations = roomTypeData.map(roomType => ({
         groupRoomTypeId: roomType.groupRoomTypeId || parseInt(roomType.key),
-        hotelId: hotelId,
+        hotelCode: hotel.hotelCode,
         allocated: roomType.allocated,
         roomInfoEditable: roomType.roomInfoEditable
       }))
@@ -1190,7 +1190,7 @@ const EditHotel = () => {
                   const { file, data } = options;
                   const formData = new FormData();
                   formData.append('file', file);
-                  formData.append('hotelId', data.hotelId);
+                  formData.append('hotelCode', data.hotelCode);
                   formData.append('imageType', data.imageType);
                   
                   try {
@@ -1198,7 +1198,6 @@ const EditHotel = () => {
                       metadata: { skipAutoLogout: true }
                     });
                     options.onSuccess(response);
-                    // 更新图片列表
                     const newImage = {
                       uid: response.id,
                       name: file.name,
@@ -1220,7 +1219,7 @@ const EditHotel = () => {
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
-                data={{ hotelId: parseInt(hotelId), imageType: 'logo' }}
+                data={{ hotelCode: hotel?.hotelCode, imageType: 'logo' }}
                 fileList={hotelImages.logo}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
@@ -1261,7 +1260,7 @@ const EditHotel = () => {
                   const { file, data } = options;
                   const formData = new FormData();
                   formData.append('file', file);
-                  formData.append('hotelId', data.hotelId);
+                  formData.append('hotelCode', data.hotelCode);
                   formData.append('imageType', data.imageType);
                   
                   try {
@@ -1269,7 +1268,6 @@ const EditHotel = () => {
                       metadata: { skipAutoLogout: true }
                     });
                     options.onSuccess(response);
-                    // 更新图片列表
                     const newImage = {
                       uid: response.id,
                       name: file.name,
@@ -1291,7 +1289,7 @@ const EditHotel = () => {
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
-                data={{ hotelId: parseInt(hotelId), imageType: 'external' }}
+                data={{ hotelCode: hotel?.hotelCode, imageType: 'external' }}
                 fileList={hotelImages.external}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
@@ -1332,7 +1330,7 @@ const EditHotel = () => {
                   const { file, data } = options;
                   const formData = new FormData();
                   formData.append('file', file);
-                  formData.append('hotelId', data.hotelId);
+                  formData.append('hotelCode', data.hotelCode);
                   formData.append('imageType', data.imageType);
                   
                   try {
@@ -1340,7 +1338,6 @@ const EditHotel = () => {
                       metadata: { skipAutoLogout: true }
                     });
                     options.onSuccess(response);
-                    // 更新图片列表
                     const newImage = {
                       uid: response.id,
                       name: file.name,
@@ -1362,7 +1359,7 @@ const EditHotel = () => {
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
-                data={{ hotelId: parseInt(hotelId), imageType: 'restaurant' }}
+                data={{ hotelCode: hotel?.hotelCode, imageType: 'restaurant' }}
                 fileList={hotelImages.restaurant}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
@@ -1403,7 +1400,7 @@ const EditHotel = () => {
                   const { file, data } = options;
                   const formData = new FormData();
                   formData.append('file', file);
-                  formData.append('hotelId', data.hotelId);
+                  formData.append('hotelCode', data.hotelCode);
                   formData.append('imageType', data.imageType);
                   
                   try {
@@ -1411,7 +1408,6 @@ const EditHotel = () => {
                       metadata: { skipAutoLogout: true }
                     });
                     options.onSuccess(response);
-                    // 更新图片列表
                     const newImage = {
                       uid: response.id,
                       name: file.name,
@@ -1433,7 +1429,7 @@ const EditHotel = () => {
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
-                data={{ hotelId: parseInt(hotelId), imageType: 'lobby' }}
+                data={{ hotelCode: hotel?.hotelCode, imageType: 'lobby' }}
                 fileList={hotelImages.lobby}
                 onRemove={(file) => {
                   console.log('Remove file:', file);
@@ -1472,7 +1468,7 @@ const EditHotel = () => {
                   const { file, data } = options;
                   const formData = new FormData();
                   formData.append('file', file);
-                  formData.append('hotelId', data.hotelId);
+                  formData.append('hotelCode', data.hotelCode);
                   formData.append('imageType', data.imageType);
                   
                   try {
@@ -1480,7 +1476,6 @@ const EditHotel = () => {
                       metadata: { skipAutoLogout: true }
                     });
                     options.onSuccess(response);
-                    // 更新视频列表
                     const newVideo = {
                       uid: response.id,
                       name: file.name,
@@ -1502,7 +1497,7 @@ const EditHotel = () => {
                 listType="text"
                 maxCount={1}
                 accept="video/*"
-                data={{ hotelId: parseInt(hotelId), imageType: 'video' }}
+                data={{ hotelCode: hotel?.hotelCode, imageType: 'video' }}
                 fileList={hotelImages.video}
                 onRemove={(file) => {
                   console.log('Remove file:', file);

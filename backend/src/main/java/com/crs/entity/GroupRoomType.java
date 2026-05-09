@@ -24,6 +24,9 @@ public class GroupRoomType {
     @Column(name = "group_id", nullable = false)
     private Integer groupId;
     
+    @Column(name = "group_code", length = 50)
+    private String groupCode;
+    
     @Column(name = "room_type_code", nullable = false, unique = true, length = 50)
     private String roomTypeCode;
     
@@ -35,6 +38,9 @@ public class GroupRoomType {
     
     @Column(name = "room_type_category_id")
     private Integer roomTypeCategoryId;
+    
+    @Column(name = "room_type_category_code", length = 50)
+    private String roomTypeCategoryCode;
     
     @Column(name = "max_occupancy")
     private Integer maxOccupancy;
@@ -81,6 +87,14 @@ public class GroupRoomType {
         this.groupId = groupId;
     }
     
+    public String getGroupCode() {
+        return groupCode;
+    }
+    
+    public void setGroupCode(String groupCode) {
+        this.groupCode = groupCode;
+    }
+    
     public String getRoomTypeCode() {
         return roomTypeCode;
     }
@@ -111,6 +125,14 @@ public class GroupRoomType {
     
     public void setRoomTypeCategoryId(Integer roomTypeCategoryId) {
         this.roomTypeCategoryId = roomTypeCategoryId;
+    }
+    
+    public String getRoomTypeCategoryCode() {
+        return roomTypeCategoryCode;
+    }
+    
+    public void setRoomTypeCategoryCode(String roomTypeCategoryCode) {
+        this.roomTypeCategoryCode = roomTypeCategoryCode;
     }
     
     public Integer getMaxOccupancy() {

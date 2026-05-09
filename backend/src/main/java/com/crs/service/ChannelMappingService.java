@@ -22,6 +22,7 @@ public interface ChannelMappingService {
      * @return 酒店映射列表
      */
     List<ChannelHotelMapping> getHotelMappings(Integer channelId, Integer hotelId);
+    List<ChannelHotelMapping> getHotelMappingsByCode(String channelCode, String hotelCode);
     
     /**
      * 创建酒店映射
@@ -60,6 +61,7 @@ public interface ChannelMappingService {
      * @return 房型映射列表
      */
     List<ChannelRoomTypeMapping> getRoomTypeMappings(Integer channelId, Integer hotelId);
+    List<ChannelRoomTypeMapping> getRoomTypeMappingsByCode(String channelCode, String hotelCode);
     
     /**
      * 创建房型映射
@@ -98,6 +100,7 @@ public interface ChannelMappingService {
      * @return 房价映射列表
      */
     List<ChannelRateCodeMapping> getRateCodeMappings(Integer channelId, Integer hotelId);
+    List<ChannelRateCodeMapping> getRateCodeMappingsByCode(String channelCode, String hotelCode);
     
     /**
      * 创建房价映射

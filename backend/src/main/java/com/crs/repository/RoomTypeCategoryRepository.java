@@ -29,4 +29,14 @@ public interface RoomTypeCategoryRepository extends JpaRepository<RoomTypeCatego
     boolean existsByTenantIdAndCategoryCode(Integer tenantId, String categoryCode);
     
     List<RoomTypeCategory> findByTenantIdAndStatus(Integer tenantId, String status);
+
+    List<RoomTypeCategory> findByGroupCode(String groupCode);
+
+    List<RoomTypeCategory> findByGroupCodeAndStatus(String groupCode, String status);
+
+    Optional<RoomTypeCategory> findByGroupCodeAndCategoryCode(String groupCode, String categoryCode);
+
+    boolean existsByGroupCodeAndCategoryCode(String groupCode, String categoryCode);
+
+    List<RoomTypeCategory> findByGroupCodeOrderBySortOrderAsc(String groupCode);
 }

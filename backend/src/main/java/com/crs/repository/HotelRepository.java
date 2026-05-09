@@ -13,13 +13,8 @@ import java.util.Optional;
  */
 @Repository
 public interface HotelRepository extends JpaRepository<Hotel, Integer> {
-    
-    /**
-     * 根据酒店代码查询酒店
-     * @param hotelCode 酒店代码
-     * @return 酒店信息
-     */
-    Optional<Hotel> findByHotelCode(String hotelCode);
+
+    Optional<Hotel> findByHotelCodeAndTenantId(String hotelCode, Integer tenantId);
     
     /**
      * 根据租户ID查询酒店列表
@@ -57,10 +52,17 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
      */
     List<Hotel> findByStatus(Hotel.Status status);
     
-    /**
-     * 检查酒店代码是否存在
-     * @param hotelCode 酒店代码
-     * @return 是否存在
-     */
-    boolean existsByHotelCode(String hotelCode);
+    boolean existsByHotelCodeAndTenantId(String hotelCode, Integer tenantId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT h FROM Hotel h WHERE h.tenantId = :tenantId AND h.status = :status " +
+            "AND (:city IS NULL OR :city = '' OR h.city = :city) " +
+            "AND (:keyword IS NULL OR :keyword = '' OR h.chineseName LIKE %:keyword% OR h.englishName LIKE %:keyword%) " +
+            "AND h.id IN :hotelIds")
+    org.springframework.data.domain.Page<Hotel> findWithFilters(
+            @org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+            @org.springframework.data.repository.query.Param("status") Hotel.Status status,
+            @org.springframework.data.repository.query.Param("city") String city,
+            @org.springframework.data.repository.query.Param("keyword") String keyword,
+            @org.springframework.data.repository.query.Param("hotelIds") java.util.Collection<Integer> hotelIds,
+            org.springframework.data.domain.Pageable pageable);
 }

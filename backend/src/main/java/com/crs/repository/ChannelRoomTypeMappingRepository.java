@@ -34,4 +34,9 @@ public interface ChannelRoomTypeMappingRepository extends JpaRepository<ChannelR
      * @return 映射列表
      */
     List<ChannelRoomTypeMapping> findByChannelIdAndHotelId(Integer channelId, Integer hotelId);
+
+    List<ChannelRoomTypeMapping> findByChannelCode(String channelCode);
+    List<ChannelRoomTypeMapping> findByHotelCode(String hotelCode);
+    List<ChannelRoomTypeMapping> findByChannelCodeAndHotelCode(String channelCode, String hotelCode);
+    List<ChannelRoomTypeMapping> findByRoomTypeCode(String roomTypeCode);
 }

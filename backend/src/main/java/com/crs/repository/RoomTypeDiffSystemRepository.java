@@ -43,4 +43,10 @@ public interface RoomTypeDiffSystemRepository extends JpaRepository<RoomTypeDiff
      * @return 房型差价体系列表
      */
     List<RoomTypeDiffSystem> findByStatus(RoomTypeDiffSystem.Status status);
+
+    List<RoomTypeDiffSystem> findByHotelCode(String hotelCode);
+
+    List<RoomTypeDiffSystem> findByHotelCodeAndStatus(String hotelCode, RoomTypeDiffSystem.Status status);
+
+    Optional<RoomTypeDiffSystem> findByHotelCodeAndName(String hotelCode, String name);
 }

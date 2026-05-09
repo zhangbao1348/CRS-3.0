@@ -1,27 +1,44 @@
 package com.crs.controller;
 
 import com.crs.entity.GroupRoomTypeHotel;
+import com.crs.entity.Hotel;
 import com.crs.service.GroupRoomTypeHotelService;
+import com.crs.repository.GroupRoomTypeHotelRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * 集团房型和酒店关联控制器
- * 用于处理集团房型和酒店关联的HTTP请求
- */
 @RestController
 @RequestMapping("/api/group-room-type-hotels")
 public class GroupRoomTypeHotelController {
     
     private final GroupRoomTypeHotelService groupRoomTypeHotelService;
     
+    @Autowired
+    private GroupRoomTypeHotelRepository groupRoomTypeHotelRepository;
+    
+    @Autowired
+    private HotelRepository hotelRepository;
+    
     public GroupRoomTypeHotelController(GroupRoomTypeHotelService groupRoomTypeHotelService) {
         this.groupRoomTypeHotelService = groupRoomTypeHotelService;
+    }
+    
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
+    }
+    
+    private boolean validateHotelTenant(String hotelCode) {
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
     }
     
     /**
@@ -161,6 +178,30 @@ public class GroupRoomTypeHotelController {
             return ResponseEntity.ok(Map.of("message", "Batch update successful"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypeAllocationsByCode(@PathVariable String hotelCode) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            
+            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelRepository.findByHotelCode(hotelCode);
+            List<AllocationDTO> allocationDTOs = allocations.stream()
+                    .map(AllocationDTO::new)
+                    .collect(Collectors.toList());
+            response.put("success", true);
+            response.put("data", allocationDTOs);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 }

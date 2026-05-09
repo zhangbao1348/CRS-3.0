@@ -36,8 +36,8 @@ public class BookingControl {
     @Temporal(TemporalType.DATE)
     private Date controlDate;
 
-    @Column(name = "cancellation_rule", length = 20)
-    private String cancellationRule = "free";
+    @Column(name = "cancellation_policy_code", length = 50)
+    private String cancellationPolicyCode;
 
     @Column(name = "advance_booking_days")
     private Integer advanceBookingDays = 0;

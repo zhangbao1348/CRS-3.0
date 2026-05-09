@@ -1,11 +1,15 @@
 package com.crs.controller;
 
+import com.crs.entity.GroupRateCode;
 import com.crs.entity.HotelRateCodeAllocation;
+import com.crs.entity.Hotel;
 import com.crs.entity.RatePlan;
 import com.crs.repository.GroupRateCodeRepository;
 import com.crs.repository.HotelRateCodeAllocationRepository;
+import com.crs.repository.HotelRepository;
 import com.crs.repository.RatePlanRepository;
 import com.crs.util.CodeValidator;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,8 +35,101 @@ public class RatePlanController {
     
     @Autowired
   private GroupRateCodeRepository groupRateCodeRepository;
+  
+  @Autowired
+  private HotelRepository hotelRepository;
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RatePlanController.class);
+  
+  private Integer getCurrentTenantId() {
+      Integer tenantId = TenantContext.getTenantId();
+      return tenantId != null ? tenantId : 1;
+  }
+  
+  private boolean validateHotelTenant(String hotelCode) {
+      return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
+  }
+
+  private boolean isBlank(String value) {
+      return value == null || value.trim().isEmpty();
+  }
+
+  private String pickString(String primary, String fallback) {
+      return !isBlank(primary) ? primary : fallback;
+  }
+
+  private Integer pickInteger(Integer primary, Integer fallback) {
+      return primary != null ? primary : fallback;
+  }
+
+  private Double pickDouble(Double primary, Double fallback) {
+      return primary != null ? primary : fallback;
+  }
+
+  private Boolean pickBoolean(Boolean primary, Boolean fallback) {
+      return primary != null ? primary : fallback;
+  }
+
+  private Map<String, Object> buildRatePlanDetailData(RatePlan ratePlan) {
+      GroupRateCode groupRateCode = null;
+      if (!isBlank(ratePlan.getSourceGroupRateCode())) {
+          groupRateCode = groupRateCodeRepository.findByRateCodeAndGroupId(ratePlan.getSourceGroupRateCode(), getCurrentTenantId());
+      }
+
+      Map<String, Object> data = new HashMap<>();
+      data.put("id", ratePlan.getId());
+      data.put("tenantId", ratePlan.getTenantId());
+      data.put("hotelId", ratePlan.getHotelId());
+      data.put("hotelCode", ratePlan.getHotelCode());
+      data.put("sourceGroupRateCode", ratePlan.getSourceGroupRateCode());
+
+      data.put("rateCode", pickString(ratePlan.getRateCode(), groupRateCode != null ? groupRateCode.getRateCode() : null));
+      data.put("rateName", pickString(ratePlan.getRateName(), groupRateCode != null ? groupRateCode.getRateName() : null));
+      data.put("description", pickString(ratePlan.getDescription(), groupRateCode != null ? groupRateCode.getDescription() : null));
+
+      data.put("rateCategory", pickString(ratePlan.getRateCategory(), groupRateCode != null ? groupRateCode.getRateCategory() : null));
+      data.put("marketCode", pickString(ratePlan.getMarketCode(), groupRateCode != null ? groupRateCode.getMarketCode() : null));
+      data.put("sourceCode", pickString(ratePlan.getSourceCode(), groupRateCode != null ? groupRateCode.getSourceCode() : null));
+
+      data.put("rateType", pickString(ratePlan.getRateType(), groupRateCode != null ? groupRateCode.getRateType() : null));
+      data.put("parentRateCode", pickString(ratePlan.getParentRateCode(), groupRateCode != null ? groupRateCode.getParentRateCode() : null));
+      data.put("derivativeLevel", pickString(ratePlan.getDerivativeLevel(), groupRateCode != null ? groupRateCode.getDerivativeLevel() : null));
+
+      data.put("discount", pickDouble(ratePlan.getDiscount(), groupRateCode != null ? groupRateCode.getDiscount() : null));
+      data.put("rounding", pickString(ratePlan.getRounding(), groupRateCode != null ? groupRateCode.getRounding() : null));
+
+      data.put("guaranteeRule", pickString(ratePlan.getGuaranteeRule(), groupRateCode != null ? groupRateCode.getGuaranteeRule() : null));
+      data.put("cancellationRule", pickString(ratePlan.getCancellationRule(), groupRateCode != null ? groupRateCode.getCancellationRule() : null));
+
+      data.put("couponRule", pickString(ratePlan.getCouponRule(), groupRateCode != null ? groupRateCode.getCouponRule() : null));
+      data.put("promotionRule", pickString(ratePlan.getPromotionRule(), groupRateCode != null ? groupRateCode.getPromotionRule() : null));
+      data.put("allowPoints", pickBoolean(ratePlan.getAllowPoints(), groupRateCode != null ? groupRateCode.getAllowPoints() : null));
+      data.put("pointsType", pickString(ratePlan.getPointsType(), groupRateCode != null ? groupRateCode.getPointsType() : null));
+      data.put("pointsValue", pickDouble(ratePlan.getPointsValue(), groupRateCode != null ? groupRateCode.getPointsValue() : null));
+
+      data.put("applicableRoomTypes", pickString(ratePlan.getApplicableRoomTypes(), groupRateCode != null ? groupRateCode.getApplicableRoomTypes() : null));
+      data.put("packages", pickString(ratePlan.getPackages(), groupRateCode != null ? groupRateCode.getPackages() : null));
+      data.put("personalMembership", pickString(ratePlan.getPersonalMembership(), groupRateCode != null ? groupRateCode.getPersonalMembership() : null));
+      data.put("companyMembership", pickString(ratePlan.getCompanyMembership(), groupRateCode != null ? groupRateCode.getCompanyMembership() : null));
+
+      data.put("advanceBookingMin", pickInteger(ratePlan.getAdvanceBookingMin(), groupRateCode != null ? groupRateCode.getAdvanceBookingMin() : null));
+      data.put("advanceBookingMax", pickInteger(ratePlan.getAdvanceBookingMax(), groupRateCode != null ? groupRateCode.getAdvanceBookingMax() : null));
+      data.put("minimumStayMin", pickInteger(ratePlan.getMinimumStayMin(), groupRateCode != null ? groupRateCode.getMinimumStayMin() : null));
+      data.put("minimumStayMax", pickInteger(ratePlan.getMinimumStayMax(), groupRateCode != null ? groupRateCode.getMinimumStayMax() : null));
+      data.put("bookingStartTime", pickString(ratePlan.getBookingStartTime(), groupRateCode != null ? groupRateCode.getBookingStartTime() : null));
+      data.put("bookingEndTime", pickString(ratePlan.getBookingEndTime(), groupRateCode != null ? groupRateCode.getBookingEndTime() : null));
+      data.put("checkinStartTime", pickString(ratePlan.getCheckinStartTime(), groupRateCode != null ? groupRateCode.getCheckinStartTime() : null));
+      data.put("checkinEndTime", pickString(ratePlan.getCheckinEndTime(), groupRateCode != null ? groupRateCode.getCheckinEndTime() : null));
+
+      data.put("roomTypeDiffCode", ratePlan.getRoomTypeDiffCode());
+      data.put("personDiffCode", ratePlan.getPersonDiffCode());
+
+      data.put("status", pickString(ratePlan.getStatus(), groupRateCode != null ? groupRateCode.getStatus() : null));
+      data.put("createdAt", ratePlan.getCreatedAt());
+      data.put("updatedAt", ratePlan.getUpdatedAt());
+
+      return data;
+  }
     
     /**
      * 获取价格计划列表
@@ -75,17 +172,29 @@ public class RatePlanController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> getRatePlanById(@PathVariable Integer id) {
-        Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id);
-        if (ratePlanOpt.isPresent()) {
-            Map<String, Object> response = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id);
+            if (!ratePlanOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "价格计划不存在");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            RatePlan ratePlan = ratePlanOpt.get();
+            if (!isBlank(ratePlan.getHotelCode()) && !validateHotelTenant(ratePlan.getHotelCode())) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+
             response.put("success", true);
-            response.put("data", ratePlanOpt.get());
+            response.put("data", buildRatePlanDetailData(ratePlan));
             return ResponseEntity.ok(response);
-        } else {
-            Map<String, Object> response = new HashMap<>();
+        } catch (Exception e) {
             response.put("success", false);
-            response.put("message", "价格计划不存在");
-            return ResponseEntity.badRequest().body(response);
+            response.put("message", "获取价格计划失败: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
     
@@ -100,12 +209,25 @@ public class RatePlanController {
             if (ratePlan.getRateCode() != null && !CodeValidator.isValid(ratePlan.getRateCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            // 检查酒店内价格计划代码是否重复
+            
+            if (ratePlan.getHotelId() == null && ratePlan.getHotelCode() != null && !ratePlan.getHotelCode().isEmpty()) {
+                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(ratePlan.getHotelCode(), getCurrentTenantId());
+                if (hotelOpt.isEmpty()) {
+                    return ResponseEntity.status(403).body(Map.of("error", "无权操作该酒店数据"));
+                }
+                ratePlan.setHotelId(hotelOpt.get().getId());
+            }
+            
+            if (ratePlan.getHotelId() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "缺少酒店信息(hotelId或hotelCode)"));
+            }
+            
+            ratePlan.setTenantId(getCurrentTenantId());
+            
             if (ratePlanRepository.existsByHotelIdAndRateCode(ratePlan.getHotelId(), ratePlan.getRateCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "价格计划代码在该酒店内已存在"));
             }
-            // 检查集团是否已存在相同CODE的房价码
-            if (groupRateCodeRepository.findByRateCode(ratePlan.getRateCode()) != null) {
+            if (groupRateCodeRepository.findByRateCodeAndGroupId(ratePlan.getRateCode(), getCurrentTenantId()) != null) {
                 return ResponseEntity.badRequest().body(Map.of("error", "此房价码集团已经存在，请更换房价码CODE"));
             }
             
@@ -135,14 +257,25 @@ public class RatePlanController {
             
             RatePlan existingRatePlan = existingOpt.get();
             
-            // 检查价格计划代码是否与其他记录重复
+            if (ratePlan.getHotelId() == null && ratePlan.getHotelCode() != null && !ratePlan.getHotelCode().isEmpty()) {
+                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(ratePlan.getHotelCode(), getCurrentTenantId());
+                if (hotelOpt.isPresent()) {
+                    ratePlan.setHotelId(hotelOpt.get().getId());
+                } else {
+                    ratePlan.setHotelId(existingRatePlan.getHotelId());
+                }
+            }
+            
+            if (ratePlan.getHotelId() == null) {
+                ratePlan.setHotelId(existingRatePlan.getHotelId());
+            }
+            
             Optional<RatePlan> duplicateOpt = ratePlanRepository.findByHotelIdAndRateCode(
                     ratePlan.getHotelId(), ratePlan.getRateCode());
             if (duplicateOpt.isPresent() && !duplicateOpt.get().getId().equals(id)) {
                 return ResponseEntity.badRequest().body("价格计划代码在该酒店内已存在");
             }
             
-            // 更新字段
             ratePlan.setId(id);
             ratePlan.setCreatedAt(existingRatePlan.getCreatedAt());
             
@@ -269,7 +402,7 @@ public class RatePlanController {
       RatePlan ratePlan = ratePlanOpt.get();
       Map<String, Object> permissions = new HashMap<>();
       
-      if (ratePlan.getSourceGroupRateCodeId() == null) {
+      if (ratePlan.getSourceGroupRateCode() == null) {
         // 酒店自建的价格计划，所有权限为true
         permissions.put("basicInfoEditable", true);
         permissions.put("priceInfoEditable", true);
@@ -320,7 +453,6 @@ public class RatePlanController {
       @RequestParam(required = false) String targetDerivativeLevel,
       @RequestParam(required = false) Integer excludeId) {
     try {
-      // 只获取基础价格计划作为父级
       List<RatePlan> parentRatePlans = ratePlanRepository.findAll().stream()
           .filter(rp -> "basic".equals(rp.getRateType()))
           .filter(rp -> !rp.getId().equals(excludeId))
@@ -332,4 +464,53 @@ public class RatePlanController {
       return ResponseEntity.status(500).body(null);
     }
   }
+
+    @GetMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<Map<String, Object>> getRatePlansByHotelCode(
+            @PathVariable String hotelCode,
+            @RequestParam(required = false) String status) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            List<RatePlan> ratePlans;
+            if (status != null) {
+                ratePlans = ratePlanRepository.findByHotelCodeAndStatus(hotelCode, status);
+            } else {
+                ratePlans = ratePlanRepository.findByHotelCode(hotelCode);
+            }
+            response.put("success", true);
+            response.put("data", ratePlans);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}/rate-code/{rateCode}")
+    public ResponseEntity<Map<String, Object>> getRatePlanByHotelCodeAndRateCode(
+            @PathVariable String hotelCode, @PathVariable String rateCode) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            var ratePlan = ratePlanRepository.findByHotelCodeAndRateCode(hotelCode, rateCode)
+                    .orElseThrow(() -> new RuntimeException("Rate plan not found"));
+            response.put("success", true);
+            response.put("data", buildRatePlanDetailData(ratePlan));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }

@@ -8,7 +8,7 @@ import { useHotelContext } from '../../contexts/HotelContext'
 const WEEKDAY_MAP = ['日', '一', '二', '三', '四', '五', '六']
 
 const PriceQuery = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
 
   const [ratePlans, setRatePlans] = useState([])
   const [selectedRateCode, setSelectedRateCode] = useState(null)
@@ -20,23 +20,21 @@ const PriceQuery = () => {
 
   // 加载价格计划
   useEffect(() => {
-    if (!selectedHotelId) { setRatePlans([]); setSelectedRateCode(null); return }
-    ratePlanApi.getRatePlans(selectedHotelId).then(res => {
+    if (!hotelCode) { setRatePlans([]); setSelectedRateCode(null); return }
+    ratePlanApi.getRatePlansByHotelCode(hotelCode).then(res => {
       const list = res?.data || []
       setRatePlans(list)
       if (list.length > 0) setSelectedRateCode(list[0].rateCode)
       else setSelectedRateCode(null)
     }).catch(() => setRatePlans([]))
-  }, [selectedHotelId])
+  }, [hotelCode])
 
-  // 加载房型
   useEffect(() => {
-    if (!selectedHotelId) { setRoomTypes([]); return }
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId).then(res => {
-      const list = (res?.data || []).filter(r => r.status === 'active')
-      setRoomTypes(list)
+    if (!hotelCode) { setRoomTypes([]); return }
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode).then(res => {
+      setRoomTypes((res?.data || []).filter(r => r.status === 'active'))
     }).catch(() => setRoomTypes([]))
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 生成月份日期列表
   const buildMonthDates = useCallback((month) => {

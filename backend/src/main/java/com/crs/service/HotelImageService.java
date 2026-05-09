@@ -40,6 +40,22 @@ public class HotelImageService {
         hotelImageRepository.deleteByHotelId(hotelId);
     }
     
+    public List<HotelImage> getImagesByHotelCode(String hotelCode) {
+        return hotelImageRepository.findByHotelCode(hotelCode);
+    }
+
+    public List<HotelImage> getImagesByHotelCodeAndType(String hotelCode, String imageType) {
+        return hotelImageRepository.findByHotelCodeAndImageType(hotelCode, imageType);
+    }
+
+    public List<HotelImage> getImagesByHotelCodeOrderBySort(String hotelCode) {
+        return hotelImageRepository.findByHotelCodeOrderBySortOrderAsc(hotelCode);
+    }
+
+    public void deleteImagesByHotelCode(String hotelCode) {
+        hotelImageRepository.deleteByHotelCode(hotelCode);
+    }
+
     public HotelImage getImageById(Integer id) {
         return hotelImageRepository.findById(id).orElse(null);
     }

@@ -4,6 +4,7 @@ import com.crs.entity.Hotel;
 import com.crs.repository.HotelRepository;
 import com.crs.service.HotelService;
 import com.crs.util.CodeValidator;
+import com.crs.util.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,11 @@ public class HotelController {
     public HotelController(HotelService hotelService, HotelRepository hotelRepository) {
         this.hotelService = hotelService;
         this.hotelRepository = hotelRepository;
+    }
+    
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
     }
     
     /**
@@ -217,8 +223,10 @@ public class HotelController {
             var hotel = hotelService.getHotelById(id)
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
             boolean exists = hotel.getHotelCode() != null && !hotel.getHotelCode().trim().isEmpty();
+            Map<String, Object> data = new HashMap<>();
+            data.put("exists", exists);
             response.put("success", true);
-            response.put("exists", exists);
+            response.put("data", data);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             response.put("success", false);
@@ -238,15 +246,19 @@ public class HotelController {
     public ResponseEntity<Map<String, Object>> getHotelByCode(@PathVariable String code) {
         Map<String, Object> response = new HashMap<>();
         try {
-            var hotel = hotelRepository.findByHotelCode(code)
-                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
+            var hotel = hotelRepository.findByHotelCodeAndTenantId(code, getCurrentTenantId());
+            if (hotel.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "酒店不存在: " + code);
+                return ResponseEntity.status(404).body(response);
+            }
             response.put("success", true);
-            response.put("data", hotel);
+            response.put("data", hotel.get());
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             response.put("success", false);
             response.put("message", "获取酒店详情失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.status(404).body(response);
         }
     }
     
@@ -260,7 +272,7 @@ public class HotelController {
     public ResponseEntity<Map<String, Object>> updateHotelByCode(@PathVariable String code, @RequestBody Hotel hotel) {
         Map<String, Object> response = new HashMap<>();
         try {
-            var existing = hotelRepository.findByHotelCode(code)
+            var existing = hotelRepository.findByHotelCodeAndTenantId(code, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
             var updatedHotel = hotelService.updateHotel(existing.getId(), hotel);
             response.put("success", true);
@@ -282,7 +294,7 @@ public class HotelController {
     public ResponseEntity<Map<String, Object>> deleteHotelByCode(@PathVariable String code) {
         Map<String, Object> response = new HashMap<>();
         try {
-            var existing = hotelRepository.findByHotelCode(code)
+            var existing = hotelRepository.findByHotelCodeAndTenantId(code, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
             hotelService.deleteHotel(existing.getId());
             response.put("success", true);

@@ -14,7 +14,7 @@ const WEEKDAY_NAMES = ['日', '一', '二', '三', '四', '五', '六']
  * 支持3种视图：库存、房价、开关房
  */
 const MainInventoryCalendar = () => {
-  const { selectedHotel: hotelCode, selectedHotelId } = useHotelContext()
+  const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const getOp = () => encodeURIComponent(user?.name || user?.username || '系统用户')
 
@@ -40,19 +40,18 @@ const MainInventoryCalendar = () => {
 
   // 加载房型列表
   useEffect(() => {
-    if (!selectedHotelId) return
-    hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId)
+    if (!hotelCode) return
+    hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode)
       .then(res => setRoomTypes((res?.data || []).filter(r => r.status === 'active')))
       .catch(() => {})
-  }, [selectedHotelId])
+  }, [hotelCode])
 
-  // 加载价格计划列表
   useEffect(() => {
-    if (!selectedHotelId) return
-    ratePlanApi.getRatePlans(selectedHotelId)
+    if (!hotelCode) return
+    ratePlanApi.getRatePlansByHotelCode(hotelCode)
       .then(res => setRatePlans(res?.data || []))
       .catch(() => {})
-  }, [selectedHotelId])
+  }, [hotelCode])
 
   // 加载渠道列表
   useEffect(() => {

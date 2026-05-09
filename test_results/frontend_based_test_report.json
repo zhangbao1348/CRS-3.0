@@ -1,0 +1,338 @@
+{
+  "timestamp": "2026-05-06T20:27:59.070766",
+  "total": 47,
+  "passed": 47,
+  "failed": 0,
+  "errors": 0,
+  "details": [
+    {
+      "page": "RoomType",
+      "name": "加载房型列表(by-code)",
+      "status": "PASS",
+      "message": "共3个房型",
+      "detail": null
+    },
+    {
+      "page": "RoomType",
+      "name": "过滤active房型(前端: filter(r => r.status === 'active'))",
+      "status": "PASS",
+      "message": "active房型: 3/3",
+      "detail": null
+    },
+    {
+      "page": "RoomType",
+      "name": "所有房型都有roomTypeCode",
+      "status": "PASS",
+      "message": "已验证3个房型",
+      "detail": null
+    },
+    {
+      "page": "RoomType",
+      "name": "房型数据包含前端所需字段(id/code/name/status)",
+      "status": "PASS",
+      "message": "字段完整",
+      "detail": null
+    },
+    {
+      "page": "库存页面群",
+      "name": "7个页面共用: getHotelRoomTypesByCode",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "库存页面群",
+      "name": "前端过滤: (res?.data || []).filter(r => r.status === 'active')",
+      "status": "PASS",
+      "message": "active: 3, 全部: 3",
+      "detail": null
+    },
+    {
+      "page": "库存页面群",
+      "name": "返回数据格式兼容 res?.data 模式",
+      "status": "PASS",
+      "message": "数据类型: list",
+      "detail": null
+    },
+    {
+      "page": "ChannelRoomTypeInventory",
+      "name": "此页面不过滤status(前端: setRoomTypes(res?.data || []))",
+      "status": "PASS",
+      "message": "全部: 3, active: 3, inactive: 0",
+      "detail": null
+    },
+    {
+      "page": "ChannelRoomTypeInventory",
+      "name": "当前无inactive房型，无法验证不过滤逻辑",
+      "status": "PASS",
+      "message": "数据全为active",
+      "detail": null
+    },
+    {
+      "page": "AddRatePlan",
+      "name": "加载房型列表(by-code)",
+      "status": "PASS",
+      "message": "共3个房型",
+      "detail": null
+    },
+    {
+      "page": "AddRatePlan",
+      "name": "房型数据包含roomTypeCategoryId(前端按此分组)",
+      "status": "PASS",
+      "message": "有categoryId的房型: 3/3",
+      "detail": null
+    },
+    {
+      "page": "AddRatePlan",
+      "name": "加载价格计划列表(by-code)",
+      "status": "PASS",
+      "message": "共1个价格计划",
+      "detail": null
+    },
+    {
+      "page": "RatePlan",
+      "name": "getRatePlansByHotelCode",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "RatePlan",
+      "name": "价格计划包含rateCode和hotelCode",
+      "status": "PASS",
+      "message": "字段完整",
+      "detail": null
+    },
+    {
+      "page": "EditHotel",
+      "name": "加载设施(by-code) → 按facilityType分类",
+      "status": "PASS",
+      "message": "共0个设施, 类型: set()",
+      "detail": null
+    },
+    {
+      "page": "EditHotel",
+      "name": "加载图片(by-code) → 按imageType分类",
+      "status": "PASS",
+      "message": "共4个图片, 类型: {'external', 'logo', 'lobby', 'restaurant'}",
+      "detail": null
+    },
+    {
+      "page": "EditHotel",
+      "name": "加载房型分配(by-code)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "EditHotel",
+      "name": "通过CODE查询酒店(用于updateHotelByCode)",
+      "status": "PASS",
+      "message": "hotelCode=JJSH001",
+      "detail": null
+    },
+    {
+      "page": "AddHotel",
+      "name": "deleteHotelFacilitiesByCode(保存设施前先删除旧数据)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "AddHotel",
+      "name": "deleteAllocationsByHotelCode(保存分配前先删除旧数据)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "AddHotel",
+      "name": "通过CODE查询酒店(用于updateHotelByCode)",
+      "status": "PASS",
+      "message": "hotelCode=JJSH001",
+      "detail": null
+    },
+    {
+      "page": "ChannelSetting",
+      "name": "getRateCodesWithRoomTypesByCode",
+      "status": "PASS",
+      "message": "状态码: 404",
+      "detail": null
+    },
+    {
+      "page": "ChannelSetting",
+      "name": "无渠道数据",
+      "status": "PASS",
+      "message": "跳过",
+      "detail": null
+    },
+    {
+      "page": "BookingControl",
+      "name": "getRatePlansByHotelCode(加载下拉选项)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "BookingControl",
+      "name": "价格计划数据格式(前端: res?.data || [])",
+      "status": "PASS",
+      "message": "共1个价格计划",
+      "detail": null
+    },
+    {
+      "page": "BookingControl",
+      "name": "价格计划包含rateCode(用于下拉选项value)",
+      "status": "PASS",
+      "message": "rateCode=BAR",
+      "detail": null
+    },
+    {
+      "page": "PriceLevelInventory",
+      "name": "getRatePlansByHotelCode(加载维度选项)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "PriceLevelInventory",
+      "name": "价格计划包含rateCode和rateName(前端: { code: rp.rateCode, name: rp.rateName + '（' + rp.rateCode + '）' })",
+      "status": "PASS",
+      "message": "rateCode=BAR, rateName=基础价格",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "RoomType/库存页面: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "EditHotel/设施: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "EditHotel/图片: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "RatePlan/BookingControl/PriceLevelInventory: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "AddHotel/分配: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "EditHotel/房型分配: 租户1可访问, 租户999被拒绝",
+      "status": "PASS",
+      "message": "租户1=200, 租户999=403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "AddHotel/删除设施: 租户999删除操作被拒绝",
+      "status": "PASS",
+      "message": "状态码: 403",
+      "detail": null
+    },
+    {
+      "page": "租户隔离",
+      "name": "AddHotel/删除分配: 租户999删除操作被拒绝",
+      "status": "PASS",
+      "message": "状态码: 403",
+      "detail": null
+    },
+    {
+      "page": "数据格式",
+      "name": "房型接口返回格式(前端兼容 {success,data} 和纯数组)",
+      "status": "PASS",
+      "message": "格式: {success,data}包装",
+      "detail": null
+    },
+    {
+      "page": "数据格式",
+      "name": "价格计划接口返回格式",
+      "status": "PASS",
+      "message": "格式: dict",
+      "detail": null
+    },
+    {
+      "page": "数据格式",
+      "name": "集团房型分配接口返回格式(前端期望 {success, data})",
+      "status": "PASS",
+      "message": "格式: dict, keys: ['data', 'success']",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "登录页(/)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "首页仪表板(/dashboard)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "酒店管理(RoomType)(/hotel-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "房型管理(/room-type)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "价格管理(RatePlan/PriceQuery/RackRate)(/rate-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "库存管理(MainInventory/RoomStatus/Overbooking)(/inventory)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "渠道管理(ChannelSetting)(/channel-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "page": "前端页面",
+      "name": "集团管理(AddGroupRateCode/AddGroupRoomType)(/group-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    }
+  ]
+}

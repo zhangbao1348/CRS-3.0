@@ -366,10 +366,10 @@ const AddGroupRateCode = () => {
             rateCode: fullRecord.rateCode,
             description: fullRecord.description,
             rateCategory: fullRecord.rateCategory,
-            marketCode: fullRecord.marketCodeId ? String(fullRecord.marketCodeId) : undefined,
-            sourceCode: fullRecord.sourceCodeId ? String(fullRecord.sourceCodeId) : undefined,
+            marketCode: fullRecord.marketCode || undefined,
+            sourceCode: fullRecord.sourceCode || undefined,
             rateType: fullRecord.rateType,
-            parentRateCode: fullRecord.parentRateCodeId ? String(fullRecord.parentRateCodeId) : undefined,
+            parentRateCode: fullRecord.parentRateCode || undefined,
             discount: fullRecord.discount,
             rounding: fullRecord.rounding,
             guaranteeRule: fullRecord.guaranteeRule,
@@ -377,8 +377,8 @@ const AddGroupRateCode = () => {
           })
           
           // 处理父级房价码的类型转换
-          if (fullRecord.parentRateCodeId) {
-            setParentRateCode(String(fullRecord.parentRateCodeId))
+          if (fullRecord.parentRateCode) {
+            setParentRateCode(fullRecord.parentRateCode)
           }
           
           // 处理预订限制数据
@@ -451,6 +451,7 @@ const AddGroupRateCode = () => {
         const formattedHotelData = response.data.map((hotel, index) => ({
           key: String(hotel.id || index),
           hotelId: hotel.id,
+          hotelCode: hotel.hotelCode,
           hotel: hotel.chineseName,
           region: hotel.province,
           city: hotel.city,
@@ -659,13 +660,10 @@ const AddGroupRateCode = () => {
         status: currentStatus,
         groupId: groupId,
         rateCategory: values.rateCategory || null,
-        marketCodeId: values.marketCode ? parseInt(values.marketCode) : null,
         marketCode: values.marketCode || null,
-        sourceCodeId: values.sourceCode ? parseInt(values.sourceCode) : null,
         sourceCode: values.sourceCode || null,
         rateType: values.rateType || 'basic',
-        parentRateCodeId: values.parentRateCode ? parseInt(values.parentRateCode) : null,
-        parentRateCode: values.parentRateCode ? (parentRateCodes.find(p => String(p.id) === values.parentRateCode)?.rateCode || null) : null,
+        parentRateCode: values.parentRateCode || null,
         discount: values.discount ? parseFloat(values.discount) : null,
         rounding: values.rounding || null,
         guaranteeRule: values.guaranteeRule || null,
@@ -823,6 +821,7 @@ const AddGroupRateCode = () => {
       setLoading(true)
       const allocationData = hotelData.map(item => ({
         hotelId: item.hotelId,
+        hotelCode: item.hotelCode,
         allocated: item.allocated,
         basicInfoEditable: item.basicInfoEditable,
         priceInfoEditable: item.priceInfoEditable,
@@ -895,8 +894,8 @@ const AddGroupRateCode = () => {
           console.log('使用baseData合并，baseData长度:', baseData.length)
           console.log('baseData内容:', baseData)
           const merged = baseData.map(item => {
-            console.log('处理酒店:', item.hotelId, item.hotel)
-            const alloc = allocations.find(a => a.hotelId === item.hotelId)
+            console.log('处理酒店:', item.hotelCode, item.hotel)
+            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
             console.log('匹配结果:', alloc ? '找到' : '未找到', '分配数据:', alloc)
             if (alloc) {
               const result = {
@@ -920,7 +919,7 @@ const AddGroupRateCode = () => {
           setHotelData(prev => {
             console.log('使用prev state合并:', prev)
             return prev.map(item => {
-              const alloc = allocations.find(a => a.hotelId === item.hotelId)
+              const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
               if (alloc) {
                 console.log('找到分配:', item.hotelId, alloc)
                 return {
@@ -1230,7 +1229,7 @@ const AddGroupRateCode = () => {
                     loading={loadingMarketCodes}
                   >
                     {marketCodes.map(code => (
-                      <Option key={code.id} value={String(code.id)}>
+                      <Option key={code.id} value={code.code}>
                         {code.name} ({code.code})
                       </Option>
                     ))}
@@ -1247,7 +1246,7 @@ const AddGroupRateCode = () => {
                     loading={loadingSourceCodes}
                   >
                     {sourceCodes.map(code => (
-                      <Option key={code.id} value={String(code.id)}>
+                      <Option key={code.id} value={code.code}>
                         {code.name} ({code.code})
                       </Option>
                     ))}
@@ -1334,13 +1333,13 @@ const AddGroupRateCode = () => {
                       <div style={{ marginBottom: 8, fontWeight: 500, color: '#1890ff' }}>{category}</div>
                       <Space wrap>
                         <Checkbox
-                          checked={roomTypes.every(roomType => selectedApplicableRoomTypes.includes(roomType.id))}
+                          checked={roomTypes.every(roomType => selectedApplicableRoomTypes.includes(roomType.roomTypeCode))}
                           onChange={(e) => {
-                            const roomTypeIds = roomTypes.map(roomType => roomType.id)
+                            const roomTypeCodes = roomTypes.map(roomType => roomType.roomTypeCode)
                             if (e.target.checked) {
-                              setSelectedApplicableRoomTypes(prev => [...new Set([...prev, ...roomTypeIds])])
+                              setSelectedApplicableRoomTypes(prev => [...new Set([...prev, ...roomTypeCodes])])
                             } else {
-                              setSelectedApplicableRoomTypes(prev => prev.filter(id => !roomTypeIds.includes(id)))
+                              setSelectedApplicableRoomTypes(prev => prev.filter(c => !roomTypeCodes.includes(c)))
                             }
                           }}
                           style={{ fontWeight: 500 }}
@@ -1350,12 +1349,12 @@ const AddGroupRateCode = () => {
                         {roomTypes.map(roomType => (
                           <Checkbox
                             key={roomType.id}
-                            checked={selectedApplicableRoomTypes.includes(roomType.id)}
+                            checked={selectedApplicableRoomTypes.includes(roomType.roomTypeCode)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedApplicableRoomTypes(prev => [...prev, roomType.id])
+                                setSelectedApplicableRoomTypes(prev => [...prev, roomType.roomTypeCode])
                               } else {
-                                setSelectedApplicableRoomTypes(prev => prev.filter(id => id !== roomType.id))
+                                setSelectedApplicableRoomTypes(prev => prev.filter(c => c !== roomType.roomTypeCode))
                               }
                             }}
                           >
@@ -1390,7 +1389,7 @@ const AddGroupRateCode = () => {
                         loading={loadingParentRateCodes}
                       >
                         {parentRateCodes.map(rateCode => (
-                          <Option key={rateCode.id} value={String(rateCode.id)}>
+                          <Option key={rateCode.id} value={rateCode.rateCode}>
                             {rateCode.rateCode} - {rateCode.rateName}
                           </Option>
                         ))}

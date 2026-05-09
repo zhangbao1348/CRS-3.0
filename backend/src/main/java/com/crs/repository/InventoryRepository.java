@@ -110,4 +110,49 @@ public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
      * @return 库存信息
      */
     Inventory findByHotelIdAndRatePlanIdAndRoomTypeIdAndChannelIdAndDate(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date date);
+
+    // =========================================================================
+    // Dashboard 聚合查询方法
+    // =========================================================================
+
+    /**
+     * 查询库存预警：指定日期范围内可用库存 <= threshold 的记录
+     * @param threshold 预警阈值
+     * @param startDate 开始日期
+     * @param endDate 结束日期
+     * @return 低库存记录列表
+     */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT i FROM Inventory i WHERE i.availableRooms <= :threshold AND i.date >= :startDate AND i.date <= :endDate AND i.status = 'active' ORDER BY i.date, i.hotelCode")
+    List<Inventory> findLowInventory(@org.springframework.data.repository.query.Param("threshold") int threshold,
+                                     @org.springframework.data.repository.query.Param("startDate") Date startDate,
+                                     @org.springframework.data.repository.query.Param("endDate") Date endDate);
+
+    /**
+     * 查询指定酒店在某一天的所有库存
+     * @param hotelId 酒店ID
+     * @param date 日期
+     * @return 库存列表
+     */
+    List<Inventory> findByHotelIdAndDate(Integer hotelId, Date date);
+
+    List<Inventory> findByHotelCode(String hotelCode);
+
+    List<Inventory> findByHotelCodeAndDateBetween(String hotelCode, Date startDate, Date endDate);
+
+    List<Inventory> findByHotelCodeAndRatePlanCodeAndRoomTypeCode(String hotelCode, String ratePlanCode, String roomTypeCode);
+
+    Inventory findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(String hotelCode, String ratePlanCode, String roomTypeCode, Date date);
+
+    List<Inventory> findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDateBetween(String hotelCode, String ratePlanCode, String roomTypeCode, Date startDate, Date endDate);
+
+    List<Inventory> findByHotelCodeAndChannelCode(String hotelCode, String channelCode);
+
+    List<Inventory> findByHotelCodeAndChannelCodeAndDateBetween(String hotelCode, String channelCode, Date startDate, Date endDate);
+
+    Inventory findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date);
+
+    List<Inventory> findByHotelCodeAndDate(String hotelCode, Date date);
+
+    List<Inventory> findByHotelCodeAndStatus(String hotelCode, Inventory.Status status);
 }

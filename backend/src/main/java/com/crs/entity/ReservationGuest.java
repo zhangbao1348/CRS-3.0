@@ -54,6 +54,9 @@ public class ReservationGuest {
     @Column(name = "pms_status", length = 30)
     private String pmsStatus;
 
+    @Column(name = "room_index")
+    private Integer roomIndex = 0;
+
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
 

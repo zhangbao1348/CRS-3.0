@@ -80,4 +80,22 @@ public interface HotelRoomTypeRepository extends JpaRepository<HotelRoomType, In
      * @return 房型列表
      */
     List<HotelRoomType> findByRoomTypeCategoryId(Integer roomTypeCategoryId);
+
+    List<HotelRoomType> findByHotelCode(String hotelCode);
+
+    Optional<HotelRoomType> findByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode);
+
+    List<HotelRoomType> findByHotelCodeAndStatus(String hotelCode, String status);
+
+    boolean existsByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode);
+
+    List<HotelRoomType> findByHotelCodeOrderBySortOrderAsc(String hotelCode);
+
+    long countByHotelCode(String hotelCode);
+
+    List<HotelRoomType> findByGroupRoomTypeCode(String groupRoomTypeCode);
+
+    Optional<HotelRoomType> findByGroupRoomTypeCodeAndHotelCode(String groupRoomTypeCode, String hotelCode);
+
+    List<HotelRoomType> findByRoomTypeCategoryCode(String roomTypeCategoryCode);
 }

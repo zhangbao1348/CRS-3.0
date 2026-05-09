@@ -4,6 +4,7 @@ import com.crs.entity.GroupRateCode;
 import com.crs.entity.RatePlan;
 import com.crs.repository.GroupRateCodeRepository;
 import com.crs.repository.RatePlanRepository;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,9 +75,9 @@ public class GroupRateCodeService {
                 .filter(rc -> (rateCategory == null || rateCategory.isEmpty() || 
                     (rc.getRateCategory() != null && rc.getRateCategory().equals(rateCategory))))
                 .filter(rc -> (marketCode == null || marketCode.isEmpty() || 
-                    (rc.getMarketCodeId() != null && ("MARKET" + String.format("%02d", rc.getMarketCodeId())).equals(marketCode))))
+                    (rc.getMarketCode() != null && rc.getMarketCode().equals(marketCode))))
                 .filter(rc -> (sourceCode == null || sourceCode.isEmpty() || 
-                    (rc.getSourceCodeId() != null && ("SOURCE" + String.format("%02d", rc.getSourceCodeId())).equals(sourceCode))))
+                    (rc.getSourceCode() != null && rc.getSourceCode().equals(sourceCode))))
                 .filter(rc -> (type == null || type.isEmpty() || 
                     (rc.getRateType() != null && 
                     ((type.equals("基础房价码") && rc.getRateType().equals("basic")) || 
@@ -126,7 +127,8 @@ public class GroupRateCodeService {
      * @return 集团房价码对象
      */
     public GroupRateCode getGroupRateCodeByRateCode(String rateCode) {
-        return groupRateCodeRepository.findByRateCode(rateCode);
+        Integer tenantId = TenantContext.getTenantId();
+        return groupRateCodeRepository.findByRateCodeAndGroupId(rateCode, tenantId != null ? tenantId : 1);
     }
     
     /**
@@ -136,8 +138,9 @@ public class GroupRateCodeService {
      */
     @Transactional
     public GroupRateCode createGroupRateCode(GroupRateCode groupRateCode) {
-        // 检查房价码代码是否已存在
-        if (groupRateCodeRepository.findByRateCode(groupRateCode.getRateCode()) != null) {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) tenantId = 1;
+        if (groupRateCodeRepository.findByRateCodeAndGroupId(groupRateCode.getRateCode(), tenantId) != null) {
             throw new IllegalArgumentException("房价码代码已存在");
         }
         
@@ -158,7 +161,7 @@ public class GroupRateCodeService {
         }
         
         // 检查房价码代码是否已被其他记录使用
-        GroupRateCode existingByRateCode = groupRateCodeRepository.findByRateCode(groupRateCode.getRateCode());
+        GroupRateCode existingByRateCode = groupRateCodeRepository.findByRateCodeAndGroupId(groupRateCode.getRateCode(), existingRateCode.getGroupId());
         if (existingByRateCode != null && !existingByRateCode.getId().equals(id)) {
             throw new IllegalArgumentException("房价码代码已存在");
         }
@@ -169,10 +172,10 @@ public class GroupRateCodeService {
         existingRateCode.setDescription(groupRateCode.getDescription());
         existingRateCode.setStatus(groupRateCode.getStatus());
         existingRateCode.setRateCategory(groupRateCode.getRateCategory());
-        existingRateCode.setMarketCodeId(groupRateCode.getMarketCodeId());
-        existingRateCode.setSourceCodeId(groupRateCode.getSourceCodeId());
+        existingRateCode.setMarketCode(groupRateCode.getMarketCode());
+        existingRateCode.setSourceCode(groupRateCode.getSourceCode());
         existingRateCode.setRateType(groupRateCode.getRateType());
-        existingRateCode.setParentRateCodeId(groupRateCode.getParentRateCodeId());
+        existingRateCode.setParentRateCode(groupRateCode.getParentRateCode());
         existingRateCode.setDerivativeLevel(groupRateCode.getDerivativeLevel());
         existingRateCode.setDiscount(groupRateCode.getDiscount());
         existingRateCode.setRounding(groupRateCode.getRounding());
@@ -293,17 +296,12 @@ public class GroupRateCodeService {
      * @param parentRateCodeId 父级房价码ID
      * @return 子衍生码数量
      */
-    public long countChildDerivatives(Integer parentRateCodeId) {
-        return groupRateCodeRepository.countByParentRateCodeId(parentRateCodeId);
+    public long countChildDerivatives(String parentRateCode) {
+        return groupRateCodeRepository.countByParentRateCode(parentRateCode);
     }
     
-    /**
-     * 获取指定房价码的子衍生码列表
-     * @param parentRateCodeId 父级房价码ID
-     * @return 子衍生码列表
-     */
-    public List<GroupRateCode> getChildDerivatives(Integer parentRateCodeId) {
-        return groupRateCodeRepository.findByParentRateCodeId(parentRateCodeId);
+    public List<GroupRateCode> getChildDerivatives(String parentRateCode) {
+        return groupRateCodeRepository.findByParentRateCode(parentRateCode);
     }
     
     /**
@@ -322,7 +320,7 @@ public class GroupRateCodeService {
         groupRateCodeRepository.save(rateCode);
         
         // 停用所有已下发到酒店的价格计划
-        List<RatePlan> hotelRatePlans = ratePlanRepository.findBySourceGroupRateCodeId(id);
+        List<RatePlan> hotelRatePlans = ratePlanRepository.findBySourceGroupRateCode(rateCode.getRateCode());
         for (RatePlan plan : hotelRatePlans) {
             if ("active".equals(plan.getStatus())) {
                 plan.setStatus("inactive");
@@ -331,7 +329,7 @@ public class GroupRateCodeService {
         }
         
         // 递归停用所有子衍生码
-        List<GroupRateCode> children = groupRateCodeRepository.findByParentRateCodeId(id);
+        List<GroupRateCode> children = groupRateCodeRepository.findByParentRateCode(rateCode.getRateCode());
         for (GroupRateCode child : children) {
             if ("active".equals(child.getStatus())) {
                 disableGroupRateCodeCascade(child.getId());

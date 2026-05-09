@@ -13,4 +13,12 @@ public interface HotelRoomTypeAllocationRepository extends JpaRepository<HotelRo
     List<HotelRoomTypeAllocation> findByHotelIdAndAllocated(Integer hotelId, Boolean allocated);
     
     void deleteByHotelId(Integer hotelId);
+
+    List<HotelRoomTypeAllocation> findByHotelCode(String hotelCode);
+
+    HotelRoomTypeAllocation findByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode);
+
+    List<HotelRoomTypeAllocation> findByHotelCodeAndAllocated(String hotelCode, Boolean allocated);
+
+    void deleteByHotelCode(String hotelCode);
 }

@@ -1,27 +1,40 @@
 package com.crs.controller;
 
 import com.crs.entity.HotelRoomType;
+import com.crs.entity.Hotel;
 import com.crs.service.HotelRoomTypeService;
+import com.crs.repository.HotelRepository;
 import com.crs.util.CodeValidator;
+import com.crs.util.TenantContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-/**
- * 酒店房型控制器
- * 用于处理酒店房型的HTTP请求
- */
 @RestController
 @RequestMapping("/api/hotel-room-types")
 public class HotelRoomTypeController {
     
     private final HotelRoomTypeService hotelRoomTypeService;
     
+    @Autowired
+    private HotelRepository hotelRepository;
+    
     public HotelRoomTypeController(HotelRoomTypeService hotelRoomTypeService) {
         this.hotelRoomTypeService = hotelRoomTypeService;
+    }
+    
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        return tenantId != null ? tenantId : 1;
+    }
+    
+    private boolean validateHotelTenant(String hotelCode) {
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
     }
     
     /**
@@ -111,6 +124,69 @@ public class HotelRoomTypeController {
             return ResponseEntity.ok(Map.of("message", "Hotel room type deleted successfully"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}")
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypesByCode(@PathVariable String hotelCode) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypesByHotelCode(hotelCode);
+            response.put("success", true);
+            response.put("data", roomTypes);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}/room-type/{roomTypeCode}")
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypeByCode(
+            @PathVariable String hotelCode, @PathVariable String roomTypeCode) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            var roomType = hotelRoomTypeService.getHotelRoomTypeByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode)
+                    .orElseThrow(() -> new RuntimeException("Room type not found"));
+            response.put("success", true);
+            response.put("data", roomType);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/by-code/hotel/{hotelCode}/status/{status}")
+    public ResponseEntity<Map<String, Object>> getHotelRoomTypesByCodeAndStatus(
+            @PathVariable String hotelCode, @PathVariable String status) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            if (!validateHotelTenant(hotelCode)) {
+                response.put("success", false);
+                response.put("message", "无权访问该酒店数据");
+                return ResponseEntity.status(403).body(response);
+            }
+            List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypesByHotelCodeAndStatus(hotelCode, status);
+            response.put("success", true);
+            response.put("data", roomTypes);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 }

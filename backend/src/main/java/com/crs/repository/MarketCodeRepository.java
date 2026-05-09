@@ -31,4 +31,8 @@ public interface MarketCodeRepository extends JpaRepository<MarketCode, Integer>
      * 根据租户ID和级别查询市场码
      */
     List<MarketCode> findByTenantIdAndLevel(Integer tenantId, Integer level);
+
+    List<MarketCode> findByTenantIdAndParentCode(Integer tenantId, String parentCode);
+
+    MarketCode findByTenantIdAndCodeAndParentCode(Integer tenantId, String code, String parentCode);
 }

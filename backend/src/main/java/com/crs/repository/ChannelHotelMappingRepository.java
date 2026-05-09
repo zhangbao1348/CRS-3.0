@@ -35,10 +35,9 @@ public interface ChannelHotelMappingRepository extends JpaRepository<ChannelHote
      */
     List<ChannelHotelMapping> findByChannelIdAndHotelId(Integer channelId, Integer hotelId);
 
-    /**
-     * 统计引用指定渠道ID的映射数量
-     * @param channelId 渠道ID
-     * @return 引用数量
-     */
+    List<ChannelHotelMapping> findByChannelCode(String channelCode);
+    List<ChannelHotelMapping> findByHotelCode(String hotelCode);
+    List<ChannelHotelMapping> findByChannelCodeAndHotelCode(String channelCode, String hotelCode);
+
     long countByChannelId(Integer channelId);
 }

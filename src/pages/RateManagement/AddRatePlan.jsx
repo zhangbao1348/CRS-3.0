@@ -201,16 +201,15 @@ const AddRatePlan = () => {
     try {
       setLoadingRoomTypes(true)
       
-      if (!selectedHotelId) {
+      if (!selectedHotel) {
         throw new Error('请先选择酒店')
       }
       
-      // 获取房型大类
       const groupId = getCurrentTenantId()
       const categoriesResponse = await axios.get(`/api/room-type-categories/group/${groupId}`)
       
       // 获取酒店房型
-      const response = await hotelRoomTypeApi.getHotelRoomTypes(selectedHotelId)
+      const response = await hotelRoomTypeApi.getHotelRoomTypesByCode(selectedHotel)
       const roomTypes = response?.data || []
       
       // 获取房型大类映射
@@ -340,10 +339,10 @@ const AddRatePlan = () => {
           description: fullRecord.description,
           status: fullRecord.status === 'active' ? 'active' : 'inactive',
           rateCategory: fullRecord.rateCategory,
-          marketCode: fullRecord.marketCodeId ? String(fullRecord.marketCodeId) : undefined,
-          sourceCode: fullRecord.sourceCodeId ? String(fullRecord.sourceCodeId) : undefined,
+          marketCode: fullRecord.marketCode || undefined,
+          sourceCode: fullRecord.sourceCode || undefined,
           rateType: fullRecord.rateType,
-          parentRateCode: fullRecord.parentRateCodeId ? String(fullRecord.parentRateCodeId) : undefined,
+          parentRateCode: fullRecord.parentRateCode || undefined,
           discount: fullRecord.discount,
           rounding: fullRecord.rounding,
           guaranteeRule: fullRecord.guaranteeRule,
@@ -436,10 +435,10 @@ const AddRatePlan = () => {
   
   // 当选择的酒店变化时，重新获取酒店房型
   useEffect(() => {
-    if (selectedHotelId) {
+    if (selectedHotel) {
       fetchHotelRoomTypes()
     }
-  }, [selectedHotelId])
+  }, [selectedHotel])
 
   // 加载父级价格计划数据
   useEffect(() => {
@@ -556,19 +555,15 @@ const AddRatePlan = () => {
       // 准备提交数据 - 完整字段
       const submitData = {
         hotelCode: selectedHotel,
-        hotelId: selectedHotelId,
         rateCode: values.rateCode,
         rateName: values.rateName,
         description: values.description || '',
         status: values.status === 'active' ? 'active' : 'inactive',
         rateCategory: values.rateCategory || null,
-        marketCodeId: values.marketCode ? parseInt(values.marketCode) : null,
         marketCode: values.marketCode || null,
-        sourceCodeId: values.sourceCode ? parseInt(values.sourceCode) : null,
         sourceCode: values.sourceCode || null,
         rateType: values.rateType || 'basic',
-        parentRateCodeId: values.parentRateCode ? parseInt(values.parentRateCode) : null,
-        parentRateCode: values.parentRateCode ? (parentRateCodes.find(p => String(p.id) === values.parentRateCode)?.rateCode || null) : null,
+        parentRateCode: values.parentRateCode || null,
         discount: values.discount ? parseFloat(values.discount) : null,
         rounding: values.rounding || null,
         guaranteeRule: values.guaranteeRule || null,
@@ -627,18 +622,6 @@ const AddRatePlan = () => {
     if (!isGroupDistributed || !permissions) return false
     return permissions[permissionKey] === false
   }
-  
-  // 包装禁用字段的Tooltip
-  const withPermissionTooltip = (permissionKey, element) => {
-    if (isFieldDisabled(permissionKey)) {
-      return (
-        <Tooltip title={permissionTooltip}>
-          <div>{element}</div>
-        </Tooltip>
-      )
-    }
-    return element
-  }
 
   return (
     <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh', overflow: 'auto' }}>
@@ -678,9 +661,7 @@ const AddRatePlan = () => {
                 label="价格计划名称"
                 rules={[{ required: true, message: '请输入价格计划名称' }]}
               >
-                {withPermissionTooltip('basicInfoEditable',
-                  <Input placeholder="请输入价格计划名称" disabled={isFieldDisabled('basicInfoEditable')} />
-                )}
+                <Input placeholder="请输入价格计划名称" disabled={isFieldDisabled('basicInfoEditable')} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -688,15 +669,13 @@ const AddRatePlan = () => {
                 name="rateCategory"
                 label="价格计划类别"
               >
-                {withPermissionTooltip('basicInfoEditable',
-                  <Select placeholder="请选择价格计划类别" loading={loadingRateCategories} disabled={isFieldDisabled('basicInfoEditable')}>
-                    {rateCategories.map(cat => (
-                      <Option key={cat.id} value={cat.code}>
-                        {cat.name}（{cat.code}）
-                      </Option>
-                    ))}
-                  </Select>
-                )}
+                <Select placeholder="请选择价格计划类别" loading={loadingRateCategories} disabled={isFieldDisabled('basicInfoEditable')}>
+                  {rateCategories.map(cat => (
+                    <Option key={cat.id} value={cat.code}>
+                      {cat.name}（{cat.code}）
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -704,19 +683,17 @@ const AddRatePlan = () => {
                 name="marketCode"
                 label="市场码"
               >
-                {withPermissionTooltip('basicInfoEditable',
-                  <Select 
-                    placeholder="请选择市场码"
-                    loading={loadingMarketCodes}
-                    disabled={isFieldDisabled('basicInfoEditable')}
-                  >
-                    {marketCodes.map(code => (
-                      <Option key={code.id} value={String(code.id)}>
-                        {code.name} ({code.code})
-                      </Option>
-                    ))}
-                  </Select>
-                )}
+                <Select 
+                  placeholder="请选择市场码"
+                  loading={loadingMarketCodes}
+                  disabled={isFieldDisabled('basicInfoEditable')}
+                >
+                  {marketCodes.map(code => (
+                    <Option key={code.id} value={code.code}>
+                      {code.name} ({code.code})
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -724,19 +701,17 @@ const AddRatePlan = () => {
                 name="sourceCode"
                 label="来源码"
               >
-                {withPermissionTooltip('basicInfoEditable',
-                  <Select 
-                    placeholder="请选择来源码"
-                    loading={loadingSourceCodes}
-                    disabled={isFieldDisabled('basicInfoEditable')}
-                  >
-                    {sourceCodes.map(code => (
-                      <Option key={code.id} value={String(code.id)}>
-                        {code.name} ({code.code})
-                      </Option>
-                    ))}
-                  </Select>
-                )}
+                <Select 
+                  placeholder="请选择来源码"
+                  loading={loadingSourceCodes}
+                  disabled={isFieldDisabled('basicInfoEditable')}
+                >
+                  {sourceCodes.map(code => (
+                    <Option key={code.id} value={code.code}>
+                      {code.name} ({code.code})
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -748,7 +723,6 @@ const AddRatePlan = () => {
                 <Select 
                   placeholder="请选择类型"
                   onChange={(value) => setRateType(value)}
-                  defaultValue="basic"
                   disabled={isGroupDistributed}
                 >
                   <Option value="basic">基础价格计划</Option>
@@ -819,13 +793,13 @@ const AddRatePlan = () => {
                     <div style={{ marginBottom: 8, fontWeight: 500, color: '#1890ff' }}>{category}</div>
                     <Space wrap>
                       <Checkbox
-                        checked={roomTypes.every(roomType => selectedApplicableRoomTypes.includes(roomType.id))}
+                        checked={roomTypes.every(roomType => selectedApplicableRoomTypes.includes(roomType.roomTypeCode))}
                         onChange={(e) => {
-                          const roomTypeIds = roomTypes.map(roomType => roomType.id)
+                          const roomTypeCodes = roomTypes.map(roomType => roomType.roomTypeCode)
                           if (e.target.checked) {
-                            setSelectedApplicableRoomTypes([...selectedApplicableRoomTypes, ...roomTypeIds])
+                            setSelectedApplicableRoomTypes([...new Set([...selectedApplicableRoomTypes, ...roomTypeCodes])])
                           } else {
-                            setSelectedApplicableRoomTypes(selectedApplicableRoomTypes.filter(id => !roomTypeIds.includes(id)))
+                            setSelectedApplicableRoomTypes(selectedApplicableRoomTypes.filter(c => !roomTypeCodes.includes(c)))
                           }
                         }}
                         style={{ fontWeight: 500 }}
@@ -835,12 +809,12 @@ const AddRatePlan = () => {
                       {roomTypes.map(roomType => (
                         <Checkbox
                           key={roomType.id}
-                          checked={selectedApplicableRoomTypes.includes(roomType.id)}
+                          checked={selectedApplicableRoomTypes.includes(roomType.roomTypeCode)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedApplicableRoomTypes([...selectedApplicableRoomTypes, roomType.id])
+                              setSelectedApplicableRoomTypes([...selectedApplicableRoomTypes, roomType.roomTypeCode])
                             } else {
-                              setSelectedApplicableRoomTypes(selectedApplicableRoomTypes.filter(id => id !== roomType.id))
+                              setSelectedApplicableRoomTypes(selectedApplicableRoomTypes.filter(c => c !== roomType.roomTypeCode))
                             }
                           }}
                         >
@@ -870,19 +844,17 @@ const AddRatePlan = () => {
                     name="parentRateCode"
                     label="父级价格计划"
                   >
-                    {withPermissionTooltip('priceInfoEditable',
-                      <Select 
-                        placeholder="请选择父级价格计划"
-                        loading={loadingParentRateCodes}
-                        disabled={isFieldDisabled('priceInfoEditable')}
-                      >
-                        {parentRateCodes.map(rateCode => (
-                          <Option key={rateCode.id} value={String(rateCode.id)}>
-                            {rateCode.rateCode} - {rateCode.rateName}
-                          </Option>
-                        ))}
-                      </Select>
-                    )}
+                    <Select 
+                      placeholder="请选择父级价格计划"
+                      loading={loadingParentRateCodes}
+                      disabled={isFieldDisabled('priceInfoEditable')}
+                    >
+                      {parentRateCodes.map(rateCode => (
+                        <Option key={rateCode.id} value={rateCode.rateCode}>
+                          {rateCode.rateCode} - {rateCode.rateName}
+                        </Option>
+                      ))}
+                    </Select>
                   </Form.Item>
                 </Col>
                 <Col span={12}>
@@ -890,9 +862,7 @@ const AddRatePlan = () => {
                     name="discount"
                     label="折扣"
                   >
-                    {withPermissionTooltip('priceInfoEditable',
-                      <Input addonAfter="%" placeholder="请输入折扣" type="number" disabled={isFieldDisabled('priceInfoEditable')} />
-                    )}
+                    <Input addonAfter="%" placeholder="请输入折扣" type="number" disabled={isFieldDisabled('priceInfoEditable')} />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
@@ -900,13 +870,11 @@ const AddRatePlan = () => {
                     name="rounding"
                     label="取整方式"
                   >
-                    {withPermissionTooltip('priceInfoEditable',
-                      <Select placeholder="请选择取整方式" disabled={isFieldDisabled('priceInfoEditable')}>
-                        <Option value="round">四舍五入</Option>
-                        <Option value="floor">向下取整</Option>
-                        <Option value="ceil">向上取整</Option>
-                      </Select>
-                    )}
+                    <Select placeholder="请选择取整方式" disabled={isFieldDisabled('priceInfoEditable')}>
+                      <Option value="round">四舍五入</Option>
+                      <Option value="floor">向下取整</Option>
+                      <Option value="ceil">向上取整</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
               </Row>
@@ -1182,19 +1150,17 @@ const AddRatePlan = () => {
                 label="担保规则"
                 rules={[{ required: true, message: '请选择担保规则' }]}
               >
-                {withPermissionTooltip('guaranteeRuleEditable',
-                  <Select 
-                    placeholder="请选择担保规则" 
-                    loading={loadingPolicies}
-                    disabled={isFieldDisabled('guaranteeRuleEditable')}
-                  >
-                    {guaranteePolicies.map(policy => (
-                      <Option key={policy.id} value={policy.code}>
-                        {policy.name}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
+                <Select 
+                  placeholder="请选择担保规则" 
+                  loading={loadingPolicies}
+                  disabled={isFieldDisabled('guaranteeRuleEditable')}
+                >
+                  {guaranteePolicies.map(policy => (
+                    <Option key={policy.id} value={policy.code}>
+                      {policy.name}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -1203,19 +1169,17 @@ const AddRatePlan = () => {
                 label="取消规则"
                 rules={[{ required: true, message: '请选择取消规则' }]}
               >
-                {withPermissionTooltip('guaranteeRuleEditable',
-                  <Select 
-                    placeholder="请选择取消规则" 
-                    loading={loadingPolicies}
-                    disabled={isFieldDisabled('guaranteeRuleEditable')}
-                  >
-                    {cancellationPolicies.map(policy => (
-                      <Option key={policy.id} value={policy.code}>
-                        {policy.name}
-                      </Option>
-                    ))}
-                  </Select>
-                )}
+                <Select 
+                  placeholder="请选择取消规则" 
+                  loading={loadingPolicies}
+                  disabled={isFieldDisabled('guaranteeRuleEditable')}
+                >
+                  {cancellationPolicies.map(policy => (
+                    <Option key={policy.id} value={policy.code}>
+                      {policy.name}
+                    </Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
           </Row>

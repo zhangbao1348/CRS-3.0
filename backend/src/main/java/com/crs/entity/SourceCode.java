@@ -37,6 +37,9 @@ public class SourceCode {
     @Column(name = "parent_id")
     private Integer parentId;
     
+    @Column(name = "parent_code", length = 50)
+    private String parentCode;
+    
     @Column(name = "level", nullable = false, columnDefinition = "INT DEFAULT 1")
     private Integer level = 1;
     

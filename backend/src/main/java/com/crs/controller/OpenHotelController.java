@@ -2,6 +2,10 @@ package com.crs.controller;
 
 import com.crs.entity.*;
 import com.crs.repository.*;
+import com.crs.service.inventory.AvailabilityContext;
+import com.crs.service.inventory.AvailabilityResult;
+import com.crs.service.inventory.InventoryDeductionService;
+import com.crs.util.DisplayMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,9 +40,11 @@ public class OpenHotelController {
     @Autowired private InventoryRepository inventoryRepo;
     @Autowired private RoomStatusRepository roomStatusRepo;
     @Autowired private BookingControlRepository bookingControlRepo;
+    @Autowired private InventoryDeductionService inventoryDeductionService;
     @Autowired private CancellationPolicyRepository cancellationPolicyRepo;
     @Autowired private GuaranteePolicyRepository guaranteePolicyRepo;
     @Autowired private ChannelHotelMappingRepository channelHotelMappingRepo;
+    @Autowired private ChannelPublishRecordRepository channelPublishRecordRepo;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -94,28 +100,22 @@ public class OpenHotelController {
             Set<Integer> allowedHotelIds = mappings.stream()
                     .map(ChannelHotelMapping::getHotelId).collect(Collectors.toSet());
 
-            // 查询 active 酒店
-            List<Hotel> hotels = hotelRepo.findByTenantIdAndStatus(channel.getTenantId(), Hotel.Status.active)
-                    .stream()
-                    .filter(h -> allowedHotelIds.contains(h.getId()))
-                    .filter(h -> cityId == null || cityId.isBlank() || cityId.equals(h.getCity()))
-                    .filter(h -> keyword == null || keyword.isBlank()
-                            || (h.getChineseName() != null && h.getChineseName().contains(keyword))
-                            || (h.getEnglishName() != null && h.getEnglishName().toLowerCase().contains(keyword.toLowerCase())))
-                    .collect(Collectors.toList());
+            if (allowedHotelIds.isEmpty()) {
+                return ResponseEntity.ok(ok(Map.of("total", 0, "page", page, "pageSize", pageSize, "list", List.of())));
+            }
 
-            int total = hotels.size();
-            int fromIdx = Math.min((page - 1) * pageSize, total);
-            int toIdx = Math.min(fromIdx + pageSize, total);
-            List<Hotel> paged = hotels.subList(fromIdx, toIdx);
+            // 使用数据库分页查询
+            org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page - 1, pageSize);
+            org.springframework.data.domain.Page<Hotel> hotelPage = hotelRepo.findWithFilters(
+                    channel.getTenantId(), Hotel.Status.active, cityId, keyword, allowedHotelIds, pageable);
 
             List<Map<String, Object>> list = new ArrayList<>();
-            for (Hotel hotel : paged) {
+            for (Hotel hotel : hotelPage.getContent()) {
                 list.add(buildHotelSummary(hotel, checkInDate, checkOutDate));
             }
 
             Map<String, Object> data = new LinkedHashMap<>();
-            data.put("total", total);
+            data.put("total", hotelPage.getTotalElements());
             data.put("page", page);
             data.put("pageSize", pageSize);
             data.put("list", list);
@@ -231,7 +231,7 @@ public class OpenHotelController {
         try {
             TenantChannel channel = getChannel(req);
 
-            Hotel hotel = hotelRepo.findByHotelCode(hotelCode).orElse(null);
+            Hotel hotel = hotelRepo.findByHotelCodeAndTenantId(hotelCode, channel.getTenantId()).orElse(null);
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
                 return ResponseEntity.status(404).body(err(404, "酒店不存在"));
             }
@@ -275,122 +275,109 @@ public class OpenHotelController {
                 fm.put("facilityName", f.getFacilityName()); return fm;
             }).collect(Collectors.toList()));
 
-            // 房型列表（含价格计划）
+            // 1. 获取基础数据列表
             List<HotelRoomType> roomTypes = roomTypeRepo.findByHotelIdAndStatus(hotel.getId(), "active");
             List<RatePlan> allRatePlans = ratePlanRepo.findByHotelIdAndStatus(hotel.getId(), "active");
 
-            // 过滤价格计划：无会员信息时只返回 personal_membership 为空的计划
-            List<RatePlan> visiblePlans = allRatePlans.stream().filter(rp -> {
-                String pm = rp.getPersonalMembership();
-                if (memberLevel == null || memberLevel.isBlank()) {
-                    return pm == null || pm.isBlank() || pm.equals("null") || pm.equals("[]") || pm.equals("{}");
-                }
-                // 有会员信息时，返回无会员限制的 + 匹配会员等级的
-                if (pm == null || pm.isBlank() || pm.equals("null") || pm.equals("[]") || pm.equals("{}")) return true;
-                return pm.contains(memberLevel);
-            }).collect(Collectors.toList());
-
-            // 获取日期范围内的价格数据（checkIn 到 checkOut 前一天）
+            // 2. 预加载所有价格、库存、房态、规则（一次性批量查询）
             Calendar cal = Calendar.getInstance();
             cal.setTime(checkOutDate); cal.add(Calendar.DATE, -1);
             Date lastNight = cal.getTime();
 
+            // 批量查询价格
             List<HotelPrice> allPrices = priceRepo.findByTenantIdAndHotelCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotelCode, checkInDate, lastNight);
+            // 组装价格 Map: "rateCode_roomTypeCode_date" -> HotelPrice
+            Map<String, HotelPrice> priceMap = allPrices.stream().collect(Collectors.toMap(
+                    p -> p.getRateCode() + "_" + p.getRoomTypeCode() + "_" + formatDate(p.getPriceDate()),
+                    p -> p, (a, b) -> a));
 
-            // 获取房态数据
-            List<RoomStatusRecord> roomStatuses = roomStatusRepo
-                    .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndStatusDateBetween(
-                            hotel.getTenantId(), hotelCode, "room_type", "", checkInDate, lastNight);
+            // 批量查询库存
+            List<Inventory> allInventory = inventoryRepo.findByHotelIdAndChannelIdAndDateBetween(
+                    hotel.getId(), channel.getId(), checkInDate, lastNight);
+            // 组装库存 Map: "ratePlanId_roomTypeId_date" -> Integer
+            Map<String, Integer> invMap = allInventory.stream().collect(Collectors.toMap(
+                    i -> i.getRatePlanId() + "_" + i.getRoomTypeId() + "_" + formatDate(i.getDate()),
+                    Inventory::getAvailableRooms, (a, b) -> Math.min(a, b)));
 
-            // 获取预订控制数据
-            List<BookingControl> bookingControls = bookingControlRepo
-                    .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndControlDateBetween(
-                            hotel.getTenantId(), hotelCode, "hotel", "", checkInDate, lastNight);
+            // 批量查询发布记录
+            List<ChannelPublishRecord> publishRecords = channelPublishRecordRepo.findByTenantIdAndHotelCodeAndChannelCodeAndStatus(
+                    channel.getTenantId(), hotelCode, channel.getChannelCode(), "published");
+            Set<String> publishedSet = publishRecords.stream()
+                    .map(r -> r.getRateCode() + "_" + r.getRoomTypeCode())
+                    .collect(Collectors.toSet());
 
+            // 3. 构建返回数据
             List<Map<String, Object>> roomTypeResults = new ArrayList<>();
             for (HotelRoomType rt : roomTypes) {
                 Map<String, Object> rtMap = buildRoomTypeSummary(rt);
-
-                // 为该房型构建价格计划列表
                 List<Map<String, Object>> ratePlanResults = new ArrayList<>();
-                for (RatePlan rp : visiblePlans) {
-                    // 检查价格计划是否适用该房型
-                    String applicableJson = rp.getApplicableRoomTypes();
-                    if (applicableJson != null && !applicableJson.isBlank()
-                            && !applicableJson.equals("[]") && !applicableJson.equals("null")) {
-                        try {
-                            List<String> applicable = objectMapper.readValue(applicableJson, new TypeReference<>() {});
-                            if (!applicable.isEmpty() && !applicable.contains(rt.getRoomTypeCode())) continue;
-                        } catch (Exception ignored) {}
+
+                for (RatePlan rp : allRatePlans) {
+                    // A. 校验发布状态
+                    if (!publishedSet.contains(rp.getRateCode() + "_" + rt.getRoomTypeCode())) continue;
+
+                    // B. 校验会员等级
+                    String pm = rp.getPersonalMembership();
+                    if (memberLevel != null && !memberLevel.isBlank()) {
+                        if (pm != null && !pm.isBlank() && !pm.equals("[]") && !pm.equals("{}") && !pm.contains(memberLevel)) continue;
+                    } else {
+                        if (pm != null && !pm.isBlank() && !pm.equals("[]") && !pm.equals("{}")) continue;
                     }
 
-                    // 获取该房型+价格计划的每日价格
-                    List<HotelPrice> rpPrices = allPrices.stream()
-                            .filter(p -> rp.getRateCode().equals(p.getRateCode())
-                                    && rt.getRoomTypeCode().equals(p.getRoomTypeCode()))
-                            .sorted(Comparator.comparing(HotelPrice::getPriceDate))
-                            .collect(Collectors.toList());
+                    // C. 检查价格计划是否适用该房型
+                    if (!isRatePlanApplicable(rp, rt.getRoomTypeCode())) continue;
 
-                    if (rpPrices.isEmpty()) continue; // 无价格则不展示
-
-                    // 每日价格列表
-                    List<Map<String, Object>> dailyPrices = rpPrices.stream().map(p -> {
+                    // D. 聚合每日价格与总价
+                    List<Map<String, Object>> dailyPrices = new ArrayList<>();
+                    BigDecimal totalPrice = BigDecimal.ZERO;
+                    boolean priceComplete = true;
+                    
+                    cal.setTime(checkInDate);
+                    for (int i = 0; i < nights; i++) {
+                        String key = rp.getRateCode() + "_" + rt.getRoomTypeCode() + "_" + formatDate(cal.getTime());
+                        HotelPrice hp = priceMap.get(key);
+                        if (hp == null || hp.getPriceWithTax() == null) {
+                            priceComplete = false; break;
+                        }
                         Map<String, Object> dp = new LinkedHashMap<>();
-                        dp.put("date", formatDate(p.getPriceDate()));
-                        dp.put("priceWithTax", p.getPriceWithTax());
-                        return dp;
-                    }).collect(Collectors.toList());
+                        dp.put("date", formatDate(cal.getTime()));
+                        dp.put("priceWithTax", hp.getPriceWithTax());
+                        dailyPrices.add(dp);
+                        totalPrice = totalPrice.add(hp.getPriceWithTax());
+                        cal.add(Calendar.DATE, 1);
+                    }
+                    if (!priceComplete) continue;
+                    totalPrice = totalPrice.multiply(BigDecimal.valueOf(roomCount));
 
-                    BigDecimal totalPrice = rpPrices.stream()
-                            .filter(p -> p.getPriceWithTax() != null)
-                            .map(HotelPrice::getPriceWithTax)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add)
-                            .multiply(BigDecimal.valueOf(roomCount));
-                    BigDecimal avgPrice = nights > 0 ? totalPrice.divide(BigDecimal.valueOf(nights), 2, java.math.RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                    // E. 计算最小可用库存
+                    int minAvail = Integer.MAX_VALUE;
+                    cal.setTime(checkInDate);
+                    for (int i = 0; i < nights; i++) {
+                        String key = rp.getId() + "_" + rt.getId() + "_" + formatDate(cal.getTime());
+                        minAvail = Math.min(minAvail, invMap.getOrDefault(key, 0));
+                        cal.add(Calendar.DATE, 1);
+                    }
 
-                    // 库存：按渠道channel_code查询，取最小值
-                    List<Inventory> invList = inventoryRepo.findByHotelIdAndChannelIdAndDateBetween(
-                            hotel.getId(), channel.getId(), checkInDate, lastNight)
-                            .stream().filter(inv -> rp.getId().equals(inv.getRatePlanId())
-                                    && rt.getId().equals(inv.getRoomTypeId()))
-                            .collect(Collectors.toList());
-                    int availableRooms = invList.stream()
-                            .mapToInt(Inventory::getAvailableRooms).min().orElse(0);
-
-                    // 包价信息
-                    List<Map<String, Object>> packages = parsePackages(rp.getPackages());
-
-                    // 取消政策
-                    Map<String, Object> cancellationPolicy = buildCancellationPolicy(rp.getCancellationRule());
-
-                    // 担保政策
-                    Map<String, Object> guaranteePolicy = buildGuaranteePolicy(rp.getGuaranteeRule());
-
-                    // 预订规则（优先 booking_controls，无则取 rate_plans）
-                    Map<String, Object> bookingRules = buildBookingRules(rp, bookingControls);
-
+                    // F. 组装 RatePlan 数据
                     Map<String, Object> rpMap = new LinkedHashMap<>();
                     rpMap.put("ratePlanCode", rp.getRateCode());
                     rpMap.put("ratePlanName", rp.getRateName());
-                    rpMap.put("rateType", rp.getRateType());
-                    rpMap.put("rateCategory", rp.getRateCategory());
-                    rpMap.put("memberLevelCode", parseMemberLevel(rp.getPersonalMembership()));
-                    rpMap.put("description", rp.getDescription());
-                    rpMap.put("availableRooms", availableRooms);
+                    rpMap.put("availableRooms", minAvail);
                     rpMap.put("totalPrice", totalPrice);
-                    rpMap.put("averagePrice", avgPrice);
+                    rpMap.put("averagePrice", totalPrice.divide(BigDecimal.valueOf(nights * roomCount), 2, java.math.RoundingMode.HALF_UP));
                     rpMap.put("currency", "CNY");
                     rpMap.put("dailyPrices", dailyPrices);
-                    rpMap.put("packages", packages);
-                    rpMap.put("cancellationPolicy", cancellationPolicy);
-                    rpMap.put("guaranteePolicy", guaranteePolicy);
-                    rpMap.put("bookingRules", bookingRules);
+                    rpMap.put("packages", parsePackages(rp.getPackages()));
+                    rpMap.put("cancellationPolicy", buildCancellationPolicy(rp.getCancellationRule()));
+                    rpMap.put("guaranteePolicy", buildGuaranteePolicy(rp.getGuaranteeRule()));
                     ratePlanResults.add(rpMap);
                 }
-
-                rtMap.put("ratePlans", ratePlanResults);
-                roomTypeResults.add(rtMap);
+                
+                if (!ratePlanResults.isEmpty()) {
+                    rtMap.put("ratePlans", ratePlanResults);
+                    roomTypeResults.add(rtMap);
+                }
             }
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -438,7 +425,7 @@ public class OpenHotelController {
             Date lastNight = cal.getTime();
 
             // 1. 渠道权限
-            Hotel hotel = hotelRepo.findByHotelCode(hotelCode).orElse(null);
+            Hotel hotel = hotelRepo.findByHotelCodeAndTenantId(hotelCode, channel.getTenantId()).orElse(null);
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
                 return ResponseEntity.status(409).body(unavailable("HOTEL_INACTIVE", "酒店不存在或已停用", null));
             }
@@ -458,14 +445,24 @@ public class OpenHotelController {
                 return ResponseEntity.status(409).body(unavailable("RATE_PLAN_INACTIVE", "价格计划不存在或已停用", null));
             }
 
+            // 3.5 渠道发布校验
+            boolean isPublished = channelPublishRecordRepo.existsByTenantIdAndHotelCodeAndChannelCodeAndRateCodeAndRoomTypeCode(
+                    hotel.getTenantId(), hotelCode, channel.getChannelCode(), ratePlanCode, roomTypeCode);
+            if (!isPublished) {
+                return ResponseEntity.status(409).body(unavailable("RATE_PLAN_NOT_PUBLISHED", "该房型+价格计划未发布至该渠道", null));
+            }
+
             // 4. 房型适用性
             String applicableJson = ratePlan.getApplicableRoomTypes();
             if (applicableJson != null && !applicableJson.isBlank()
                     && !applicableJson.equals("[]") && !applicableJson.equals("null")) {
                 try {
-                    List<String> applicable = objectMapper.readValue(applicableJson, new TypeReference<>() {});
-                    if (!applicable.isEmpty() && !applicable.contains(roomTypeCode)) {
-                        return ResponseEntity.status(409).body(unavailable("ROOM_TYPE_NOT_APPLICABLE", "价格计划不适用该房型", null));
+                    List<Object> applicableRaw = objectMapper.readValue(applicableJson, new TypeReference<>() {});
+                    if (!applicableRaw.isEmpty()) {
+                        List<String> applicableCodes = applicableRaw.stream().map(Object::toString).collect(Collectors.toList());
+                        if (!applicableCodes.contains(roomTypeCode)) {
+                            return ResponseEntity.status(409).body(unavailable("ROOM_TYPE_NOT_APPLICABLE", "价格计划不适用该房型", null));
+                        }
                     }
                 } catch (Exception ignored) {}
             }
@@ -482,76 +479,33 @@ public class OpenHotelController {
                 }
             }
 
-            // 6. 房态检查
-            List<RoomStatusRecord> statuses = roomStatusRepo
-                    .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndStatusDateBetween(
-                            hotel.getTenantId(), hotelCode, "room_type", roomTypeCode, checkIn, lastNight);
-            Map<String, Boolean> statusMap = new HashMap<>();
-            statuses.forEach(s -> statusMap.put(formatDate(s.getStatusDate()), s.getIsOpen()));
+            // 6-10. 综合可售性检查（房态+预订规则+物理库存+超预订+多维度配额）
+            AvailabilityContext availCtx = new AvailabilityContext();
+            availCtx.setTenantId(hotel.getTenantId());
+            availCtx.setHotelCode(hotelCode);
+            availCtx.setRoomTypeCode(roomTypeCode);
+            availCtx.setRateCode(ratePlanCode);
+            availCtx.setChannelCode(channel.getChannelCode());
+            availCtx.setRateCategoryCode(ratePlan.getRateCategory());
+            availCtx.setCheckInDate(checkIn.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+            availCtx.setCheckOutDate(checkOut.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
+            availCtx.setRequestedRooms(roomCount);
 
-            List<String> closedDates = new ArrayList<>();
-            Calendar cur = Calendar.getInstance(); cur.setTime(checkIn);
-            while (!cur.getTime().after(lastNight)) {
-                String ds = sdf.format(cur.getTime());
-                if (Boolean.FALSE.equals(statusMap.get(ds))) closedDates.add(ds);
-                cur.add(Calendar.DATE, 1);
-            }
-            if (!closedDates.isEmpty()) {
-                return ResponseEntity.status(409).body(unavailableWithDates("ROOM_CLOSED",
-                        "房态已关闭：" + closedDates.get(0), closedDates));
-            }
+            AvailabilityResult availResult = inventoryDeductionService.checkAvailability(availCtx);
 
-            // 7. 库存检查
-            List<Inventory> invList = inventoryRepo.findByHotelIdAndChannelIdAndDateBetween(
-                    hotel.getId(), channel.getId(), checkIn, lastNight)
-                    .stream().filter(inv -> ratePlan.getId().equals(inv.getRatePlanId())
-                            && roomType.getId().equals(inv.getRoomTypeId()))
-                    .collect(Collectors.toList());
-
-            List<String> insufficientDates = new ArrayList<>();
-            cur.setTime(checkIn);
-            while (!cur.getTime().after(lastNight)) {
-                String ds = sdf.format(cur.getTime());
-                Date d = cur.getTime();
-                int avail = invList.stream()
-                        .filter(inv -> sdf.format(inv.getDate()).equals(ds))
-                        .mapToInt(Inventory::getAvailableRooms).findFirst().orElse(0);
-                if (avail < roomCount) insufficientDates.add(ds + "(可用:" + avail + ")");
-                cur.add(Calendar.DATE, 1);
-            }
-            if (!insufficientDates.isEmpty()) {
-                return ResponseEntity.status(409).body(unavailableWithDates("INSUFFICIENT_INVENTORY",
-                        "库存不足：" + insufficientDates.get(0), insufficientDates));
+            if (!availResult.isAvailable()) {
+                String code = availResult.getRejectReason().contains("房态关闭") ? "ROOM_CLOSED"
+                        : availResult.getRejectReason().contains("提前") ? "ADVANCE_BOOKING_VIOLATION"
+                        : availResult.getRejectReason().contains("连住") || availResult.getRejectReason().contains("入住") ? "STAY_DURATION_VIOLATION"
+                        : "INSUFFICIENT_INVENTORY";
+                return ResponseEntity.status(409).body(unavailable(code, availResult.getRejectReason(), null));
             }
 
-            // 8. 入住人数校验
+            // 入住人数校验
             int maxOcc = roomType.getMaxOccupancy() != null ? roomType.getMaxOccupancy() : 2;
-            int maxChildren = roomType.getMaxChildren() != null ? roomType.getMaxChildren() : 0;
             if (adultCount + childCount > maxOcc) {
                 return ResponseEntity.status(409).body(unavailable("EXCEED_MAX_OCCUPANCY",
                         "超出最大入住人数 " + maxOcc, null));
-            }
-
-            // 9. 提前预订天数
-            List<BookingControl> controls = bookingControlRepo
-                    .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndControlDateBetween(
-                            hotel.getTenantId(), hotelCode, "hotel", "", checkIn, lastNight);
-            int advanceDays = controls.stream().mapToInt(BookingControl::getAdvanceBookingDays).max()
-                    .orElse(ratePlan.getAdvanceBookingMin() != null ? ratePlan.getAdvanceBookingMin() : 0);
-            long daysUntilCheckIn = (checkIn.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24);
-            if (daysUntilCheckIn < advanceDays) {
-                return ResponseEntity.status(409).body(unavailable("ADVANCE_BOOKING_VIOLATION",
-                        "需提前 " + advanceDays + " 天预订", null));
-            }
-
-            // 10. 入住天数限制
-            int minStay = controls.stream().mapToInt(BookingControl::getMinStay).max()
-                    .orElse(ratePlan.getMinimumStayMin() != null ? ratePlan.getMinimumStayMin() : 1);
-            int maxStay = controls.stream().mapToInt(BookingControl::getMaxStay).min()
-                    .orElse(ratePlan.getMinimumStayMax() != null ? ratePlan.getMinimumStayMax() : 30);
-            if (nights < minStay || nights > maxStay) {
-                return ResponseEntity.status(409).body(unavailable("STAY_DURATION_VIOLATION",
-                        "入住天数需在 " + minStay + " ~ " + maxStay + " 晚之间", null));
             }
 
             // 11. 价格完整性
@@ -573,7 +527,7 @@ public class OpenHotelController {
                     .map(HotelPrice::getPriceWithTax).reduce(BigDecimal.ZERO, BigDecimal::add)
                     .multiply(BigDecimal.valueOf(roomCount));
 
-            int minAvail = invList.stream().mapToInt(Inventory::getAvailableRooms).min().orElse(0);
+            int minAvail = availResult.getAvailableCount() != null ? availResult.getAvailableCount() : 0;
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("available", true);
@@ -633,7 +587,7 @@ public class OpenHotelController {
                 pm.put("packageName", p.get("name"));
                 String type = (String) p.getOrDefault("type", "other");
                 pm.put("type", type);
-                pm.put("typeName", resolvePackageTypeName(type));
+                pm.put("typeName", DisplayMapper.packageTypeName(type));
                 pm.put("frequency", p.getOrDefault("frequency", "daily"));
                 pm.put("quantity", p.getOrDefault("fixedQuantity", p.getOrDefault("quantity", 1)));
                 return pm;
@@ -641,17 +595,6 @@ public class OpenHotelController {
         } catch (Exception e) { return Collections.emptyList(); }
     }
 
-    private String resolvePackageTypeName(String type) {
-        if (type == null) return "其他";
-        return switch (type) {
-            case "breakfast" -> "早餐"; case "lunch" -> "午餐"; case "dinner" -> "晚餐";
-            case "afternoon_tea" -> "下午茶"; case "minibar" -> "迷你吧"; case "spa" -> "SPA/水疗";
-            case "parking" -> "停车"; case "airport_transfer" -> "接送机"; case "laundry" -> "洗衣";
-            case "gym" -> "健身"; case "pool" -> "泳池"; case "wifi" -> "上网";
-            case "voucher" -> "代金券"; case "gift" -> "礼品"; case "upgrade" -> "升级";
-            case "late_checkout" -> "延迟退房"; default -> "其他";
-        };
-    }
 
     private Map<String, Object> buildCancellationPolicy(String ruleCode) {
         if (ruleCode == null || ruleCode.isBlank()) return null;
@@ -701,5 +644,18 @@ public class OpenHotelController {
             List<String> levels = objectMapper.readValue(personalMembership, new TypeReference<>() {});
             return levels.isEmpty() ? null : String.join(",", levels);
         } catch (Exception e) { return null; }
+    }
+
+    private boolean isRatePlanApplicable(RatePlan rp, String roomTypeCode) {
+        String applicableJson = rp.getApplicableRoomTypes();
+        if (applicableJson == null || applicableJson.isBlank() || applicableJson.equals("[]") || applicableJson.equals("null")) {
+            return true;
+        }
+        try {
+            List<Object> applicableRaw = objectMapper.readValue(applicableJson, new TypeReference<>() {});
+            if (applicableRaw.isEmpty()) return true;
+            List<String> applicableCodes = applicableRaw.stream().map(Object::toString).collect(Collectors.toList());
+            return applicableCodes.contains(roomTypeCode);
+        } catch (Exception e) { return true; }
     }
 }

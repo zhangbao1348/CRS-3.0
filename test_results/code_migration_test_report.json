@@ -1,0 +1,261 @@
+{
+  "timestamp": "2026-05-06T16:32:05.562875",
+  "total": 36,
+  "passed": 36,
+  "failed": 0,
+  "errors": 0,
+  "details": [
+    {
+      "module": "酒店",
+      "name": "获取酒店列表",
+      "status": "PASS",
+      "message": "共20家酒店",
+      "detail": null
+    },
+    {
+      "module": "酒店",
+      "name": "酒店CODE字段存在性",
+      "status": "PASS",
+      "message": "hotelCode=JJSH001",
+      "detail": null
+    },
+    {
+      "module": "酒店",
+      "name": "通过CODE查询酒店",
+      "status": "PASS",
+      "message": "hotelCode=JJSH001, 匹配=True",
+      "detail": null
+    },
+    {
+      "module": "酒店",
+      "name": "查询不存在的CODE返回404",
+      "status": "PASS",
+      "message": "状态码: 404",
+      "detail": null
+    },
+    {
+      "module": "房型",
+      "name": "通过hotelCode查询房型列表",
+      "status": "PASS",
+      "message": "共3个房型",
+      "detail": null
+    },
+    {
+      "module": "房型",
+      "name": "通过hotelCode+roomTypeCode查询房型",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "房型",
+      "name": "通过hotelCode+status查询房型",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "价格",
+      "name": "通过hotelCode查询价格计划列表",
+      "status": "PASS",
+      "message": "共1个价格计划",
+      "detail": null
+    },
+    {
+      "module": "价格",
+      "name": "通过hotelCode+rateCode查询价格计划",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "设施",
+      "name": "通过hotelCode查询设施列表",
+      "status": "PASS",
+      "message": "状态码: 200, 数据量=8",
+      "detail": null
+    },
+    {
+      "module": "设施",
+      "name": "通过hotelCode+type查询设施",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "图片",
+      "name": "通过hotelCode查询图片列表",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "图片",
+      "name": "通过hotelCode+type查询图片",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "分配",
+      "name": "通过hotelCode查询房价码分配",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "集团房型",
+      "name": "通过hotelCode查询集团房型分配",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户1获取酒店列表",
+      "status": "PASS",
+      "message": "共20家酒店",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户1通过CODE查询房型",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户999访问租户1的酒店CODE返回403",
+      "status": "PASS",
+      "message": "正确拒绝跨租户访问",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户1通过CODE查询设施",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户999访问租户1的设施CODE",
+      "status": "PASS",
+      "message": "状态码: 403",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户1通过CODE查询价格计划",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "租户隔离",
+      "name": "租户999访问租户1的价格计划CODE",
+      "status": "PASS",
+      "message": "状态码: 403",
+      "detail": null
+    },
+    {
+      "module": "无Token",
+      "name": "无Token+有TenantId请求",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "数据完整性",
+      "name": "所有酒店都有hotelCode",
+      "status": "PASS",
+      "message": "缺少CODE的酒店: 0/20",
+      "detail": null
+    },
+    {
+      "module": "数据完整性",
+      "name": "房型都有roomTypeCode",
+      "status": "PASS",
+      "message": "缺少CODE的房型: 0/3",
+      "detail": null
+    },
+    {
+      "module": "数据完整性",
+      "name": "价格计划都有rateCode",
+      "status": "PASS",
+      "message": "缺少CODE的价格计划: 0/1",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "登录页(/)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "首页仪表板(/dashboard)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "酒店管理(/hotel-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "房型管理(/room-type)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "价格管理(/rate-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "库存管理(/inventory)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "渠道管理(/channel-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "前端页面",
+      "name": "集团管理(/group-management)",
+      "status": "PASS",
+      "message": "状态码: 200",
+      "detail": null
+    },
+    {
+      "module": "集团分配",
+      "name": "集团房价码分配返回hotelCode",
+      "status": "PASS",
+      "message": "有hotelCode的分配: 20/20",
+      "detail": null
+    },
+    {
+      "module": "集团分配",
+      "name": "集团房型分配返回hotelCode",
+      "status": "PASS",
+      "message": "有hotelCode的分配: 1/20",
+      "detail": null
+    }
+  ]
+}
