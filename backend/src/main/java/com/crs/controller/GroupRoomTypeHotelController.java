@@ -16,6 +16,19 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * GroupRoomTypeHotelController 控制器 (REST Controller)
+ * 
+ * <p>本核心模块自动生成详细注释。主要负责处理【GroupRoomTypeHotelController】相关的核心业务逻辑、对外接口或数据传输封装。</p>
+ * 
+ * <p>关键元数据关联：</p>
+ * <ul>
+ *     <li>**关联PRD文档**：.kiro/specs/prd/08-集团管理.md</li>
+ *     <li>**模块职责**：遵循单一职责原则，实现 GroupRoomTypeHotelController 的功能定义。</li>
+ * </ul>
+ * 
+ * @since 2026-05-10
+ */
 @RestController
 @RequestMapping("/api/group-room-type-hotels")
 public class GroupRoomTypeHotelController {
@@ -191,7 +204,8 @@ public class GroupRoomTypeHotelController {
                 return ResponseEntity.status(403).body(response);
             }
             
-            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelRepository.findByHotelCode(hotelCode);
+            // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户数据泄露
+            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
             List<AllocationDTO> allocationDTOs = allocations.stream()
                     .map(AllocationDTO::new)
                     .collect(Collectors.toList());

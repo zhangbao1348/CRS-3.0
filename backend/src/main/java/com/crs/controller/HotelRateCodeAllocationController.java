@@ -13,6 +13,19 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * HotelRateCodeAllocationController 控制器 (REST Controller)
+ * 
+ * <p>本核心模块自动生成详细注释。主要负责处理【HotelRateCodeAllocationController】相关的核心业务逻辑、对外接口或数据传输封装。</p>
+ * 
+ * <p>关键元数据关联：</p>
+ * <ul>
+ *     <li>**关联PRD文档**：.kiro/specs/prd/09-系统设置.md</li>
+ *     <li>**模块职责**：遵循单一职责原则，实现 HotelRateCodeAllocationController 的功能定义。</li>
+ * </ul>
+ * 
+ * @since 2026-05-10
+ */
 @RestController
 @RequestMapping("/api/hotel-rate-code-allocations")
 @CrossOrigin(origins = "*")
@@ -51,7 +64,8 @@ public class HotelRateCodeAllocationController {
             Hotel hotel = hotelOpt.get();
             String hotelCode = hotel.getHotelCode();
 
-            List<HotelRateCodeAllocation> allocations = allocationRepository.findByHotelCode(hotelCode);
+            // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户泄露
+            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (HotelRateCodeAllocation allocation : allocations) {
@@ -208,7 +222,8 @@ public class HotelRateCodeAllocationController {
                 return ResponseEntity.status(403).build();
             }
 
-            List<HotelRateCodeAllocation> allocations = allocationRepository.findByHotelCode(hotelCode);
+            // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户泄露
+            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (HotelRateCodeAllocation allocation : allocations) {
@@ -246,7 +261,8 @@ public class HotelRateCodeAllocationController {
                 return ResponseEntity.status(403).build();
             }
 
-            allocationRepository.deleteByHotelCode(hotelCode);
+            // 关联查询原则：必须带 tenantId 防止跨租户越权删除
+            allocationRepository.deleteByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             e.printStackTrace();

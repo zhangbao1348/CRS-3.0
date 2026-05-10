@@ -141,7 +141,8 @@ const AddGroupRoomType = () => {
       if (Array.isArray(allocations)) {
         if (baseData) {
           const merged = baseData.map(item => {
-            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
+            // 关联查询原则：使用 hotelCode 匹配，而非 hotelId（符合CODE关联规范）
+            const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
             console.log(`处理酒店 ${item.hotelCode} (${item.hotel}), 找到分配:`, alloc)
             if (alloc) {
               return {
@@ -156,7 +157,8 @@ const AddGroupRoomType = () => {
           setHotelData(merged)
         } else {
           setHotelData(prev => prev.map(item => {
-            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
+            // 关联查询原则：使用 hotelCode 匹配，而非 hotelId
+            const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
             if (alloc) {
               return {
                 ...item,

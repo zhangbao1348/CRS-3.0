@@ -198,7 +198,15 @@ export const groupRateCodeApi = {
   },
   getAllocations: (id, options = {}) => api.get(`/group-rate-codes/${id}/allocations`, options),
   allocate: (id, data, options = {}) => api.post(`/group-rate-codes/${id}/allocate`, data, options),
-  syncToHotels: (id, hotelIds, options = {}) => api.post(`/group-rate-codes/${id}/sync-to-hotels`, { hotelIds }, options),
+  /**
+   * 同步设置到酒店（关联查询原则：使用 hotelCodes 而非 hotelIds）
+   * @param {number} id - 集团房价码ID
+   * @param {string[]} hotelCodes - 酒店CODE列表（优先使用）
+   * @deprecated hotelIds 参数已废弃，请传入 hotelCodes
+   */
+  syncToHotels: (id, hotelCodes, options = {}) => api.post(`/group-rate-codes/${id}/sync-to-hotels`, { hotelCodes }, options),
+  /** @deprecated 请使用 syncToHotels 并传入 hotelCodes */
+  syncToHotelsByIds: (id, hotelIds, options = {}) => api.post(`/group-rate-codes/${id}/sync-to-hotels`, { hotelIds }, options),
   createGroupRateCode: (data, options = {}) => api.post('/group-rate-codes', data, options),
   updateGroupRateCode: (id, data, options = {}) => api.put(`/group-rate-codes/${id}`, data, options),
   deleteGroupRateCode: (id, options = {}) => api.delete(`/group-rate-codes/${id}`, options),
@@ -286,7 +294,17 @@ export const cancellationPolicyApi = {
 }
 
 export const ratePlanApi = {
-  getRatePlans: (hotelId, options = {}) => {
+  /**
+   * 获取价格计划列表
+   * 关联查询原则：优先使用 hotelCode，兼容 hotelId（已废弃）
+   */
+  getRatePlans: (hotelCode, options = {}) => {
+    // 如果传入 string 类型，视为 hotelCode（符合CODE关联规范）
+    const params = hotelCode ? { hotelCode } : {}
+    return api.get('/rate-plans', { params, ...options })
+  },
+  /** @deprecated 请使用 getRatePlansByHotelCode */
+  getRatePlansByHotelId: (hotelId, options = {}) => {
     const params = hotelId ? { hotelId } : {}
     return api.get('/rate-plans', { params, ...options })
   },
@@ -298,8 +316,22 @@ export const ratePlanApi = {
   deleteRatePlan: (id, options = {}) => api.delete(`/rate-plans/${id}`, options),
   enableRatePlan: (id, options = {}) => api.put(`/rate-plans/${id}/enable`, options),
   disableRatePlan: (id, options = {}) => api.put(`/rate-plans/${id}/disable`, options),
-  checkRateCodeUnique: (code, hotelId, excludeId, options = {}) => {
-    const params = { code, hotelId }
+  /**
+   * 检查房价码唯一性（关联查询原则：优先使用 hotelCode）
+   * @param {string} code - 房价码
+   * @param {string} hotelCode - 酒店CODE（优先）
+   * @param {number} [excludeId] - 排除的记录ID
+   * @deprecated 旧版本使用 hotelId，请升级为传入 hotelCode
+   */
+  checkRateCodeUnique: (code, hotelCode, excludeId, options = {}) => {
+    const params = { code }
+    // 支持 hotelCode 和 hotelId 两种，优先使用 hotelCode
+    if (typeof hotelCode === 'string') {
+      params.hotelCode = hotelCode
+    } else if (typeof hotelCode === 'number') {
+      // 兼容旧代码传 hotelId 的情况
+      params.hotelId = hotelCode
+    }
     if (excludeId) params.id = excludeId
     return api.get('/rate-plans/check-code', { params, ...options })
   },

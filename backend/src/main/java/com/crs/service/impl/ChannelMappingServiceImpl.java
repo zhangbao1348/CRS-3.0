@@ -31,6 +31,30 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     @Autowired
     private ChannelRateCodeMappingRepository rateCodeMappingRepository;
     
+    @Autowired
+    private com.crs.repository.HotelRepository hotelRepository;
+    
+    @Autowired
+    private com.crs.repository.TenantChannelRepository tenantChannelRepository;
+    
+    private void validateTenantAccess(String channelCode, String hotelCode) {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant not found");
+        }
+        
+        if (hotelCode != null) {
+            hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Access denied or hotel not found for code: " + hotelCode));
+        }
+        if (channelCode != null) {
+            com.crs.entity.TenantChannel tc = tenantChannelRepository.findByTenantIdAndChannelCode(tenantId, channelCode);
+            if (tc == null) {
+                throw new RuntimeException("Access denied or channel not found for code: " + channelCode);
+            }
+        }
+    }
+    
     // ===== 酒店映射 =====
     
     @Override
@@ -47,6 +71,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
 
     @Override
     public List<ChannelHotelMapping> getHotelMappingsByCode(String channelCode, String hotelCode) {
+        validateTenantAccess(channelCode, hotelCode);
         if (channelCode != null && hotelCode != null) {
             return hotelMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
         } else if (channelCode != null) {
@@ -54,7 +79,9 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
         } else if (hotelCode != null) {
             return hotelMappingRepository.findByHotelCode(hotelCode);
         }
-        return hotelMappingRepository.findAll();
+        // 如果都为空，需要考虑是否应该返回当前租户下的所有映射，但目前映射表没有 tenantId，直接 findAll 会泄露数据。
+        // 为了安全起见，如果不传参数，就不返回任何数据或报错
+        throw new IllegalArgumentException("必须提供 channelCode 或 hotelCode");
     }
     
     @Override
@@ -106,6 +133,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
 
     @Override
     public List<ChannelRoomTypeMapping> getRoomTypeMappingsByCode(String channelCode, String hotelCode) {
+        validateTenantAccess(channelCode, hotelCode);
         if (channelCode != null && hotelCode != null) {
             return roomTypeMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
         } else if (channelCode != null) {
@@ -113,7 +141,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
         } else if (hotelCode != null) {
             return roomTypeMappingRepository.findByHotelCode(hotelCode);
         }
-        return roomTypeMappingRepository.findAll();
+        throw new IllegalArgumentException("必须提供 channelCode 或 hotelCode");
     }
     
     @Override
@@ -165,6 +193,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
 
     @Override
     public List<ChannelRateCodeMapping> getRateCodeMappingsByCode(String channelCode, String hotelCode) {
+        validateTenantAccess(channelCode, hotelCode);
         if (channelCode != null && hotelCode != null) {
             return rateCodeMappingRepository.findByChannelCodeAndHotelCode(channelCode, hotelCode);
         } else if (channelCode != null) {
@@ -172,7 +201,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
         } else if (hotelCode != null) {
             return rateCodeMappingRepository.findByHotelCode(hotelCode);
         }
-        return rateCodeMappingRepository.findAll();
+        throw new IllegalArgumentException("必须提供 channelCode 或 hotelCode");
     }
     
     @Override

@@ -145,6 +145,7 @@ public class GroupRoomTypeHotelService {
         var hotel = hotelRepository.findById(hotelId).orElse(null);
         if (hotel != null) {
             hotelRoomType.setHotelCode(hotel.getHotelCode());
+            hotelRoomType.setTenantId(hotel.getTenantId());
         }
         hotelRoomType.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
         

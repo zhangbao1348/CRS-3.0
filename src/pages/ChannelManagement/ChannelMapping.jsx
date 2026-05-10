@@ -185,14 +185,16 @@ const ChannelMapping = () => {
   const [form] = Form.useForm()
   const [batchForm] = Form.useForm()
 
-  // 筛选数据
+  // 筛选数据（关联查询原则：使用 channelCode/hotelCode，而非 channelId/hotelId）
   const getFilteredData = (data) => {
     let filtered = [...data]
     if (selectedChannel) {
-      filtered = filtered.filter(item => item.channelId === selectedChannel)
+      // 使用 channelCode 过滤，符合CODE关联规范
+      filtered = filtered.filter(item => item.channelCode === selectedChannel || channels.find(c => c.code === selectedChannel)?.name === item.channelName)
     }
     if (selectedHotel) {
-      filtered = filtered.filter(item => item.hotelId === selectedHotel)
+      // 使用 hotelCode 过滤，符合CODE关联规范
+      filtered = filtered.filter(item => item.hotelCode === selectedHotel)
     }
     return filtered
   }
@@ -740,7 +742,8 @@ const ChannelMapping = () => {
               onChange={setSelectedChannel}
             >
               {channels.map(channel => (
-                <Option key={channel.id} value={channel.id}>{channel.name}</Option>
+                // Option value 使用 channelCode（符合CODE关联规范）
+                <Option key={channel.code} value={channel.code}>{channel.name}</Option>
               ))}
             </Select>
           </Col>
@@ -753,7 +756,8 @@ const ChannelMapping = () => {
               onChange={setSelectedHotel}
             >
               {hotels.map(hotel => (
-                <Option key={hotel.id} value={hotel.id}>{hotel.name}</Option>
+                // Option value 使用 hotelCode（符合CODE关联规范）
+                <Option key={hotel.code} value={hotel.code}>{hotel.name}</Option>
               ))}
             </Select>
           </Col>

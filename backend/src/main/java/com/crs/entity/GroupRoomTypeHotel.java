@@ -33,6 +33,9 @@ public class GroupRoomTypeHotel {
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
     
+    @Column(name = "tenant_id")
+    private Integer tenantId;
+    
     @Column(name = "allocated", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean allocated = false;
     
@@ -102,6 +105,14 @@ public class GroupRoomTypeHotel {
     
     public void setHotelCode(String hotelCode) {
         this.hotelCode = hotelCode;
+    }
+    
+    public Integer getTenantId() {
+        return tenantId;
+    }
+    
+    public void setTenantId(Integer tenantId) {
+        this.tenantId = tenantId;
     }
     
     public Boolean getAllocated() {

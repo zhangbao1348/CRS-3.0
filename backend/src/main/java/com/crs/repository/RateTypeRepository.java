@@ -30,12 +30,29 @@ public interface RateTypeRepository extends JpaRepository<RateType, Integer> {
     RateType findByTenantIdAndCode(Integer tenantId, String code);
     
     /**
-     * 根据价格类型代码查询价格类型
+     * 检查价格类型代码是否存在（同一租户下）
+     * @param tenantId 租户ID
      * @param code 价格类型代码
-     * @return 价格类型信息
+     * @return 是否存在
      */
+    boolean existsByTenantIdAndCode(Integer tenantId, String code);
+
+    // =====================================================================
+    // 已废弃方法：缺少 tenantId 约束（存在跨租户风险，禁止新代码使用）
+    // =====================================================================
+
+    /**
+     * @deprecated 缺少 tenantId 约束，请使用 findByTenantIdAndCode
+     */
+    @Deprecated
     Optional<RateType> findByCode(String code);
-    
+
+    /**
+     * @deprecated 缺少 tenantId 约束，请使用 existsByTenantIdAndCode
+     */
+    @Deprecated
+    boolean existsByCode(String code);
+
     /**
      * 根据价格类型名称查询价格类型
      * @param name 价格类型名称
@@ -49,11 +66,4 @@ public interface RateTypeRepository extends JpaRepository<RateType, Integer> {
      * @return 价格类型列表
      */
     List<RateType> findByStatus(RateType.Status status);
-    
-    /**
-     * 检查价格类型代码是否存在
-     * @param code 价格类型代码
-     * @return 是否存在
-     */
-    boolean existsByCode(String code);
 }

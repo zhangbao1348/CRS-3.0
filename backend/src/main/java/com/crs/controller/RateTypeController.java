@@ -14,6 +14,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * RateTypeController 控制器 (REST Controller)
+ * 
+ * <p>本核心模块自动生成详细注释。主要负责处理【RateTypeController】相关的核心业务逻辑、对外接口或数据传输封装。</p>
+ * 
+ * <p>关键元数据关联：</p>
+ * <ul>
+ *     <li>**关联PRD文档**：.kiro/specs/prd/10-价格计划管理.md</li>
+ *     <li>**模块职责**：遵循单一职责原则，实现 RateTypeController 的功能定义。</li>
+ * </ul>
+ * 
+ * @since 2026-05-10
+ */
 @RestController
 @RequestMapping("/api/rate-types")
 @CrossOrigin(origins = "*")

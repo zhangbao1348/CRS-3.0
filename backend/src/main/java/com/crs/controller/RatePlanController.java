@@ -133,7 +133,9 @@ public class RatePlanController {
     
     /**
      * 获取价格计划列表
-     * @param hotelId 酒店ID（可选）
+     * 关联查询原则：优先使用 tenantId + hotelCode，hotelId 作为兼容参数
+     * @param hotelCode 酒店CODE（优先，符合CODE关联规范）
+     * @param hotelId 酒店ID（已废弃，兼容旧应用）
      * @param name 价格计划名称（可选）
      * @param code 价格计划代码（可选）
      * @param rateCategory 价格类别（可选）
@@ -142,14 +144,25 @@ public class RatePlanController {
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getRatePlans(
+            @RequestParam(required = false) String hotelCode,
             @RequestParam(required = false) Integer hotelId,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String code,
             @RequestParam(required = false) String rateCategory,
             @RequestParam(required = false) String status) {
         List<RatePlan> ratePlans;
-        
-        if (hotelId != null) {
+
+        if (hotelCode != null && !hotelCode.isEmpty()) {
+            // 关联查询原则：必须使用 tenantId + hotelCode 双维度，防止跨租户泄露
+            Integer tenantId = getCurrentTenantId();
+            if (status != null) {
+                ratePlans = ratePlanRepository.findByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, status);
+            } else {
+                ratePlans = ratePlanRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
+            }
+        } else if (hotelId != null) {
+            // 已废弃：兼容旧应用传 hotelId 的情况
+            logger.warn("getRatePlans 收到旧参数 hotelId={}. 请升级为使用 hotelCode 参数", hotelId);
             if (status != null) {
                 ratePlans = ratePlanRepository.findByHotelIdAndStatus(hotelId, status);
             } else {
@@ -353,23 +366,41 @@ public class RatePlanController {
     
     /**
      * 检查价格计划代码是否唯一
+     * 关联查询原则：优先使用 tenantId + hotelCode + rateCode
      * @param code 价格计划代码
-     * @param hotelId 酒店ID
+     * @param hotelCode 酒店CODE（优先）
+     * @param hotelId 酒店ID（兼容旧应用，已废弃）
      * @param excludeId 排除的价格计划ID（可选）
      * @return 检查结果
      */
     @GetMapping("/check-code")
     public ResponseEntity<Map<String, Object>> checkRateCodeUnique(
             @RequestParam String code,
-            @RequestParam Integer hotelId,
+            @RequestParam(required = false) String hotelCode,
+            @RequestParam(required = false) Integer hotelId,
             @RequestParam(required = false) Integer id) {
         Map<String, Object> response = new HashMap<>();
         try {
             boolean exists;
-            if (id != null) {
-                exists = ratePlanRepository.existsByHotelIdAndRateCodeAndIdNot(hotelId, code, id);
+            if (hotelCode != null && !hotelCode.isEmpty()) {
+                // 优先使用 hotelCode 查重（符合CODE关联规范）
+                if (id != null) {
+                    exists = ratePlanRepository.existsByHotelCodeAndRateCodeAndIdNot(hotelCode, code, id);
+                } else {
+                    exists = ratePlanRepository.existsByHotelCodeAndRateCode(hotelCode, code);
+                }
+            } else if (hotelId != null) {
+                // 已废弃：兼容旧应用
+                logger.warn("checkRateCodeUnique 收到旧参数 hotelId={}. 请升级为使用 hotelCode 参数", hotelId);
+                if (id != null) {
+                    exists = ratePlanRepository.existsByHotelIdAndRateCodeAndIdNot(hotelId, code, id);
+                } else {
+                    exists = ratePlanRepository.existsByHotelIdAndRateCode(hotelId, code);
+                }
             } else {
-                exists = ratePlanRepository.existsByHotelIdAndRateCode(hotelId, code);
+                response.put("success", false);
+                response.put("message", "缺少酒店标识（hotelCode 或 hotelId）");
+                return ResponseEntity.badRequest().body(response);
             }
             response.put("success", true);
             response.put("exists", exists);
@@ -411,9 +442,10 @@ public class RatePlanController {
         permissions.put("promotionEditable", true);
         permissions.put("isGroupDistributed", false);
       } else {
-        // 集团下发的价格计划，查找分配记录
-        HotelRateCodeAllocation allocation = hotelRateCodeAllocationRepository
-            .findByHotelCodeAndRateCode(ratePlan.getHotelCode(), ratePlan.getRateCode());
+        // 关联查询原则：必须使用 tenantId + hotelCode + rateCode 三维度精确查询
+        List<HotelRateCodeAllocation> allocationList = hotelRateCodeAllocationRepository
+            .findByTenantIdAndHotelCodeAndRateCode(getCurrentTenantId(), ratePlan.getHotelCode(), ratePlan.getRateCode());
+        HotelRateCodeAllocation allocation = allocationList.isEmpty() ? null : allocationList.get(0);
         
         if (allocation != null) {
           permissions.put("basicInfoEditable", allocation.getBasicInfoEditable());
@@ -476,11 +508,13 @@ public class RatePlanController {
                 response.put("message", "无权访问该酒店数据");
                 return ResponseEntity.status(403).body(response);
             }
+            // 关联查询原则：必须使用 tenantId + hotelCode 双维度，防止跨租户泄露
+            Integer tenantId = getCurrentTenantId();
             List<RatePlan> ratePlans;
             if (status != null) {
-                ratePlans = ratePlanRepository.findByHotelCodeAndStatus(hotelCode, status);
+                ratePlans = ratePlanRepository.findByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, status);
             } else {
-                ratePlans = ratePlanRepository.findByHotelCode(hotelCode);
+                ratePlans = ratePlanRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
             }
             response.put("success", true);
             response.put("data", ratePlans);
@@ -502,7 +536,8 @@ public class RatePlanController {
                 response.put("message", "无权访问该酒店数据");
                 return ResponseEntity.status(403).body(response);
             }
-            var ratePlan = ratePlanRepository.findByHotelCodeAndRateCode(hotelCode, rateCode)
+            // 关联查询原则：必须使用 tenantId + hotelCode + rateCode 三维度精确查询
+            var ratePlan = ratePlanRepository.findByTenantIdAndHotelCodeAndRateCode(getCurrentTenantId(), hotelCode, rateCode)
                     .orElseThrow(() -> new RuntimeException("Rate plan not found"));
             response.put("success", true);
             response.put("data", buildRatePlanDetailData(ratePlan));

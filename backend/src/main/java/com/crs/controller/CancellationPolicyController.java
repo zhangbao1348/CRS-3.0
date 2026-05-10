@@ -152,7 +152,8 @@ public class CancellationPolicyController {
      */
     @PutMapping("/code/{code}")
     public ResponseEntity<?> updatePolicyByCode(@PathVariable String code, @RequestBody CancellationPolicy policy) {
-        CancellationPolicy existing = cancellationPolicyRepository.findByCode(code);
+        Integer tenantId = com.crs.util.TenantContext.getTenantId() != null ? com.crs.util.TenantContext.getTenantId() : DEFAULT_TENANT_ID;
+        CancellationPolicy existing = cancellationPolicyRepository.findByTenantIdAndCode(tenantId, code);
         if (existing == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("取消政策不存在");
         }

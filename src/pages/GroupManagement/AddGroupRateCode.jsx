@@ -699,7 +699,8 @@ const AddGroupRateCode = () => {
         
         // Task 8: 检查是否需要同步到酒店
         if (result && result.syncRequired && result.affectedHotels && result.affectedHotels.length > 0) {
-          const selectedHotelIds = result.affectedHotels.map(h => h.hotelId)
+          // 关联查询原则：使用 hotelCode 而非 hotelId
+          const selectedHotelCodes = result.affectedHotels.map(h => h.hotelCode)
           Modal.confirm({
             title: '同步确认',
             content: (
@@ -707,7 +708,8 @@ const AddGroupRateCode = () => {
                 <p>该房价码已下发到以下酒店，是否同步更新？</p>
                 <ul style={{ maxHeight: 200, overflow: 'auto' }}>
                   {result.affectedHotels.map(h => (
-                    <li key={h.hotelId}>
+                    // 使用 hotelCode 作为 key，符合CODE关联规范
+                    <li key={h.hotelCode}>
                       {h.hotelName}（变更字段：{translateFields(h.diffFields).join('、')}）
                     </li>
                   ))}
@@ -718,7 +720,8 @@ const AddGroupRateCode = () => {
             cancelText: '跳过',
             onOk: async () => {
               try {
-                await groupRateCodeApi.syncToHotels(currentId, selectedHotelIds)
+                // 同步时传入 hotelCodes，关联查询原则：使用 CODE
+                await groupRateCodeApi.syncToHotels(currentId, selectedHotelCodes)
                 message.success('同步成功')
               } catch (syncError) {
                 message.error('同步失败: ' + (syncError.response?.data?.error || syncError.message))
@@ -895,7 +898,8 @@ const AddGroupRateCode = () => {
           console.log('baseData内容:', baseData)
           const merged = baseData.map(item => {
             console.log('处理酒店:', item.hotelCode, item.hotel)
-            const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
+            // 关联查询原则：使用 hotelCode 匹配，而非 hotelId
+            const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
             console.log('匹配结果:', alloc ? '找到' : '未找到', '分配数据:', alloc)
             if (alloc) {
               const result = {
@@ -919,9 +923,10 @@ const AddGroupRateCode = () => {
           setHotelData(prev => {
             console.log('使用prev state合并:', prev)
             return prev.map(item => {
-              const alloc = allocations.find(a => (a.hotelCode && a.hotelCode === item.hotelCode) || (a.hotelId === item.hotelId))
+              // 关联查询原则：使用 hotelCode 匹配，而非 hotelId
+              const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
               if (alloc) {
-                console.log('找到分配:', item.hotelId, alloc)
+                console.log('找到分配:', item.hotelCode, alloc)
                 return {
                   ...item,
                   allocated: alloc.allocated || false,

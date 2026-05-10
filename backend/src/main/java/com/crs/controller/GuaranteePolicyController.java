@@ -152,7 +152,8 @@ public class GuaranteePolicyController {
      */
     @PutMapping("/code/{code}")
     public ResponseEntity<?> updatePolicyByCode(@PathVariable String code, @RequestBody GuaranteePolicy policy) {
-        GuaranteePolicy existing = guaranteePolicyRepository.findByCode(code);
+        Integer tenantId = com.crs.util.TenantContext.getTenantId() != null ? com.crs.util.TenantContext.getTenantId() : DEFAULT_TENANT_ID;
+        GuaranteePolicy existing = guaranteePolicyRepository.findByTenantIdAndCode(tenantId, code);
         if (existing == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("担保政策不存在");
         }

@@ -19,6 +19,19 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * ApiLoggingAspect 切面类 (Aspect)
+ * 
+ * <p>本核心模块自动生成详细注释。主要负责处理【ApiLoggingAspect】相关的常量定义或切面逻辑。</p>
+ * 
+ * <p>关键元数据关联：</p>
+ * <ul>
+ *     <li>**关联PRD文档**：.kiro/specs/prd/00-SOW-功能清单.md</li>
+ *     <li>**模块职责**：遵循项目规范，提供统一的系统枚举或切面增强功能。</li>
+ * </ul>
+ * 
+ * @since 2026-05-10
+ */
 @Aspect
 @Component
 public class ApiLoggingAspect {

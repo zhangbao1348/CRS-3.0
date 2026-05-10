@@ -204,7 +204,7 @@ public class HotelRoomTypeService {
         }
         var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
                 .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
-        return hotelRoomTypeRepository.findByHotelCode(hotelCode);
+        return hotelRoomTypeRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
     }
 
     public Optional<HotelRoomType> getHotelRoomTypeByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode) {
@@ -214,7 +214,7 @@ public class HotelRoomTypeService {
         }
         var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
                 .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
-        return hotelRoomTypeRepository.findByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
+        return hotelRoomTypeRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, roomTypeCode);
     }
 
     public List<HotelRoomType> getHotelRoomTypesByHotelCodeAndStatus(String hotelCode, String status) {
@@ -224,6 +224,6 @@ public class HotelRoomTypeService {
         }
         var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
                 .orElseThrow(() -> new RuntimeException("Hotel not found with code: " + hotelCode));
-        return hotelRoomTypeRepository.findByHotelCodeAndStatus(hotelCode, status);
+        return hotelRoomTypeRepository.findByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, status);
     }
 }

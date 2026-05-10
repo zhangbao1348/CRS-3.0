@@ -63,9 +63,9 @@ const RackRateList = () => {
   const [filteredData, setFilteredData] = useState(dataSource)
   const [loading, setLoading] = useState(false)
 
-  // 搜索条件
+  // 搜索条件（关联查询原则：使用 hotelCode 而非 hotelId）
   const [searchParams, setSearchParams] = useState({
-    hotelId: null,
+    hotelCode: null,   // 应使用 hotelCode，符合CODE关联规范
     roomTypeCode: null,
     dateRange: null,
     keyword: ''
@@ -78,9 +78,9 @@ const RackRateList = () => {
     setTimeout(() => {
       let result = [...dataSource]
 
-      // 按酒店筛选
-      if (searchParams.hotelId) {
-        result = result.filter(item => item.hotelId === searchParams.hotelId)
+      // 按酒店筛选（使用 hotelCode，符合CODE关联规范）
+      if (searchParams.hotelCode) {
+        result = result.filter(item => item.hotelCode === searchParams.hotelCode)
       }
 
       // 按房型筛选
@@ -117,7 +117,7 @@ const RackRateList = () => {
   // 处理重置
   const handleReset = () => {
     setSearchParams({
-      hotelId: null,
+      hotelCode: null,
       roomTypeCode: null,
       dateRange: null,
       keyword: ''
@@ -234,12 +234,13 @@ const RackRateList = () => {
             <Select
               placeholder="选择酒店"
               style={{ width: 200 }}
-              value={searchParams.hotelId}
-              onChange={(value) => setSearchParams({ ...searchParams, hotelId: value })}
+              value={searchParams.hotelCode}
+              onChange={(value) => setSearchParams({ ...searchParams, hotelCode: value })}
               allowClear
             >
               {hotels.map(hotel => (
-                <Option key={hotel.id} value={hotel.id}>
+                // Option value 使用 hotelCode（符合CODE关联规范）
+                <Option key={hotel.code} value={hotel.code}>
                   {hotel.name} ({hotel.code})
                 </Option>
               ))}

@@ -23,6 +23,7 @@ public class TenantChannel {
     private Integer id;
 
     @Column(name = "tenant_id", nullable = false)
+
     private Integer tenantId;
 
     @Column(name = "channel_name", nullable = false, length = 100)

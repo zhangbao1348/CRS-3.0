@@ -24,6 +24,7 @@ public class ChannelPublishRecord {
     @Column(name = "tenant_id", nullable = false)
     private Integer tenantId;
 
+    
     @Column(name = "hotel_code", nullable = false, length = 50)
     private String hotelCode;
 

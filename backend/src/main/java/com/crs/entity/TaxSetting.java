@@ -24,6 +24,7 @@ public class TaxSetting {
     private Integer id;
     
     @Column(name = "tenant_id", nullable = false)
+
     private Integer tenantId;
     
     @Column(name = "tax_code", nullable = false, unique = true, length = 50)

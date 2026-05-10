@@ -222,12 +222,17 @@ public class GroupRateCodeController {
             
             // 比较差异
             List<Map<String, Object>> affectedHotels = new ArrayList<>();
+            Integer tenantIdForSync = getCurrentTenantId();
             for (RatePlan plan : activePlans) {
                 List<String> diffFields = compareRateCodeWithPlan(updatedRateCode, plan);
                 if (!diffFields.isEmpty()) {
                     Map<String, Object> hotelInfo = new HashMap<>();
-                    hotelInfo.put("hotelId", plan.getHotelId());
-                    Hotel hotel = hotelRepository.findById(plan.getHotelId()).orElse(null);
+                    // 使用 hotelCode 作为关联条件，符合CODE关联规范
+                    String planHotelCode = plan.getHotelCode();
+                    hotelInfo.put("hotelCode", planHotelCode);
+                    Hotel hotel = (planHotelCode != null)
+                            ? hotelRepository.findByHotelCodeAndTenantId(planHotelCode, tenantIdForSync).orElse(null)
+                            : null;
                     hotelInfo.put("hotelName", hotel != null ? hotel.getChineseName() : "未知酒店");
                     hotelInfo.put("diffFields", diffFields);
                     affectedHotels.add(hotelInfo);
@@ -261,11 +266,25 @@ public class GroupRateCodeController {
                 return ResponseEntity.badRequest().body(Map.of("error", "集团房价码不存在"));
             }
             
+            // 关联查询原则：使用 hotelCode 列表而非 hotelId 列表
             @SuppressWarnings("unchecked")
-            List<Integer> hotelIds = (List<Integer>) request.get("hotelIds");
-            if (hotelIds == null || hotelIds.isEmpty()) {
+            List<String> hotelCodes = (List<String>) request.get("hotelCodes");
+            // 兼容旧前端传 hotelIds 的情况：通过 hotelId 反查 hotelCode
+            if ((hotelCodes == null || hotelCodes.isEmpty()) && request.containsKey("hotelIds")) {
+                @SuppressWarnings("unchecked")
+                List<Integer> legacyHotelIds = (List<Integer>) request.get("hotelIds");
+                if (legacyHotelIds != null && !legacyHotelIds.isEmpty()) {
+                    Integer tenantIdLookup = getCurrentTenantId();
+                    hotelCodes = hotelRepository.findByTenantId(tenantIdLookup).stream()
+                        .filter(h -> legacyHotelIds.contains(h.getId()))
+                        .map(Hotel::getHotelCode)
+                        .collect(Collectors.toList());
+                }
+            }
+            if (hotelCodes == null || hotelCodes.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "请选择要同步的酒店"));
             }
+            final List<String> finalHotelCodes = hotelCodes;
             
             List<RatePlan> distributedPlans = ratePlanRepository.findBySourceGroupRateCode(groupRateCode.getRateCode());
             int syncCount = 0;
@@ -276,7 +295,8 @@ public class GroupRateCodeController {
             boolean isDerivative = "level1".equals(derivativeLevel) || "level2".equals(derivativeLevel);
             
             for (RatePlan plan : distributedPlans) {
-                if (plan.getHotelId() != null && hotelIds.contains(plan.getHotelId()) && "active".equals(plan.getStatus())) {
+                // 使用 hotelCode 匹配，符合CODE关联规范
+                if (plan.getHotelCode() != null && finalHotelCodes.contains(plan.getHotelCode()) && "active".equals(plan.getStatus())) {
                     // 记录同步前的折扣和取整方式
                     Double oldDiscount = plan.getDiscount();
                     String oldRounding = plan.getRounding();
@@ -739,43 +759,47 @@ public class GroupRateCodeController {
             }
             Integer tenantId = getCurrentTenantId();
             
-            // Task 10: 衍生码下发时检查父级房价码链
+            // Task 10: 衍生码下发时检查父级房价码链（使用hotelCode，符合CODE关联规范）
             String derivativeLevel = groupRateCode.getDerivativeLevel();
             if ("level1".equals(derivativeLevel) || "level2".equals(derivativeLevel)) {
-                // 获取当前已分配的酒店ID列表
+                // 获取当前已分配的酒店CODE集合
                 List<HotelRateCodeAllocation> existingAllocations = allocationRepository.findByTenantIdAndRateCode(tenantId, groupRateCode.getRateCode());
                 Set<String> alreadyAllocatedHotelCodes = existingAllocations.stream()
                     .filter(a -> Boolean.TRUE.equals(a.getAllocated()))
                     .map(HotelRateCodeAllocation::getHotelCode)
                     .collect(Collectors.toSet());
                 
-                // 通过hotelCode查询对应的hotelId
-                Set<Integer> alreadyAllocatedHotelIds = hotelRepository.findByTenantId(tenantId).stream()
-                    .filter(h -> alreadyAllocatedHotelCodes.contains(h.getHotelCode()))
-                    .map(Hotel::getId)
-                    .collect(Collectors.toSet());
-                
-                // 只检查新增分配的酒店（排除已分配的）
-                List<Integer> allocatingHotelIds = allocationList.stream()
+                // 只检查新增分配的酒店（排除已分配的），使用 hotelCode 作为标识
+                List<String> allocatingHotelCodes = allocationList.stream()
                     .filter(item -> Boolean.TRUE.equals(item.get("allocated")))
-                    .map(item -> item.get("hotelId") instanceof Number ? ((Number) item.get("hotelId")).intValue() : null)
-                    .filter(hotelId -> hotelId != null && !alreadyAllocatedHotelIds.contains(hotelId))
+                    .map(item -> {
+                        String hCode = item.get("hotelCode") instanceof String ? (String) item.get("hotelCode") : null;
+                        if (hCode == null && item.get("hotelId") instanceof Number) {
+                            // 兼容旧前端只传hotelId的情况，反查hotelCode
+                            Integer hId = ((Number) item.get("hotelId")).intValue();
+                            Hotel h = hotelRepository.findById(hId).orElse(null);
+                            return h != null ? h.getHotelCode() : null;
+                        }
+                        return hCode;
+                    })
+                    .filter(hCode -> hCode != null && !alreadyAllocatedHotelCodes.contains(hCode))
                     .collect(Collectors.toList());
                 
-                if (!allocatingHotelIds.isEmpty()) {
+                if (!allocatingHotelCodes.isEmpty()) {
                     String parentCode = groupRateCode.getParentRateCode();
                     if (parentCode != null && !parentCode.isBlank()) {
                         GroupRateCode parentRateCode = groupRateCodeRepository.findByRateCodeAndGroupId(parentCode, getCurrentTenantId());
                         if (parentRateCode != null) {
                             List<RatePlan> parentPlans = ratePlanRepository.findBySourceGroupRateCode(parentCode);
                             
-                            for (Integer hotelId : allocatingHotelIds) {
+                            // 使用 hotelCode 匹配，而非 hotelId
+                            for (String hCode : allocatingHotelCodes) {
                                 boolean parentAllocatedToHotel = parentPlans.stream()
-                                    .anyMatch(rp -> rp.getHotelId() != null && rp.getHotelId().equals(hotelId) && "active".equals(rp.getStatus()));
+                                    .anyMatch(rp -> hCode.equals(rp.getHotelCode()) && "active".equals(rp.getStatus()));
                                 
                                 if (!parentAllocatedToHotel) {
-                                    Hotel hotel = hotelRepository.findById(hotelId).orElse(null);
-                                    String hotelName = hotel != null ? hotel.getChineseName() : "未知酒店";
+                                    Hotel hotel = hotelRepository.findByHotelCodeAndTenantId(hCode, tenantId).orElse(null);
+                                    String hotelName = hotel != null ? hotel.getChineseName() : hCode;
                                     return ResponseEntity.badRequest().body(Map.of(
                                         "error", groupRateCode.getRateName() + " 下发到「" + hotelName + "」失败，需要先下发父级房价码（" + parentRateCode.getRateName() + "）"
                                     ));
@@ -787,13 +811,13 @@ public class GroupRateCodeController {
                                 List<RatePlan> grandparentPlans = ratePlanRepository.findBySourceGroupRateCode(grandparentCode);
                                 GroupRateCode grandparentRateCode = groupRateCodeRepository.findByRateCodeAndGroupId(grandparentCode, getCurrentTenantId());
                                 
-                                for (Integer hotelId : allocatingHotelIds) {
+                                for (String hCode : allocatingHotelCodes) {
                                     boolean grandparentAllocated = grandparentPlans.stream()
-                                        .anyMatch(rp -> rp.getHotelId() != null && rp.getHotelId().equals(hotelId) && "active".equals(rp.getStatus()));
+                                        .anyMatch(rp -> hCode.equals(rp.getHotelCode()) && "active".equals(rp.getStatus()));
                                     
                                     if (!grandparentAllocated) {
-                                        Hotel hotel = hotelRepository.findById(hotelId).orElse(null);
-                                        String hotelName = hotel != null ? hotel.getChineseName() : "未知酒店";
+                                        Hotel hotel = hotelRepository.findByHotelCodeAndTenantId(hCode, tenantId).orElse(null);
+                                        String hotelName = hotel != null ? hotel.getChineseName() : hCode;
                                         String grandparentName = grandparentRateCode != null ? grandparentRateCode.getRateName() : "基础房价码";
                                         return ResponseEntity.badRequest().body(Map.of(
                                             "error", groupRateCode.getRateName() + " 下发到「" + hotelName + "」失败，需要先下发基础房价码（" + grandparentName + "）"
@@ -842,10 +866,11 @@ public class GroupRateCodeController {
                     // 下发：创建或更新酒店价格计划和分配记录
                     RatePlan ratePlan;
                     
-                    // 查找该酒店已有的价格计划（通过 sourceGroupRateCode 和 hotelId）
+                    // 查找该酒店已有的价格计划（通过 sourceGroupRateCode 和 hotelCode，符合CODE关联规范）
                     List<RatePlan> existingList = ratePlanRepository.findBySourceGroupRateCode(groupRateCode.getRateCode());
+                    final String finalHotelCode = hotelCode;
                     Optional<RatePlan> existingOpt = existingList.stream()
-                        .filter(rp -> rp.getHotelId() != null && rp.getHotelId().equals(hotelId))
+                        .filter(rp -> finalHotelCode.equals(rp.getHotelCode()))
                         .findFirst();
 
                     if (existingOpt.isPresent()) {
@@ -911,10 +936,11 @@ public class GroupRateCodeController {
                         .findByTenantIdAndHotelCodeAndRateCode(tenantId, hotelCode, groupRateCodeValue);
                     HotelRateCodeAllocation allocation = allocations.isEmpty() ? null : allocations.get(0);
                     if (allocation != null) {
-                        // 查找该酒店的价格计划
+                        // 查找该酒店的价格计划（使用 hotelCode，符合CODE关联规范）
                         List<RatePlan> ratePlans = ratePlanRepository.findBySourceGroupRateCode(groupRateCode.getRateCode());
+                        final String finalHotelCodeForRevoke = hotelCode;
                         Optional<RatePlan> ratePlanOpt = ratePlans.stream()
-                            .filter(rp -> rp.getHotelId() != null && rp.getHotelId().equals(hotelId))
+                            .filter(rp -> finalHotelCodeForRevoke.equals(rp.getHotelCode()))
                             .findFirst();
                         
                         if (ratePlanOpt.isPresent()) {
