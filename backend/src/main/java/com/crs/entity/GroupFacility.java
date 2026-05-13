@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 
@@ -10,9 +7,9 @@ import jakarta.persistence.*;
  * 集团设施实体类
  * 对应数据库group_facilities表，存储集团级别的标准设施
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "group_facilities")
 public class GroupFacility {
@@ -38,4 +35,19 @@ public class GroupFacility {
     
     @Column(name = "description", length = 255)
     private String description;
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getFacilityType() { return facilityType; }
+    public void setFacilityType(String facilityType) { this.facilityType = facilityType; }
+    public String getFacilityName() { return facilityName; }
+    public void setFacilityName(String facilityName) { this.facilityName = facilityName; }
+    public String getFacilityCode() { return facilityCode; }
+    public void setFacilityCode(String facilityCode) { this.facilityCode = facilityCode; }
+    public String getScope() { return scope; }
+    public void setScope(String scope) { this.scope = scope; }
+    public Boolean getAvailable() { return available; }
+    public void setAvailable(Boolean available) { this.available = available; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 }

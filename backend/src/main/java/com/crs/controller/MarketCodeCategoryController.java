@@ -30,15 +30,12 @@ public class MarketCodeCategoryController {
     @Autowired
     private MarketCodeCategoryService marketCodeCategoryService;
 
-    private static final Integer DEFAULT_TENANT_ID = 1;
-
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getAllMarketCodeCategories() {
         try {
-            List<Map<String, Object>> categories = marketCodeCategoryService.getAllMarketCodeCategories(DEFAULT_TENANT_ID);
+            List<Map<String, Object>> categories = marketCodeCategoryService.getAllMarketCodeCategories();
             return ResponseEntity.ok(categories);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -46,14 +43,13 @@ public class MarketCodeCategoryController {
     @GetMapping("/{id}")
     public ResponseEntity<MarketCodeCategory> getMarketCodeCategoryById(@PathVariable Integer id) {
         try {
-            MarketCodeCategory category = marketCodeCategoryService.getMarketCodeCategoryById(DEFAULT_TENANT_ID, id);
+            MarketCodeCategory category = marketCodeCategoryService.getMarketCodeCategoryById(id);
             if (category != null) {
                 return ResponseEntity.ok(category);
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -61,10 +57,9 @@ public class MarketCodeCategoryController {
     @PostMapping
     public ResponseEntity<MarketCodeCategory> createMarketCodeCategory(@RequestBody MarketCodeCategory marketCodeCategory) {
         try {
-            MarketCodeCategory created = marketCodeCategoryService.createMarketCodeCategory(DEFAULT_TENANT_ID, marketCodeCategory);
+            MarketCodeCategory created = marketCodeCategoryService.createMarketCodeCategory(marketCodeCategory);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -73,14 +68,13 @@ public class MarketCodeCategoryController {
     public ResponseEntity<MarketCodeCategory> updateMarketCodeCategory(@PathVariable Integer id, @RequestBody MarketCodeCategory marketCodeCategory) {
         try {
             marketCodeCategory.setId(id);
-            MarketCodeCategory updated = marketCodeCategoryService.updateMarketCodeCategory(DEFAULT_TENANT_ID, marketCodeCategory);
+            MarketCodeCategory updated = marketCodeCategoryService.updateMarketCodeCategory(marketCodeCategory);
             if (updated != null) {
                 return ResponseEntity.ok(updated);
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -88,10 +82,9 @@ public class MarketCodeCategoryController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMarketCodeCategory(@PathVariable Integer id) {
         try {
-            marketCodeCategoryService.deleteMarketCodeCategory(DEFAULT_TENANT_ID, id);
+            marketCodeCategoryService.deleteMarketCodeCategory(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -99,10 +92,9 @@ public class MarketCodeCategoryController {
     @GetMapping("/check-code")
     public ResponseEntity<Map<String, Boolean>> checkCodeUnique(@RequestParam String code, @RequestParam(required = false) Integer id) {
         try {
-            boolean isUnique = marketCodeCategoryService.isCodeUnique(DEFAULT_TENANT_ID, code, id);
+            boolean isUnique = marketCodeCategoryService.isCodeUnique(code, id);
             return ResponseEntity.ok(Map.of("unique", isUnique));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }

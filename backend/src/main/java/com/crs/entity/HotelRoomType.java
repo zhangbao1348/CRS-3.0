@@ -1,7 +1,5 @@
 package com.crs.entity;
 
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,8 +18,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  *     <li>**关联继承**：通过 `groupRoomTypeId` 关联集团标准房型模板，支持“集团定义标准，单店差异化实施”。</li>
  * </ul>
  */
-@NoArgsConstructor
-@AllArgsConstructor
+
+
 @Entity
 @Table(name = "hotel_room_types")
 public class HotelRoomType {
@@ -31,10 +29,6 @@ public class HotelRoomType {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
-    
     /** 酒店外部编码 */
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
@@ -42,10 +36,6 @@ public class HotelRoomType {
     /** 所属租户 ID */
     @Column(name = "tenant_id")
     private Integer tenantId;
-    
-    /** 关联的集团标准房型 ID */
-    @Column(name = "group_room_type_id")
-    private Integer groupRoomTypeId;
     
     /** 集团标准房型编码 */
     @Column(name = "group_room_type_code", length = 50)
@@ -99,10 +89,6 @@ public class HotelRoomType {
     @Column(name = "sort_order")
     private Integer sortOrder;
     
-    /** 关联的房型大类 ID */
-    @Column(name = "room_type_category_id")
-    private Integer roomTypeCategoryId;
-    
     /** 房型大类编码 */
     @Column(name = "room_type_category_code", length = 50)
     private String roomTypeCategoryCode;
@@ -111,10 +97,9 @@ public class HotelRoomType {
     @Column(name = "status", nullable = false, length = 20)
     private String status = "active";
     
-    /** 房型分类实体引用 */
-    @JsonIgnore
+    /** 房型分类实体引用 (基于 room_type_category_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_type_category_id", insertable = false, updatable = false)
+    @JoinColumn(name = "room_type_category_code", referencedColumnName = "category_code", insertable = false, updatable = false)
     private RoomTypeCategory roomTypeCategory;
     
     /** 创建时间 */
@@ -129,16 +114,16 @@ public class HotelRoomType {
     
     // 关联关系 ---------------------------------------------------------
     
-    /** 所属酒店实体引用 */
+    /** 所属酒店实体引用 (基于 hotel_code) */
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
     
-    /** 关联的集团房型模板实体引用 */
+    /** 关联的集团房型模板实体引用 (基于 group_room_type_code) */
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_room_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "group_room_type_code", referencedColumnName = "room_type_code", insertable = false, updatable = false)
     private GroupRoomType groupRoomType;
     
     /**
@@ -159,14 +144,6 @@ public class HotelRoomType {
         this.id = id;
     }
     
-    public Integer getHotelId() {
-        return hotelId;
-    }
-    
-    public void setHotelId(Integer hotelId) {
-        this.hotelId = hotelId;
-    }
-    
     public String getHotelCode() {
         return hotelCode;
     }
@@ -181,14 +158,6 @@ public class HotelRoomType {
     
     public void setTenantId(Integer tenantId) {
         this.tenantId = tenantId;
-    }
-    
-    public Integer getGroupRoomTypeId() {
-        return groupRoomTypeId;
-    }
-    
-    public void setGroupRoomTypeId(Integer groupRoomTypeId) {
-        this.groupRoomTypeId = groupRoomTypeId;
     }
     
     public String getGroupRoomTypeCode() {
@@ -295,14 +264,6 @@ public class HotelRoomType {
         this.sortOrder = sortOrder;
     }
     
-    public Integer getRoomTypeCategoryId() {
-        return roomTypeCategoryId;
-    }
-    
-    public void setRoomTypeCategoryId(Integer roomTypeCategoryId) {
-        this.roomTypeCategoryId = roomTypeCategoryId;
-    }
-    
     public String getRoomTypeCategoryCode() {
         return roomTypeCategoryCode;
     }
@@ -363,8 +324,8 @@ public class HotelRoomType {
     public String toString() {
         return "HotelRoomType{" +
                 "id=" + id +
-                ", hotelId=" + hotelId +
-                ", groupRoomTypeId=" + groupRoomTypeId +
+                ", hotelCode='" + hotelCode + '\'' +
+                ", groupRoomTypeCode='" + groupRoomTypeCode + '\'' +
                 ", roomTypeCode='" + roomTypeCode + '\'' +
                 ", roomTypeName='" + roomTypeName + '\'' +
                 ", status='" + status + '\'' +

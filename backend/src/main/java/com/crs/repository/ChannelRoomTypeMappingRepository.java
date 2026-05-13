@@ -13,30 +13,18 @@ import java.util.List;
 @Repository
 public interface ChannelRoomTypeMappingRepository extends JpaRepository<ChannelRoomTypeMapping, Integer> {
     
-    /**
-     * 根据渠道ID查询映射
-     * @param channelId 渠道ID
-     * @return 映射列表
-     */
-    List<ChannelRoomTypeMapping> findByChannelId(Integer channelId);
-    
-    /**
-     * 根据酒店ID查询映射
-     * @param hotelId 酒店ID
-     * @return 映射列表
-     */
-    List<ChannelRoomTypeMapping> findByHotelId(Integer hotelId);
-    
-    /**
-     * 根据渠道ID和酒店ID查询映射
-     * @param channelId 渠道ID
-     * @param hotelId 酒店ID
-     * @return 映射列表
-     */
-    List<ChannelRoomTypeMapping> findByChannelIdAndHotelId(Integer channelId, Integer hotelId);
+    /** 获取指定租户下的所有房型映射 */
+    List<ChannelRoomTypeMapping> findByTenantId(Integer tenantId);
 
-    List<ChannelRoomTypeMapping> findByChannelCode(String channelCode);
-    List<ChannelRoomTypeMapping> findByHotelCode(String hotelCode);
-    List<ChannelRoomTypeMapping> findByChannelCodeAndHotelCode(String channelCode, String hotelCode);
-    List<ChannelRoomTypeMapping> findByRoomTypeCode(String roomTypeCode);
+    /** 根据租户和渠道编码查询房型映射列表 */
+    List<ChannelRoomTypeMapping> findByTenantIdAndChannelCode(Integer tenantId, String channelCode);
+
+    /** 根据租户和酒店编码查询房型映射列表 */
+    List<ChannelRoomTypeMapping> findByTenantIdAndHotelCode(Integer tenantId, String hotelCode);
+
+    /** 根据租户、渠道编码和酒店编码查询房型映射列表 */
+    List<ChannelRoomTypeMapping> findByTenantIdAndChannelCodeAndHotelCode(Integer tenantId, String channelCode, String hotelCode);
+
+    /** 根据租户和房型代码查询房型映射列表 */
+    List<ChannelRoomTypeMapping> findByTenantIdAndRoomTypeCode(Integer tenantId, String roomTypeCode);
 }

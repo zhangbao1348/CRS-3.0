@@ -14,39 +14,18 @@ import java.util.Optional;
 @Repository
 public interface RoomTypeDiffSystemRepository extends JpaRepository<RoomTypeDiffSystem, Integer> {
     
-    /**
-     * 根据酒店ID查询房型差价体系列表
-     * @param hotelId 酒店ID
-     * @return 房型差价体系列表
-     */
-    List<RoomTypeDiffSystem> findByHotelId(Integer hotelId);
-    
-    /**
-     * 根据酒店ID和状态查询房型差价体系列表
-     * @param hotelId 酒店ID
-     * @param status 状态
-     * @return 房型差价体系列表
-     */
-    List<RoomTypeDiffSystem> findByHotelIdAndStatus(Integer hotelId, RoomTypeDiffSystem.Status status);
-    
-    /**
-     * 根据酒店ID和名称查询房型差价体系
-     * @param hotelId 酒店ID
-     * @param name 体系名称
-     * @return 房型差价体系信息
-     */
-    Optional<RoomTypeDiffSystem> findByHotelIdAndName(Integer hotelId, String name);
-    
-    /**
-     * 根据状态查询房型差价体系
-     * @param status 状态
-     * @return 房型差价体系列表
-     */
-    List<RoomTypeDiffSystem> findByStatus(RoomTypeDiffSystem.Status status);
+    /** 获取租户下的房型差价体系 */
+    List<RoomTypeDiffSystem> findByTenantId(Integer tenantId);
 
-    List<RoomTypeDiffSystem> findByHotelCode(String hotelCode);
+    /** 根据租户和状态查询房型差价体系 */
+    List<RoomTypeDiffSystem> findByTenantIdAndStatus(Integer tenantId, RoomTypeDiffSystem.Status status);
 
-    List<RoomTypeDiffSystem> findByHotelCodeAndStatus(String hotelCode, RoomTypeDiffSystem.Status status);
+    /** 根据租户和酒店编码查询 */
+    List<RoomTypeDiffSystem> findByTenantIdAndHotelCode(Integer tenantId, String hotelCode);
 
-    Optional<RoomTypeDiffSystem> findByHotelCodeAndName(String hotelCode, String name);
+    /** 根据租户、酒店编码和状态查询 */
+    List<RoomTypeDiffSystem> findByTenantIdAndHotelCodeAndStatus(Integer tenantId, String hotelCode, RoomTypeDiffSystem.Status status);
+
+    /** 根据租户、酒店编码和名称查找 */
+    Optional<RoomTypeDiffSystem> findByTenantIdAndHotelCodeAndName(Integer tenantId, String hotelCode, String name);
 }

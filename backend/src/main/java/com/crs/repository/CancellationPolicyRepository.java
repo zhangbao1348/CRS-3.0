@@ -60,19 +60,4 @@ public interface CancellationPolicyRepository extends JpaRepository<Cancellation
      */
     boolean existsByTenantIdAndCode(Integer tenantId, String code);
 
-    // =====================================================================
-    // 已废弃方法：缺少 tenantId 约束（存在跨租户数据风险，禁止新代码使用）
-    // =====================================================================
-
-    /** 
-     * @deprecated 缺少租户约束。请改用 {@link #existsByTenantIdAndCode(Integer, String)} 
-     */
-    @Deprecated
-    boolean existsByCode(String code);
-    
-    /** 
-     * @deprecated 缺少租户约束。请改用 {@link #findByTenantIdAndCode(Integer, String)} 
-     */
-    @Deprecated
-    CancellationPolicy findByCode(String code);
 }

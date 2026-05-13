@@ -27,6 +27,8 @@ public interface GroupRateCodeRepository extends JpaRepository<GroupRateCode, In
 
     List<GroupRateCode> findByGroupId(Integer groupId);
 
+    /** @deprecated 存在安全隐患，请改用 findByRateCodeAndGroupId */
+    @Deprecated
     GroupRateCode findByRateCode(String rateCode);
 
     List<GroupRateCode> findByGroupIdAndStatus(Integer groupId, String status);
@@ -50,11 +52,11 @@ public interface GroupRateCodeRepository extends JpaRepository<GroupRateCode, In
     @Query("SELECT COUNT(g) FROM GroupRateCode g WHERE g.packages LIKE %:packageCode%")
     long countByPackagesContaining(@Param("packageCode") String packageCode);
 
-    long countByParentRateCode(String parentRateCode);
+    long countByGroupIdAndParentRateCode(Integer groupId, String parentRateCode);
 
     List<GroupRateCode> findByGroupIdAndDerivativeLevel(Integer groupId, String derivativeLevel);
 
-    List<GroupRateCode> findByParentRateCode(String parentRateCode);
+    List<GroupRateCode> findByGroupIdAndParentRateCode(Integer groupId, String parentRateCode);
 
     List<GroupRateCode> findByGroupCode(String groupCode);
 

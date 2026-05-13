@@ -1,8 +1,6 @@
 package com.crs.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,8 +18,8 @@ import java.util.List;
  *     <li>**价格模型**：支持多价格体系开关、房型差价系统开关以及人数差价系统开关。</li>
  * </ul>
  */
-@NoArgsConstructor
-@AllArgsConstructor
+
+
 @Entity
 @Table(name = "hotels")
 public class Hotel {

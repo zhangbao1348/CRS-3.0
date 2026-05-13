@@ -6,14 +6,16 @@ import com.crs.repository.GroupRoomTypeHotelRepository;
 import com.crs.repository.HotelRoomTypeRepository;
 import com.crs.repository.GroupRoomTypeRepository;
 import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
  * 集团房型和酒店关联服务类
- * 用于处理集团房型和酒店关联的业务逻辑
+ * 已根据【CODE关联规范】重构，移除对 ID 的跨模块依赖。
  */
 @Service
 public class GroupRoomTypeHotelService {
@@ -36,66 +38,53 @@ public class GroupRoomTypeHotelService {
     
     /**
      * 获取集团房型的酒店分配列表
-     * @param groupRoomTypeId 集团房型ID
+     * @param groupRoomTypeCode 集团房型编码
      * @return 分配列表
      */
-    public List<GroupRoomTypeHotel> getGroupRoomTypeHotels(Integer groupRoomTypeId) {
-        return groupRoomTypeHotelRepository.findByGroupRoomTypeId(groupRoomTypeId);
+    public List<GroupRoomTypeHotel> getGroupRoomTypeHotelsByCode(String groupRoomTypeCode) {
+        Integer tenantId = TenantContext.getTenantId();
+        return groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomTypeCode);
     }
     
     /**
-     * 获取酒店的集团房型分配列表
-     * @param hotelId 酒店ID
+     * 获取当前酒店的房型分配列表
+     * @param hotelCode 酒店编码
      * @return 分配列表
      */
-    public List<GroupRoomTypeHotel> getHotelRoomTypeAllocations(Integer hotelId) {
-        return groupRoomTypeHotelRepository.findByHotelId(hotelId);
+    public List<GroupRoomTypeHotel> getHotelRoomTypeAllocationsByCode(String hotelCode) {
+        Integer tenantId = TenantContext.getTenantId();
+        return groupRoomTypeHotelRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
     }
     
     /**
-     * 更新酒店房型分配状态
-     * @param groupRoomTypeId 集团房型ID
-     * @param hotelId 酒店ID
+     * 更新酒店房型分配状态 (基于 CODE)
+     * @param groupRoomTypeCode 集团房型编码
+     * @param hotelCode 酒店编码
      * @param allocated 是否分配
      * @param roomInfoEditable 房型信息是否可修改
      * @return 关联信息
      */
-    public GroupRoomTypeHotel updateRoomTypeAllocation(
-            Integer groupRoomTypeId, 
-            Integer hotelId, 
+    @Transactional
+    public GroupRoomTypeHotel updateRoomTypeAllocationByCode(
+            String groupRoomTypeCode, 
+            String hotelCode, 
             Boolean allocated, 
             Boolean roomInfoEditable) {
-        // 检查集团房型是否存在
-        if (!groupRoomTypeRepository.existsById(groupRoomTypeId)) {
-            throw new RuntimeException("Group room type not found");
-        }
         
-        // 检查酒店是否存在
-        if (!hotelRepository.existsById(hotelId)) {
-            throw new RuntimeException("Hotel not found");
-        }
+        Integer tenantId = TenantContext.getTenantId();
         
         // 查找或创建关联
         Optional<GroupRoomTypeHotel> existingAllocation = 
-                groupRoomTypeHotelRepository.findByGroupRoomTypeIdAndHotelId(groupRoomTypeId, hotelId);
+                groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCodeAndHotelCode(tenantId, groupRoomTypeCode, hotelCode);
         
         GroupRoomTypeHotel allocation;
         if (existingAllocation.isPresent()) {
             allocation = existingAllocation.get();
         } else {
             allocation = new GroupRoomTypeHotel();
-            allocation.setGroupRoomTypeId(groupRoomTypeId);
-            allocation.setHotelId(hotelId);
-        }
-        
-        // 设置 CODE 字段
-        var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
-        var hotel = hotelRepository.findById(hotelId).orElse(null);
-        if (groupRoomType != null) {
-            allocation.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
-        }
-        if (hotel != null) {
-            allocation.setHotelCode(hotel.getHotelCode());
+            allocation.setGroupRoomTypeCode(groupRoomTypeCode);
+            allocation.setHotelCode(hotelCode);
+            allocation.setTenantId(tenantId);
         }
         
         allocation.setAllocated(allocated);
@@ -106,104 +95,110 @@ public class GroupRoomTypeHotelService {
         
         // 如果分配，创建或更新酒店房型
         if (allocated) {
-            createOrUpdateHotelRoomType(groupRoomTypeId, hotelId);
+            createOrUpdateHotelRoomTypeByCode(groupRoomTypeCode, hotelCode);
         } else {
-            // 如果取消分配，删除酒店房型
-            deleteHotelRoomType(groupRoomTypeId, hotelId);
+            // 如果取消分配，停用酒店房型
+            deleteHotelRoomTypeByCode(groupRoomTypeCode, hotelCode);
         }
         
         return savedAllocation;
     }
     
     /**
-     * 创建或更新酒店房型
-     * @param groupRoomTypeId 集团房型ID
-     * @param hotelId 酒店ID
+     * 创建或更新酒店房型 (基于 CODE)
+     * @param groupRoomTypeCode 集团房型编码
+     * @param hotelCode 酒店编码
      */
-    public void createOrUpdateHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
+    public void createOrUpdateHotelRoomTypeByCode(String groupRoomTypeCode, String hotelCode) {
+        Integer tenantId = TenantContext.getTenantId();
+        
         // 获取集团房型信息
-        var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
-                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        var groupRoomType = groupRoomTypeRepository.findByRoomTypeCode(groupRoomTypeCode)
+                .orElseThrow(() -> new RuntimeException("Group room type not found: " + groupRoomTypeCode));
+        
+        // 获取酒店信息以获取 tenantId
+        var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel not found: " + hotelCode));
         
         // 检查酒店房型是否已存在
         Optional<HotelRoomType> existingHotelRoomType = 
-                hotelRoomTypeRepository.findByHotelIdAndRoomTypeCode(hotelId, groupRoomType.getRoomTypeCode());
+                hotelRoomTypeRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, groupRoomTypeCode);
         
         HotelRoomType hotelRoomType;
         if (existingHotelRoomType.isPresent()) {
-            // 更新现有房型
             hotelRoomType = existingHotelRoomType.get();
         } else {
-            // 创建新房型
             hotelRoomType = new HotelRoomType();
-            hotelRoomType.setHotelId(hotelId);
-            hotelRoomType.setGroupRoomTypeId(groupRoomTypeId);
-            hotelRoomType.setRoomTypeCode(groupRoomType.getRoomTypeCode());
-        }
-        
-        // 设置 CODE 字段
-        var hotel = hotelRepository.findById(hotelId).orElse(null);
-        if (hotel != null) {
-            hotelRoomType.setHotelCode(hotel.getHotelCode());
+            hotelRoomType.setHotelCode(hotelCode);
+            hotelRoomType.setRoomTypeCode(groupRoomTypeCode);
             hotelRoomType.setTenantId(hotel.getTenantId());
         }
-        hotelRoomType.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
         
-        // 更新房型信息
+        // 更新房型信息 (不再包含已删除的 ID 字段)
         hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
         hotelRoomType.setDescription(groupRoomType.getDescription());
         hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
         hotelRoomType.setSortOrder(groupRoomType.getSortOrder());
-        hotelRoomType.setRoomTypeCategoryId(groupRoomType.getRoomTypeCategoryId());
+        hotelRoomType.setGroupRoomTypeCode(groupRoomTypeCode);
+        hotelRoomType.setRoomTypeCategoryCode(groupRoomType.getRoomTypeCategoryCode());
         hotelRoomType.setStatus(groupRoomType.getStatus());
         
         hotelRoomTypeRepository.save(hotelRoomType);
     }
     
     /**
-     * 删除酒店房型
-     * @param groupRoomTypeId 集团房型ID
-     * @param hotelId 酒店ID
+     * 删除酒店房型 (基于 CODE)
+     * @param groupRoomTypeCode 集团房型编码
+     * @param hotelCode 酒店编码
      */
-    public void deleteHotelRoomType(Integer groupRoomTypeId, Integer hotelId) {
-        // 获取集团房型信息
-        var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
-                .orElseThrow(() -> new RuntimeException("Group room type not found"));
-        
-        // 查找酒店房型，设为无效（软删除）
+    public void deleteHotelRoomTypeByCode(String groupRoomTypeCode, String hotelCode) {
         Optional<HotelRoomType> existingHotelRoomType = 
-                hotelRoomTypeRepository.findByHotelIdAndRoomTypeCode(hotelId, groupRoomType.getRoomTypeCode());
+                hotelRoomTypeRepository.findByHotelCodeAndRoomTypeCode(hotelCode, groupRoomTypeCode);
         
         existingHotelRoomType.ifPresent(roomType -> {
             roomType.setStatus("inactive");
             hotelRoomTypeRepository.save(roomType);
         });
     }
-    
-    /**
-     * 批量更新酒店房型分配
-     * @param groupRoomTypeId 集团房型ID
-     * @param allocations 分配列表
-     */
+
+    // =====================================================================
+    // 适配旧 ID 方法 (已标记为 Deprecated，内部调用自动重定向到 CODE 方法)
+    // =====================================================================
+
+    @Deprecated
+    public List<GroupRoomTypeHotel> getGroupRoomTypeHotels(Integer groupRoomTypeId) {
+        var grt = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
+        if (grt != null) return getGroupRoomTypeHotelsByCode(grt.getRoomTypeCode());
+        return List.of();
+    }
+
+    @Deprecated
+    public List<GroupRoomTypeHotel> getHotelRoomTypeAllocations(Integer hotelId) {
+        var hotel = hotelRepository.findById(hotelId).orElse(null);
+        if (hotel != null) return getHotelRoomTypeAllocationsByCode(hotel.getHotelCode());
+        return List.of();
+    }
+
+    @Deprecated
     public void batchUpdateRoomTypeAllocations(Integer groupRoomTypeId, List<GroupRoomTypeHotel> allocations) {
+        var grt = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
+        if (grt == null) return;
+        
         for (GroupRoomTypeHotel allocation : allocations) {
-            updateRoomTypeAllocation(
-                    groupRoomTypeId,
-                    allocation.getHotelId(),
+            updateRoomTypeAllocationByCode(
+                    grt.getRoomTypeCode(),
+                    allocation.getHotelCode(),
                     allocation.getAllocated(),
                     allocation.getRoomInfoEditable());
         }
     }
-    
-    /**
-     * 批量保存酒店房型分配
-     * @param allocations 分配列表
-     */
+
+    @Deprecated
     public void batchSaveRoomTypeAllocations(List<GroupRoomTypeHotel> allocations) {
         for (GroupRoomTypeHotel allocation : allocations) {
-            updateRoomTypeAllocation(
-                    allocation.getGroupRoomTypeId(),
-                    allocation.getHotelId(),
+            updateRoomTypeAllocationByCode(
+                    allocation.getGroupRoomTypeCode(),
+                    allocation.getHotelCode(),
                     allocation.getAllocated(),
                     allocation.getRoomInfoEditable());
         }

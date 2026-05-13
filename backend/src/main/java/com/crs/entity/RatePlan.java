@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -21,9 +21,9 @@ import java.util.Date;
  *     <li>**多租户与多店**：通过 `tenantId` 和 `hotelId` 实现数据隔离。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "rate_plans")
 public class RatePlan {
@@ -36,10 +36,6 @@ public class RatePlan {
     /** 所属租户 ID */
     @Column(name = "tenant_id")
     private Integer tenantId;
-
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
 
     /** 酒店外部编码冗余 */
     @Column(name = "hotel_code", length = 50)
@@ -198,5 +194,84 @@ public class RatePlan {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getSourceGroupRateCode() { return sourceGroupRateCode; }
+    public void setSourceGroupRateCode(String sourceGroupRateCode) { this.sourceGroupRateCode = sourceGroupRateCode; }
+    public String getRateCode() { return rateCode; }
+    public void setRateCode(String rateCode) { this.rateCode = rateCode; }
+    public String getRateName() { return rateName; }
+    public void setRateName(String rateName) { this.rateName = rateName; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getRateCategory() { return rateCategory; }
+    public void setRateCategory(String rateCategory) { this.rateCategory = rateCategory; }
+    public String getMarketCode() { return marketCode; }
+    public void setMarketCode(String marketCode) { this.marketCode = marketCode; }
+    public String getSourceCode() { return sourceCode; }
+    public void setSourceCode(String sourceCode) { this.sourceCode = sourceCode; }
+    public String getRateType() { return rateType; }
+    public void setRateType(String rateType) { this.rateType = rateType; }
+    public String getParentRateCode() { return parentRateCode; }
+    public void setParentRateCode(String parentRateCode) { this.parentRateCode = parentRateCode; }
+    public String getDerivativeLevel() { return derivativeLevel; }
+    public void setDerivativeLevel(String derivativeLevel) { this.derivativeLevel = derivativeLevel; }
+    public Double getDiscount() { return discount; }
+    public void setDiscount(Double discount) { this.discount = discount; }
+    public String getRounding() { return rounding; }
+    public void setRounding(String rounding) { this.rounding = rounding; }
+    public String getGuaranteeRule() { return guaranteeRule; }
+    public void setGuaranteeRule(String guaranteeRule) { this.guaranteeRule = guaranteeRule; }
+    public String getCancellationRule() { return cancellationRule; }
+    public void setCancellationRule(String cancellationRule) { this.cancellationRule = cancellationRule; }
+    public String getCouponRule() { return couponRule; }
+    public void setCouponRule(String couponRule) { this.couponRule = couponRule; }
+    public String getPromotionRule() { return promotionRule; }
+    public void setPromotionRule(String promotionRule) { this.promotionRule = promotionRule; }
+    public Boolean getAllowPoints() { return allowPoints; }
+    public void setAllowPoints(Boolean allowPoints) { this.allowPoints = allowPoints; }
+    public String getPointsType() { return pointsType; }
+    public void setPointsType(String pointsType) { this.pointsType = pointsType; }
+    public Double getPointsValue() { return pointsValue; }
+    public void setPointsValue(Double pointsValue) { this.pointsValue = pointsValue; }
+    public String getApplicableRoomTypes() { return applicableRoomTypes; }
+    public void setApplicableRoomTypes(String applicableRoomTypes) { this.applicableRoomTypes = applicableRoomTypes; }
+    public String getPackages() { return packages; }
+    public void setPackages(String packages) { this.packages = packages; }
+    public String getPersonalMembership() { return personalMembership; }
+    public void setPersonalMembership(String personalMembership) { this.personalMembership = personalMembership; }
+    public String getCompanyMembership() { return companyMembership; }
+    public void setCompanyMembership(String companyMembership) { this.companyMembership = companyMembership; }
+    public Integer getAdvanceBookingMin() { return advanceBookingMin; }
+    public void setAdvanceBookingMin(Integer advanceBookingMin) { this.advanceBookingMin = advanceBookingMin; }
+    public Integer getAdvanceBookingMax() { return advanceBookingMax; }
+    public void setAdvanceBookingMax(Integer advanceBookingMax) { this.advanceBookingMax = advanceBookingMax; }
+    public Integer getMinimumStayMin() { return minimumStayMin; }
+    public void setMinimumStayMin(Integer minimumStayMin) { this.minimumStayMin = minimumStayMin; }
+    public Integer getMinimumStayMax() { return minimumStayMax; }
+    public void setMinimumStayMax(Integer minimumStayMax) { this.minimumStayMax = minimumStayMax; }
+    public String getBookingStartTime() { return bookingStartTime; }
+    public void setBookingStartTime(String bookingStartTime) { this.bookingStartTime = bookingStartTime; }
+    public String getBookingEndTime() { return bookingEndTime; }
+    public void setBookingEndTime(String bookingEndTime) { this.bookingEndTime = bookingEndTime; }
+    public String getCheckinStartTime() { return checkinStartTime; }
+    public void setCheckinStartTime(String checkinStartTime) { this.checkinStartTime = checkinStartTime; }
+    public String getCheckinEndTime() { return checkinEndTime; }
+    public void setCheckinEndTime(String checkinEndTime) { this.checkinEndTime = checkinEndTime; }
+    public String getRoomTypeDiffCode() { return roomTypeDiffCode; }
+    public void setRoomTypeDiffCode(String roomTypeDiffCode) { this.roomTypeDiffCode = roomTypeDiffCode; }
+    public String getPersonDiffCode() { return personDiffCode; }
+    public void setPersonDiffCode(String personDiffCode) { this.personDiffCode = personDiffCode; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
 

@@ -1,9 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,21 +16,30 @@ import java.util.Date;
  *     <li>**展示顺序**：`sortOrder` 决定了图片在前端轮播或详情页的显示先后。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "hotel_images")
 public class HotelImage {
+    
+    public HotelImage() {}
+
+    public HotelImage(Integer id, Integer tenantId, String hotelCode, String imageType, String imagePath, String imageName, String description, Integer sortOrder, Date createdAt, Hotel hotel) {
+        this.id = id;
+        this.tenantId = tenantId;
+        this.hotelCode = hotelCode;
+        this.imageType = imageType;
+        this.imagePath = imagePath;
+        this.imageName = imageName;
+        this.description = description;
+        this.sortOrder = sortOrder;
+        this.createdAt = createdAt;
+        this.hotel = hotel;
+    }
+
     
     /** 图片主键 ID */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-    
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
     
     /** 所属租户 ID */
     @Column(name = "tenant_id")
@@ -74,9 +79,29 @@ public class HotelImage {
     
     // 关联关系 ---------------------------------------------------------
     
-    /** 所属酒店实体引用 */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     @JsonIgnore
     private Hotel hotel;
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getImageType() { return imageType; }
+    public void setImageType(String imageType) { this.imageType = imageType; }
+    public String getImagePath() { return imagePath; }
+    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
+    public String getImageName() { return imageName; }
+    public void setImageName(String imageName) { this.imageName = imageName; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Hotel getHotel() { return hotel; }
+    public void setHotel(Hotel hotel) { this.hotel = hotel; }
 }

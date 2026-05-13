@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 集团担保政策实体类
  * 对应数据库group_guarantee_policies表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "group_guarantee_policies")
 public class GroupGuaranteePolicy {

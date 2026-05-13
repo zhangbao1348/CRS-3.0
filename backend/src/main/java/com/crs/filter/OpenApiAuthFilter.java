@@ -69,7 +69,15 @@ public class OpenApiAuthFilter extends OncePerRequestFilter {
 
         // 将渠道信息存入请求属性，供Controller使用
         request.setAttribute("openApiChannel", channel);
-        filterChain.doFilter(request, response);
+        
+        try {
+            // 关键：将渠道所属租户存入安全上下文，确保后续 Service 逻辑能自动应用隔离
+            com.crs.util.TenantContext.setTenantId(channel.getTenantId());
+            filterChain.doFilter(request, response);
+        } finally {
+            // 必须清理，防止线程复用导致上下文污染
+            com.crs.util.TenantContext.clear();
+        }
     }
 
     private void writeError(HttpServletResponse response, int code, String message) throws IOException {

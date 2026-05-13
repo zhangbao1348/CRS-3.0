@@ -8,13 +8,15 @@ import com.crs.repository.MenuRepository;
 import com.crs.repository.RoleMenuRepository;
 import com.crs.repository.RoleRepository;
 import com.crs.repository.UserRoleRepository;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TestPermissionController 控制器 (REST Controller)
@@ -32,8 +34,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/test-permission")
 @CrossOrigin(origins = "*")
-@Slf4j
 public class TestPermissionController {
+    private static final Logger log = LoggerFactory.getLogger(TestPermissionController.class);
     
     @Autowired
     private RoleMenuRepository roleMenuRepository;

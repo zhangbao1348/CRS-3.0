@@ -40,7 +40,10 @@ public class GroupRoomTypeController {
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
     
     @GetMapping
@@ -62,40 +65,53 @@ public class GroupRoomTypeController {
     public ResponseEntity<?> getGroupRoomTypeById(@PathVariable Integer id) {
         try {
             var groupRoomType = groupRoomTypeService.getGroupRoomTypeById(id)
-                    .orElseThrow(() -> new RuntimeException("Group room type not found"));
+                    .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
             return ResponseEntity.ok(groupRoomType);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
     
-    @GetMapping("/group/{groupId}")
-    public ResponseEntity<?> getGroupRoomTypesByGroupId(
-            @PathVariable Integer groupId,
+    /**
+     * 获取当前租户下的所有集团房型（不再依赖路径参数 groupId）
+     */
+    @GetMapping("/group/current")
+    public ResponseEntity<?> getGroupRoomTypesByCurrentTenant(
             @RequestParam(required = false) Integer categoryId) {
         try {
             List<GroupRoomType> groupRoomTypes;
             if (categoryId != null) {
-                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupIdAndCategory(groupId, categoryId);
+                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupIdAndCategory(getCurrentTenantId(), categoryId);
             } else {
-                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupId(groupId);
+                groupRoomTypes = groupRoomTypeService.getGroupRoomTypesByGroupId(getCurrentTenantId());
             }
             return ResponseEntity.ok(groupRoomTypes);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    /**
+     * 兼容性接口：根据 groupId 获取集团房型（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<?> getGroupRoomTypesByGroupId(@PathVariable Integer groupId,
+                                                       @RequestParam(required = false) Integer categoryId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getGroupRoomTypesByCurrentTenant(categoryId);
+    }
     
-    @GetMapping("/group/{groupId}/count")
-    public ResponseEntity<?> countByGroupId(@PathVariable Integer groupId) {
-        long count = groupRoomTypeService.countByGroupId(groupId);
+    @GetMapping("/group/current/count")
+    public ResponseEntity<?> countByCurrentTenant() {
+        long count = groupRoomTypeService.countByGroupId(getCurrentTenantId());
         return ResponseEntity.ok(Map.of("count", count));
     }
     
     @GetMapping("/{id}/allocations")
     public ResponseEntity<?> getAllocationsByGroupRoomTypeId(@PathVariable Integer id) {
-        List<GroupRoomTypeHotel> allocations = groupRoomTypeService.getAllocationsByGroupRoomTypeId(id);
+        var groupRoomType = groupRoomTypeService.getGroupRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        List<GroupRoomTypeHotel> allocations = groupRoomTypeService.getAllocationsByGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
         return ResponseEntity.ok(allocations);
     }
     

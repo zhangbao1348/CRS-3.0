@@ -1,11 +1,10 @@
 package com.crs.entity;
 
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
  * 集团标准房型实体类 (GroupRoomType)
@@ -18,8 +17,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  *     <li>各酒店在本地创建 {@link RoomType} 时，可选择关联此标准房型，以保持集团内房型统计的一致性。</li>
  * </ul>
  */
-@NoArgsConstructor
-@AllArgsConstructor
+
+
 @Entity
 @Table(name = "group_room_types")
 public class GroupRoomType {
@@ -38,6 +37,7 @@ public class GroupRoomType {
     private String groupCode;
     
     /** 集团标准房型代码 (如 'DBL', 'TWD')，全集团唯一 */
+    @org.hibernate.annotations.NaturalId
     @Column(name = "room_type_code", nullable = false, unique = true, length = 50)
     private String roomTypeCode;
     
@@ -72,9 +72,9 @@ public class GroupRoomType {
     // 关联关系 ---------------------------------------------------------
     
     /** 关联的房型分类实体 */
-    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_type_category_id", insertable = false, updatable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private RoomTypeCategory roomTypeCategory;
     
     /** 创建时间 */

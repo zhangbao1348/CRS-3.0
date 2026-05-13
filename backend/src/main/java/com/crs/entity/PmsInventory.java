@@ -1,12 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
 import java.util.Date;
 
-@Data @NoArgsConstructor @AllArgsConstructor
 @Entity @Table(name = "pms_inventory", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"tenant_id", "hotel_code", "room_type_code", "inventory_date"})
 })
@@ -68,11 +64,36 @@ public class PmsInventory {
     @PreUpdate
     public void preUpdate() { this.updatedAt = new Date(); }
 
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public Date getInventoryDate() { return inventoryDate; }
+    public void setInventoryDate(Date inventoryDate) { this.inventoryDate = inventoryDate; }
+    public Integer getPhysicalRooms() { return physicalRooms; }
+    public void setPhysicalRooms(Integer physicalRooms) { this.physicalRooms = physicalRooms; }
+    public Integer getAvailableRooms() { return availableRooms; }
+    public void setAvailableRooms(Integer availableRooms) { this.availableRooms = availableRooms; }
+    public Integer getMaintenanceRooms() { return maintenanceRooms; }
+    public void setMaintenanceRooms(Integer maintenanceRooms) { this.maintenanceRooms = maintenanceRooms; }
+    public Integer getOverbookCount() { return overbookCount; }
+    public void setOverbookCount(Integer overbookCount) { this.overbookCount = overbookCount; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+
     /**
      * 已售数量 = 物理房型数 + 超预订数 - 剩余可售 - 维修房数
      */
     @Transient
     public int getSoldCount() {
-        return physicalRooms + overbookCount - availableRooms - maintenanceRooms;
+        return (physicalRooms != null ? physicalRooms : 0) + (overbookCount != null ? overbookCount : 0) - (availableRooms != null ? availableRooms : 0) - (maintenanceRooms != null ? maintenanceRooms : 0);
     }
 }

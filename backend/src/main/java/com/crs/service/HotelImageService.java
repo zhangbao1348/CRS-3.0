@@ -25,19 +25,10 @@ public class HotelImageService {
     @Autowired
     private HotelImageRepository hotelImageRepository;
     
-    public List<HotelImage> getImagesByHotelId(Integer hotelId) {
-        return hotelImageRepository.findByHotelId(hotelId);
-    }
-    
-    public List<HotelImage> getImagesByType(Integer hotelId, String imageType) {
-        return hotelImageRepository.findByHotelIdAndImageType(hotelId, imageType);
-    }
-    
-    public List<HotelImage> getImagesByHotelIdOrderBySort(Integer hotelId) {
-        return hotelImageRepository.findByHotelIdOrderBySortOrderAsc(hotelId);
-    }
-    
     public HotelImage createImage(HotelImage image) {
+        if (image.getTenantId() == null) {
+            image.setTenantId(com.crs.util.TenantContext.getTenantId());
+        }
         return hotelImageRepository.save(image);
     }
     
@@ -47,10 +38,6 @@ public class HotelImageService {
     
     public void deleteImage(Integer id) {
         hotelImageRepository.deleteById(id);
-    }
-    
-    public void deleteImagesByHotelId(Integer hotelId) {
-        hotelImageRepository.deleteByHotelId(hotelId);
     }
     
     public List<HotelImage> getImagesByHotelCode(String hotelCode) {

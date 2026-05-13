@@ -212,19 +212,11 @@ const AddRatePlan = () => {
       const response = await hotelRoomTypeApi.getHotelRoomTypesByCode(selectedHotel)
       const roomTypes = response?.data || []
       
-      // 获取房型大类映射
-      const categoryList = categoriesResponse.data || []
-      const categoryMap = categoryList.reduce((map, cat) => {
-        map[cat.id] = cat.categoryName
-        return map
-      }, {})
-      
       setGroupRoomTypes(roomTypes)
       
-      // 按房型大类分组
+      // 按房型大类分组，直接使用后端返回的 categoryName
       const grouped = roomTypes.reduce((acc, roomType) => {
-        const categoryId = roomType.roomTypeCategoryId || 0
-        const category = categoryMap[categoryId] || '其他'
+        const category = roomType.roomTypeCategory?.categoryName || '其他'
         if (!acc[category]) {
           acc[category] = []
         }
@@ -546,7 +538,7 @@ const AddRatePlan = () => {
       }
       
       // 检查酒店CODE数据
-      const hasHotelCode = await checkHotelCode(selectedHotelId)
+      const hasHotelCode = await checkHotelCode(selectedHotel)
       if (!hasHotelCode) {
         message.error('酒店CODE数据不存在，请先配置酒店CODE')
         return

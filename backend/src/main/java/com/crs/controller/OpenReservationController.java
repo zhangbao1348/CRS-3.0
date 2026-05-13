@@ -97,7 +97,7 @@ public class OpenReservationController {
                 return ResponseEntity.badRequest().body(err(400, "缺少必填参数：hotelCode, channelOrderNumber, roomTypeCode, ratePlanCode, checkInDate, checkOutDate"));
             }
 
-            if (reservationRepo.existsByChannelIdAndChannelOrderNumber(channel.getId(), channelOrderNumber)) {
+            if (reservationRepo.existsByTenantIdAndChannelCodeAndChannelOrderNumber(channel.getTenantId(), channel.getChannelCode(), channelOrderNumber)) {
                 return ResponseEntity.status(409).body(err(409, "订单已存在，请勿重复提交 (Duplicate Order)"));
             }
 
@@ -107,17 +107,17 @@ public class OpenReservationController {
                 return ResponseEntity.status(404).body(err(404, "酒店不存在或已停用"));
             }
 
-            if (!hasHotelAccess(channel, hotel.getId())) {
+            if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
             }
 
-            HotelRoomType roomType = roomTypeRepo.findByHotelIdAndRoomTypeCode(hotel.getId(), roomTypeCode)
+            HotelRoomType roomType = roomTypeRepo.findByTenantIdAndHotelCodeAndRoomTypeCode(hotel.getTenantId(), hotel.getHotelCode(), roomTypeCode)
                     .orElse(null);
             if (roomType == null || !"active".equals(roomType.getStatus())) {
                 return ResponseEntity.status(404).body(err(404, "房型不存在或已停用"));
             }
 
-            RatePlan ratePlan = ratePlanRepo.findByHotelIdAndRateCode(hotel.getId(), ratePlanCode)
+            RatePlan ratePlan = ratePlanRepo.findByTenantIdAndHotelCodeAndRateCode(hotel.getTenantId(), hotel.getHotelCode(), ratePlanCode)
                     .orElse(null);
             if (ratePlan == null || !"active".equals(ratePlan.getStatus())) {
                 return ResponseEntity.status(404).body(err(404, "价格计划不存在或已停用"));
@@ -288,16 +288,12 @@ public class OpenReservationController {
 
             Reservation reservation = new Reservation();
             reservation.setTenantId(hotel.getTenantId());
-            reservation.setHotelId(hotel.getId());
             reservation.setHotelCode(hotelCode);
             reservation.setHotelName(hotel.getChineseName());
-            reservation.setRoomTypeId(roomType.getId());
             reservation.setRoomTypeCode(roomTypeCode);
             reservation.setRoomTypeName(roomType.getRoomTypeName());
-            reservation.setRatePlanId(ratePlan.getId());
             reservation.setRatePlanCode(ratePlanCode);
             reservation.setRatePlanName(ratePlan.getRateName());
-            reservation.setChannelId(channel.getId());
             reservation.setChannelCode(channel.getChannelCode());
             reservation.setChannelName(channel.getChannelName());
             reservation.setChannelOrderNumber(getString(body, "channelOrderNumber"));
@@ -348,7 +344,7 @@ public class OpenReservationController {
             // 1. 自动填充政策快照
             String cancelRule = ratePlan.getCancellationRule();
             if (cancelRule != null && !cancelRule.isBlank()) {
-                CancellationPolicy cp = cancellationPolicyRepo.findByCode(cancelRule);
+                CancellationPolicy cp = cancellationPolicyRepo.findByTenantIdAndCode(channel.getTenantId(), cancelRule);
                 if (cp != null) {
                     reservation.setCancellationPolicyCode(cp.getCode());
                     reservation.setCancellationPolicyDesc(cp.getDescription());
@@ -364,7 +360,7 @@ public class OpenReservationController {
 
             String guaranteeRule = ratePlan.getGuaranteeRule();
             if (guaranteeRule != null && !guaranteeRule.isBlank()) {
-                GuaranteePolicy gp = guaranteePolicyRepo.findByCode(guaranteeRule);
+                GuaranteePolicy gp = guaranteePolicyRepo.findByTenantIdAndCode(channel.getTenantId(), guaranteeRule);
                 if (gp != null) {
                     reservation.setGuaranteePolicyCode(gp.getCode());
                     reservation.setGuaranteePolicyDesc(gp.getDescription());
@@ -468,7 +464,7 @@ public class OpenReservationController {
                 return ResponseEntity.status(404).body(err(404, "订单不存在"));
             }
 
-            if (!reservation.getChannelId().equals(channel.getId())) {
+            if (!channel.getChannelCode().equals(reservation.getChannelCode())) {
                 return ResponseEntity.status(403).body(err(403, "无权查看该订单"));
             }
 
@@ -561,7 +557,7 @@ public class OpenReservationController {
                 return ResponseEntity.status(404).body(err(404, "订单不存在"));
             }
 
-            if (!reservation.getChannelId().equals(channel.getId())) {
+            if (!channel.getChannelCode().equals(reservation.getChannelCode())) {
                 return ResponseEntity.status(403).body(err(403, "无权操作该订单"));
             }
 
@@ -571,7 +567,7 @@ public class OpenReservationController {
             // 校验取消政策
             String policyCode = reservation.getCancellationPolicyCode();
             if (policyCode != null) {
-                CancellationPolicy policy = cancellationPolicyRepo.findByCode(policyCode);
+                CancellationPolicy policy = cancellationPolicyRepo.findByTenantIdAndCode(reservation.getTenantId(), policyCode);
                 if (policy != null) {
                     if ("non_refundable".equalsIgnoreCase(policy.getType())) {
                         return ResponseEntity.status(409).body(err(409, "该订单不可退（Non-refundable）"));
@@ -620,9 +616,9 @@ public class OpenReservationController {
         return (TenantChannel) req.getAttribute("openApiChannel");
     }
 
-    private boolean hasHotelAccess(TenantChannel channel, Integer hotelId) {
+    private boolean hasHotelAccess(TenantChannel channel, String hotelCode) {
         List<ChannelHotelMapping> mappings = channelHotelMappingRepo
-                .findByChannelIdAndHotelId(channel.getId(), hotelId);
+                .findByTenantIdAndChannelCodeAndHotelCode(channel.getTenantId(), channel.getChannelCode(), hotelCode);
         return mappings.stream().anyMatch(m -> "active".equals(m.getStatus()));
     }
 

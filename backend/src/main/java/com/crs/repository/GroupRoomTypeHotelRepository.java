@@ -41,6 +41,12 @@ public interface GroupRoomTypeHotelRepository extends JpaRepository<GroupRoomTyp
     /** 根据集团房型CODE + 酒店CODE 精确查询（推荐使用） */
     Optional<GroupRoomTypeHotel> findByGroupRoomTypeCodeAndHotelCode(String groupRoomTypeCode, String hotelCode);
 
+    /** 租户维度：根据集团房型CODE获取关联列表 */
+    List<GroupRoomTypeHotel> findByTenantIdAndGroupRoomTypeCode(Integer tenantId, String groupRoomTypeCode);
+
+    /** 租户维度：根据集团房型CODE + 酒店CODE 精确查询 */
+    Optional<GroupRoomTypeHotel> findByTenantIdAndGroupRoomTypeCodeAndHotelCode(Integer tenantId, String groupRoomTypeCode, String hotelCode);
+
     /** 根据集团房型CODE获取关联列表 */
     List<GroupRoomTypeHotel> findByGroupRoomTypeCode(String groupRoomTypeCode);
 
@@ -52,44 +58,12 @@ public interface GroupRoomTypeHotelRepository extends JpaRepository<GroupRoomTyp
 
     @Modifying
     @Transactional
-    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeCode = :groupRoomTypeCode")
-    void deleteByGroupRoomTypeCode(@Param("groupRoomTypeCode") String groupRoomTypeCode);
-
-    // =====================================================================
-    // 旧 ID 方法（仅内部使用，禁止新代码使用）
-    // =====================================================================
-
-    /**
-     * 根据集团房型ID获取关联列表
-     * @param groupRoomTypeId 集团房型ID
-     */
-    List<GroupRoomTypeHotel> findByGroupRoomTypeId(Integer groupRoomTypeId);
-
-    /**
-     * @deprecated 请使用 findByTenantIdAndHotelCode(Integer, String)
-     */
-    @Deprecated
-    List<GroupRoomTypeHotel> findByHotelId(Integer hotelId);
-
-    /**
-     * @deprecated 请使用基于 CODE 的查询方法
-     */
-    @Deprecated
-    Optional<GroupRoomTypeHotel> findByGroupRoomTypeIdAndHotelId(Integer groupRoomTypeId, Integer hotelId);
-
-    List<GroupRoomTypeHotel> findByGroupRoomTypeIdAndAllocated(Integer groupRoomTypeId, Boolean allocated);
-
-    boolean existsByGroupRoomTypeIdAndHotelId(Integer groupRoomTypeId, Integer hotelId);
+    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.tenantId = :tenantId AND grth.groupRoomTypeCode = :groupRoomTypeCode")
+    void deleteByTenantIdAndGroupRoomTypeCode(@Param("tenantId") Integer tenantId, @Param("groupRoomTypeCode") String groupRoomTypeCode);
 
     @Modifying
     @Transactional
-    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeId = :groupRoomTypeId")
-    void deleteByGroupRoomTypeId(@Param("groupRoomTypeId") Integer groupRoomTypeId);
-
-    /**
-     * @deprecated 缺少 tenantId 约束，请使用 findByTenantIdAndHotelCode
-     */
-    @Deprecated
-    List<GroupRoomTypeHotel> findByHotelCode(String hotelCode);
+    @Query("DELETE FROM GroupRoomTypeHotel grth WHERE grth.groupRoomTypeCode = :groupRoomTypeCode")
+    void deleteByGroupRoomTypeCode(@Param("groupRoomTypeCode") String groupRoomTypeCode);
 }
 

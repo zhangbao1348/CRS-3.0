@@ -40,11 +40,10 @@ public interface GuaranteePolicyService {
     
     /**
      * 创建担保政策
-     * @param tenantId 租户ID
      * @param policy 担保政策
      * @return 创建的担保政策
      */
-    GuaranteePolicy create(Integer tenantId, GuaranteePolicy policy);
+    GuaranteePolicy create(GuaranteePolicy policy);
     
     /**
      * 更新担保政策

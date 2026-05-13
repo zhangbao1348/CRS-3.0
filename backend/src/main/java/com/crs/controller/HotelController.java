@@ -30,31 +30,30 @@ public class HotelController {
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
     
     /**
      * 获取酒店列表（只返回状态为active的酒店）
-     * @param tenantId 租户ID（可选）
      * @return 酒店列表
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getHotels(@RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<Map<String, Object>> getHotels() {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<Hotel> hotels;
-            if (tenantId != null && tenantId > 0) {
-                hotels = hotelService.getHotelsByTenantIdAndStatus(tenantId, Hotel.Status.active);
-            } else {
-                hotels = hotelService.getHotelsByStatus(Hotel.Status.active);
-            }
+            Integer effectiveTenantId = getCurrentTenantId();
+            List<Hotel> hotels = hotelService.getHotelsByTenantIdAndStatus(effectiveTenantId, Hotel.Status.active);
+            
             response.put("success", true);
             response.put("data", hotels);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "获取酒店列表失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.status(403).body(response);
         }
     }
     
@@ -69,13 +68,19 @@ public class HotelController {
         try {
             var hotel = hotelService.getHotelById(id)
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
+            
+            // 校验归属权
+            if (!hotel.getTenantId().equals(getCurrentTenantId())) {
+                throw new RuntimeException("Access denied: Tenant mismatch");
+            }
+
             response.put("success", true);
             response.put("data", hotel);
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             response.put("success", false);
             response.put("message", "获取酒店详情失败: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.status(403).body(response);
         }
     }
     
@@ -88,6 +93,10 @@ public class HotelController {
     public ResponseEntity<Map<String, Object>> getHotelsByTenantId(@PathVariable Integer tenantId) {
         Map<String, Object> response = new HashMap<>();
         try {
+            // 强制校验路径租户ID与上下文匹配
+            if (!tenantId.equals(getCurrentTenantId())) {
+                throw new RuntimeException("Access denied: Tenant mismatch");
+            }
             List<Hotel> hotels = hotelService.getHotelsByTenantId(tenantId);
             response.put("success", true);
             response.put("data", hotels);
@@ -95,7 +104,7 @@ public class HotelController {
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "获取酒店列表失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.status(403).body(response);
         }
     }
     
@@ -303,6 +312,30 @@ public class HotelController {
         } catch (RuntimeException e) {
             response.put("success", false);
             response.put("message", "删除酒店失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 根据酒店代码检查酒店CODE数据是否存在
+     * @param code 酒店代码
+     * @return 检查结果
+     */
+    @GetMapping("/code/{code}/check-code")
+    public ResponseEntity<Map<String, Object>> checkHotelCodeByCode(@PathVariable String code) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            var hotel = hotelRepository.findByHotelCodeAndTenantId(code, getCurrentTenantId())
+                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
+            boolean exists = hotel.getHotelCode() != null && !hotel.getHotelCode().trim().isEmpty();
+            Map<String, Object> data = new HashMap<>();
+            data.put("exists", exists);
+            response.put("success", true);
+            response.put("data", data);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", "检查酒店CODE失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }

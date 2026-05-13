@@ -37,7 +37,10 @@ public class PmsInventoryController {
 
     private Integer tid() {
         Integer t = TenantContext.getTenantId();
-        return t != null ? t : 1;
+        if (t == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return t;
     }
 
     /**

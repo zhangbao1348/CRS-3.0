@@ -22,20 +22,29 @@ public class HotelService {
     }
     
     /**
-     * 获取所有酒店列表
+     * 获取当前租户的所有酒店列表
      * @return 酒店列表
      */
     public List<Hotel> getAllHotels() {
-        return hotelRepository.findAll();
+        return hotelRepository.findByTenantId(getCurrentTenantId());
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 根据ID获取酒店
      * @param id 酒店ID
      * @return 酒店信息
      */
     public Optional<Hotel> getHotelById(Integer id) {
-        return hotelRepository.findById(id);
+        return hotelRepository.findById(id)
+                .filter(h -> h.getTenantId() != null && h.getTenantId().equals(getCurrentTenantId()));
     }
     
     /**
@@ -44,8 +53,7 @@ public class HotelService {
      * @return 酒店信息
      */
     public Optional<Hotel> getHotelByCode(String hotelCode) {
-        Integer tenantId = TenantContext.getTenantId();
-        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId != null ? tenantId : 1);
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId());
     }
     
     /**
@@ -54,7 +62,8 @@ public class HotelService {
      * @return 酒店列表
      */
     public List<Hotel> getHotelsByTenantId(Integer tenantId) {
-        return hotelRepository.findByTenantId(tenantId);
+        // 强制使用当前上下文租户 ID
+        return hotelRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -64,7 +73,7 @@ public class HotelService {
      * @return 酒店列表
      */
     public List<Hotel> getHotelsByTenantIdAndStatus(Integer tenantId, Hotel.Status status) {
-        return hotelRepository.findByTenantIdAndStatus(tenantId, status);
+        return hotelRepository.findByTenantIdAndStatus(getCurrentTenantId(), status);
     }
     
     /**
@@ -73,10 +82,11 @@ public class HotelService {
      * @return 创建的酒店信息
      */
     public Hotel createHotel(Hotel hotel) {
-        Integer tenantId = hotel.getTenantId() != null ? hotel.getTenantId() : TenantContext.getTenantId();
-        if (tenantId == null) tenantId = 1;
+        Integer tenantId = getCurrentTenantId();
+        hotel.setTenantId(tenantId);
+        
         if (hotelRepository.existsByHotelCodeAndTenantId(hotel.getHotelCode(), tenantId)) {
-            throw new RuntimeException("Hotel code already exists");
+            throw new RuntimeException("Hotel code already exists in this tenant");
         }
         
         return hotelRepository.save(hotel);
@@ -89,8 +99,8 @@ public class HotelService {
      * @return 更新后的酒店信息
      */
     public Hotel updateHotel(Integer id, Hotel hotel) {
-        Hotel existingHotel = hotelRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Hotel not found"));
+        Hotel existingHotel = getHotelById(id)
+                .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
         
         // 酒店代码不允许修改，保留原有代码
         // existingHotel.setHotelCode(hotel.getHotelCode());
@@ -140,10 +150,9 @@ public class HotelService {
      * @param id 酒店ID
      */
     public void deleteHotel(Integer id) {
-        if (!hotelRepository.existsById(id)) {
-            throw new RuntimeException("Hotel not found");
-        }
-        hotelRepository.deleteById(id);
+        Hotel existing = getHotelById(id)
+                .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
+        hotelRepository.delete(existing);
     }
     
     /**
@@ -152,7 +161,7 @@ public class HotelService {
      * @return 酒店列表
      */
     public List<Hotel> getHotelsByStatus(Hotel.Status status) {
-        return hotelRepository.findByStatus(status);
+        return hotelRepository.findByTenantIdAndStatus(getCurrentTenantId(), status);
     }
     
     /**
@@ -161,6 +170,6 @@ public class HotelService {
      * @return 酒店列表
      */
     public List<Hotel> getHotelsByCity(String city) {
-        return hotelRepository.findByCity(city);
+        return hotelRepository.findByTenantIdAndCity(getCurrentTenantId(), city);
     }
 }

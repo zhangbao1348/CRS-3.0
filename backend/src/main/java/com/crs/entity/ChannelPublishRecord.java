@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -10,9 +7,9 @@ import java.util.Date;
 /**
  * 渠道发布记录实体类
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "channel_publish_records")
 public class ChannelPublishRecord {
@@ -56,4 +53,34 @@ public class ChannelPublishRecord {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+
+    public String getChannelCode() { return channelCode; }
+    public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
+
+    public String getRateCode() { return rateCode; }
+    public void setRateCode(String rateCode) { this.rateCode = rateCode; }
+
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public Date getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(Date publishedAt) { this.publishedAt = publishedAt; }
+
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

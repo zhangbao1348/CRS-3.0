@@ -1,12 +1,12 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 import jakarta.persistence.*;
 import java.util.Date;
 
-@Data @NoArgsConstructor @AllArgsConstructor
+  
 @Entity @Table(name = "inventory_quota", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"tenant_id", "hotel_code", "dimension_type", "dimension_code", "quota_date"})
 })
@@ -37,4 +37,27 @@ public class InventoryQuota {
     @Column(name = "created_at", nullable = false, updatable = false) @Temporal(TemporalType.TIMESTAMP) private Date createdAt = new Date();
     @Column(name = "updated_at", nullable = false) @Temporal(TemporalType.TIMESTAMP) private Date updatedAt = new Date();
     @PreUpdate public void preUpdate() { this.updatedAt = new Date(); }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getDimensionType() { return dimensionType; }
+    public void setDimensionType(String dimensionType) { this.dimensionType = dimensionType; }
+    public String getDimensionCode() { return dimensionCode; }
+    public void setDimensionCode(String dimensionCode) { this.dimensionCode = dimensionCode; }
+    public Date getQuotaDate() { return quotaDate; }
+    public void setQuotaDate(Date quotaDate) { this.quotaDate = quotaDate; }
+    public Integer getQuotaLimit() { return quotaLimit; }
+    public void setQuotaLimit(Integer quotaLimit) { this.quotaLimit = quotaLimit; }
+    public Integer getSoldCount() { return soldCount; }
+    public void setSoldCount(Integer soldCount) { this.soldCount = soldCount; }
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

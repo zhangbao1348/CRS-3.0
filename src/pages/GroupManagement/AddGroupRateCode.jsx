@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tabs, Tag, Radio, Table, Switch, message, Spin, Modal, DatePicker } from 'antd'
-import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
-import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import dayjs from 'dayjs'
-import { groupRateCodeApi, hotelApi } from '../../utils/api'
+import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { groupRateCodeApi, hotelApi, marketCodeApi, sourceCodeApi, packageApi, roomTypeCategoryApi, groupRoomTypeApi, guaranteePolicyApi, cancellationPolicyApi, rateTypeApi } from '../../utils/api'
 import { getCurrentTenantId } from '../../utils/tenantUtils'
 
 const { Option } = Select
@@ -171,8 +171,8 @@ const AddGroupRateCode = () => {
   const fetchThirdLevelMarketCodes = async () => {
     try {
       setLoadingMarketCodes(true)
-      const response = await axios.get('/api/market-codes/third-level')
-      setMarketCodes(response.data)
+      const data = await marketCodeApi.getThirdLevelMarketCodes()
+      setMarketCodes(data || [])
     } catch (error) {
       console.error('获取第三级市场码失败:', error)
       setMarketCodes([])
@@ -186,8 +186,8 @@ const AddGroupRateCode = () => {
   const fetchThirdLevelSourceCodes = async () => {
     try {
       setLoadingSourceCodes(true)
-      const response = await axios.get('/api/source-codes/third-level')
-      setSourceCodes(response.data)
+      const data = await sourceCodeApi.getThirdLevelSourceCodes()
+      setSourceCodes(data || [])
     } catch (error) {
       console.error('获取第三级来源码失败:', error)
       setSourceCodes([])
@@ -201,8 +201,8 @@ const AddGroupRateCode = () => {
   const fetchPackages = async () => {
     try {
       setLoadingPackages(true)
-      const response = await axios.get('/api/packages')
-      setPackages(response.data)
+      const data = await packageApi.getAllPackages()
+      setPackages(data || [])
     } catch (error) {
       console.error('获取包价数据失败:', error)
       setPackages([])
@@ -223,26 +223,25 @@ const AddGroupRateCode = () => {
       }
       
       // 并行获取房型大类和集团房型
-      const [categoriesResponse, roomTypesResponse] = await Promise.all([
-        axios.get(`/api/room-type-categories/group/${groupId}`),
-        axios.get(`/api/group-room-types/group/${groupId}`)
+      const [categoriesData, roomTypesData] = await Promise.all([
+        roomTypeCategoryApi.getCategoriesByGroupId(groupId),
+        groupRoomTypeApi.getGroupRoomTypesByGroupId(groupId)
       ])
       
       // 获取房型大类映射
-      const categoryList = categoriesResponse.data || []
+      const categoryList = categoriesData || []
       const categoryMap = categoryList.reduce((map, cat) => {
         map[cat.id] = cat.categoryName
         return map
       }, {})
       
       // 直接获取当前租户的集团房型
-      const filteredRoomTypes = roomTypesResponse.data || []
+      const filteredRoomTypes = roomTypesData || []
       setGroupRoomTypes(filteredRoomTypes)
       
-      // 按房型大类分组
+      // 按房型大类分组，直接使用后端返回的 categoryName
       const grouped = filteredRoomTypes.reduce((acc, roomType) => {
-        const categoryId = roomType.roomTypeCategoryId || 0
-        const category = categoryMap[categoryId] || '其他'
+        const category = roomType.roomTypeCategory?.categoryName || '其他'
         if (!acc[category]) {
           acc[category] = []
         }
@@ -270,13 +269,13 @@ const AddGroupRateCode = () => {
       }
       
       // 并行获取担保规则和取消规则
-      const [guaranteeResponse, cancellationResponse] = await Promise.all([
-        axios.get(`/api/guarantee-policies?tenantId=${groupId}`),
-        axios.get(`/api/cancellation-policies?tenantId=${groupId}`)
+      const [guaranteeData, cancellationData] = await Promise.all([
+        guaranteePolicyApi.getAllGuaranteePolicies(groupId),
+        cancellationPolicyApi.getAllCancellationPolicies(groupId)
       ])
       
-      setGuaranteePolicies(guaranteeResponse.data)
-      setCancellationPolicies(cancellationResponse.data)
+      setGuaranteePolicies(guaranteeData || [])
+      setCancellationPolicies(cancellationData || [])
     } catch (error) {
       console.error('获取政策数据失败:', error)
       setGuaranteePolicies([])
@@ -291,8 +290,8 @@ const AddGroupRateCode = () => {
   const fetchRateCategories = async () => {
     try {
       setLoadingRateCategories(true)
-      const response = await axios.get('/api/rate-types/active')
-      setRateCategories(response.data || [])
+      const data = await rateTypeApi.getActiveRateTypes()
+      setRateCategories(data || [])
     } catch (error) {
       console.error('获取房价大类数据失败:', error)
       setRateCategories([])
@@ -450,7 +449,6 @@ const AddGroupRateCode = () => {
       if (response && response.success && response.data && response.data.length > 0) {
         const formattedHotelData = response.data.map((hotel, index) => ({
           key: String(hotel.id || index),
-          hotelId: hotel.id,
           hotelCode: hotel.hotelCode,
           hotel: hotel.chineseName,
           region: hotel.province,
@@ -823,7 +821,6 @@ const AddGroupRateCode = () => {
     try {
       setLoading(true)
       const allocationData = hotelData.map(item => ({
-        hotelId: item.hotelId,
         hotelCode: item.hotelCode,
         allocated: item.allocated,
         basicInfoEditable: item.basicInfoEditable,
@@ -843,7 +840,7 @@ const AddGroupRateCode = () => {
               <p>以下酒店的价格计划已按最新集团房价码数据更新：</p>
               <ul style={{ maxHeight: 200, overflow: 'auto' }}>
                 {result.reallocationDiffs.map(d => (
-                  <li key={d.hotelId}>
+                  <li key={d.hotelCode}>
                     {d.hotelName}（更新字段：{translateFields(d.diffFields).join('、')}）
                   </li>
                 ))}

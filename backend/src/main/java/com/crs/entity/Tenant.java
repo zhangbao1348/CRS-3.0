@@ -1,9 +1,6 @@
 package com.crs.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,9 +17,9 @@ import java.util.List;
  *     <li>所有业务数据（酒店、房型、价格、订单等）通过 `tenant_id` 物理或逻辑隔离，确保租户间的数据安全性。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "tenants")
 public class Tenant {
@@ -97,5 +94,30 @@ public class Tenant {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getTenantCode() { return tenantCode; }
+    public void setTenantCode(String tenantCode) { this.tenantCode = tenantCode; }
+    public String getTenantName() { return tenantName; }
+    public void setTenantName(String tenantName) { this.tenantName = tenantName; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public Date getExpireDate() { return expireDate; }
+    public void setExpireDate(Date expireDate) { this.expireDate = expireDate; }
+    public String getContactName() { return contactName; }
+    public void setContactName(String contactName) { this.contactName = contactName; }
+    public String getContactPhone() { return contactPhone; }
+    public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
+    public String getContactEmail() { return contactEmail; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+    public Integer getHotelCount() { return hotelCount; }
+    public void setHotelCount(Integer hotelCount) { this.hotelCount = hotelCount; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
 

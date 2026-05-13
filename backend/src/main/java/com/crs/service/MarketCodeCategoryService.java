@@ -20,15 +20,15 @@ import java.util.Map;
  */
 public interface MarketCodeCategoryService {
     
-    List<Map<String, Object>> getAllMarketCodeCategories(Integer tenantId);
+    List<Map<String, Object>> getAllMarketCodeCategories();
     
-    MarketCodeCategory getMarketCodeCategoryById(Integer tenantId, Integer id);
+    MarketCodeCategory getMarketCodeCategoryById(Integer id);
     
-    MarketCodeCategory createMarketCodeCategory(Integer tenantId, MarketCodeCategory marketCodeCategory);
+    MarketCodeCategory createMarketCodeCategory(MarketCodeCategory marketCodeCategory);
     
-    MarketCodeCategory updateMarketCodeCategory(Integer tenantId, MarketCodeCategory marketCodeCategory);
+    MarketCodeCategory updateMarketCodeCategory(MarketCodeCategory marketCodeCategory);
     
-    void deleteMarketCodeCategory(Integer tenantId, Integer id);
+    void deleteMarketCodeCategory(Integer id);
     
-    boolean isCodeUnique(Integer tenantId, String code, Integer excludeId);
+    boolean isCodeUnique(String code, Integer excludeId);
 }

@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -19,9 +16,9 @@ import java.util.Date;
  *     <li>**模板继承**：支持集团定义模板，酒店进行引用的管理模式。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "cancellation_policies")
 public class CancellationPolicy {
@@ -91,5 +88,38 @@ public class CancellationPolicy {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    /** 是否为默认政策 (0: 否, 1: 是) */
+    @Column(name = "is_default")
+    private Integer isDefault = 0;
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public Integer getCancellationDays() { return cancellationDays; }
+    public void setCancellationDays(Integer cancellationDays) { this.cancellationDays = cancellationDays; }
+    public String getCancellationTime() { return cancellationTime; }
+    public void setCancellationTime(String cancellationTime) { this.cancellationTime = cancellationTime; }
+    public String getCancellationFeeType() { return cancellationFeeType; }
+    public void setCancellationFeeType(String cancellationFeeType) { this.cancellationFeeType = cancellationFeeType; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Integer getGroupId() { return groupId; }
+    public void setGroupId(Integer groupId) { this.groupId = groupId; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    public Integer getIsDefault() { return isDefault; }
+    public void setIsDefault(Integer isDefault) { this.isDefault = isDefault; }
 }
 

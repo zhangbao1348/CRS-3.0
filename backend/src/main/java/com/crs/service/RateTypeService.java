@@ -28,33 +28,43 @@ public class RateTypeService {
     @Autowired
     private RateTypeRepository rateTypeRepository;
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     public List<RateType> getAllRateTypes(Integer tenantId) {
-        return rateTypeRepository.findByTenantId(tenantId);
+        return rateTypeRepository.findByTenantId(getCurrentTenantId());
     }
     
     public RateType getRateTypeById(Integer tenantId, Integer id) {
+        Integer currentTenantId = getCurrentTenantId();
         RateType rateType = rateTypeRepository.findById(id).orElse(null);
-        if (rateType != null && rateType.getTenantId() != null && rateType.getTenantId().equals(tenantId)) {
+        if (rateType != null && rateType.getTenantId() != null && rateType.getTenantId().equals(currentTenantId)) {
             return rateType;
         }
         return null;
     }
     
     public RateType getRateTypeByCode(Integer tenantId, String code) {
-        return rateTypeRepository.findByTenantIdAndCode(tenantId, code);
+        return rateTypeRepository.findByTenantIdAndCode(getCurrentTenantId(), code);
     }
     
     public List<RateType> getActiveRateTypes(Integer tenantId) {
-        return rateTypeRepository.findByTenantIdAndStatus(tenantId, RateType.Status.active);
+        return rateTypeRepository.findByTenantIdAndStatus(getCurrentTenantId(), RateType.Status.active);
     }
     
     public RateType createRateType(Integer tenantId, RateType rateType) {
-        rateType.setTenantId(tenantId);
+        rateType.setTenantId(getCurrentTenantId());
         return rateTypeRepository.save(rateType);
     }
     
     public RateType updateRateType(Integer tenantId, RateType rateType) {
-        RateType existing = getRateTypeById(tenantId, rateType.getId());
+        Integer currentTenantId = getCurrentTenantId();
+        RateType existing = getRateTypeById(currentTenantId, rateType.getId());
         if (existing != null) {
             if (rateType.getCode() != null) {
                 existing.setCode(rateType.getCode());
@@ -77,15 +87,15 @@ public class RateTypeService {
     }
     
     public void deleteRateType(Integer tenantId, Integer id) {
-        RateType existing = getRateTypeById(tenantId, id);
+        RateType existing = getRateTypeById(getCurrentTenantId(), id);
         if (existing != null) {
-            rateTypeRepository.deleteById(id);
+            rateTypeRepository.delete(existing);
         }
     }
     
     public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
         try {
-            RateType existing = rateTypeRepository.findByTenantIdAndCode(tenantId, code);
+            RateType existing = rateTypeRepository.findByTenantIdAndCode(getCurrentTenantId(), code);
             return existing == null || (excludeId != null && existing.getId().equals(excludeId));
         } catch (Exception e) {
             e.printStackTrace();
@@ -95,9 +105,10 @@ public class RateTypeService {
 
     @Transactional
     public List<RateType> batchCreateRateTypes(Integer tenantId, List<RateType> rateTypes) {
+        Integer currentTenantId = getCurrentTenantId();
         List<RateType> savedRateTypes = new ArrayList<>();
         for (RateType rateType : rateTypes) {
-            rateType.setTenantId(tenantId);
+            rateType.setTenantId(currentTenantId);
             savedRateTypes.add(rateTypeRepository.save(rateType));
         }
         return savedRateTypes;
@@ -105,10 +116,11 @@ public class RateTypeService {
 
     @Transactional
     public List<RateType> initDefaultRateTypesForTenant(Integer tenantId) {
+        Integer currentTenantId = getCurrentTenantId();
         List<RateType> defaultRateTypes = new ArrayList<>();
         
         RateType bar = new RateType();
-        bar.setTenantId(tenantId);
+        bar.setTenantId(currentTenantId);
         bar.setCode("BAR");
         bar.setName("最佳可用房价");
         bar.setDescription("酒店的标准房价，适用于所有客人");
@@ -117,7 +129,7 @@ public class RateTypeService {
         defaultRateTypes.add(rateTypeRepository.save(bar));
         
         RateType corp = new RateType();
-        corp.setTenantId(tenantId);
+        corp.setTenantId(currentTenantId);
         corp.setCode("CORP");
         corp.setName("企业协议价");
         corp.setDescription("与企业客户签订的协议价格");
@@ -126,7 +138,7 @@ public class RateTypeService {
         defaultRateTypes.add(rateTypeRepository.save(corp));
         
         RateType promo = new RateType();
-        promo.setTenantId(tenantId);
+        promo.setTenantId(currentTenantId);
         promo.setCode("PROMO");
         promo.setName("促销价");
         promo.setDescription("特别促销活动价格");
@@ -135,7 +147,7 @@ public class RateTypeService {
         defaultRateTypes.add(rateTypeRepository.save(promo));
         
         RateType group = new RateType();
-        group.setTenantId(tenantId);
+        group.setTenantId(currentTenantId);
         group.setCode("GROUP");
         group.setName("团队价");
         group.setDescription("适用于团队预订的价格");
@@ -144,7 +156,7 @@ public class RateTypeService {
         defaultRateTypes.add(rateTypeRepository.save(group));
         
         RateType packageRate = new RateType();
-        packageRate.setTenantId(tenantId);
+        packageRate.setTenantId(currentTenantId);
         packageRate.setCode("PACKAGE");
         packageRate.setName("包价");
         packageRate.setDescription("包含额外服务的套餐价格");
@@ -153,7 +165,7 @@ public class RateTypeService {
         defaultRateTypes.add(rateTypeRepository.save(packageRate));
         
         RateType longstay = new RateType();
-        longstay.setTenantId(tenantId);
+        longstay.setTenantId(currentTenantId);
         longstay.setCode("LONGSTAY");
         longstay.setName("长住价");
         longstay.setDescription("适用于长期住宿客人的优惠价格");

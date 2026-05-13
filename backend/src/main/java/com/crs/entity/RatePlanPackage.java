@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 价格计划包价关联实体类
  * 对应数据库rate_plan_packages表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "rate_plan_packages")
 public class RatePlanPackage {

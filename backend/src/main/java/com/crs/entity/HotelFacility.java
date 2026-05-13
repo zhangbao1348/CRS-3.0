@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -20,9 +20,9 @@ import java.util.Date;
  *     <li>**多维度关联**：支持基于 `hotelId` 或 `hotelCode` 的灵活关联查询。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "hotel_facilities")
 public class HotelFacility {
@@ -31,10 +31,6 @@ public class HotelFacility {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-    
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
     
     /** 酒店外部编码冗余 */
     @Column(name = "hotel_code", length = 50)
@@ -74,7 +70,7 @@ public class HotelFacility {
     
     /** 所属酒店实体引用 */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     @JsonIgnore
     private Hotel hotel;
     
@@ -85,4 +81,25 @@ public class HotelFacility {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getFacilityType() { return facilityType; }
+    public void setFacilityType(String facilityType) { this.facilityType = facilityType; }
+    public String getFacilityName() { return facilityName; }
+    public void setFacilityName(String facilityName) { this.facilityName = facilityName; }
+    public String getFacilityCode() { return facilityCode; }
+    public void setFacilityCode(String facilityCode) { this.facilityCode = facilityCode; }
+    public Boolean getAvailable() { return available; }
+    public void setAvailable(Boolean available) { this.available = available; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    public Hotel getHotel() { return hotel; }
+    public void setHotel(Hotel hotel) { this.hotel = hotel; }
 }

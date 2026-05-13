@@ -11,6 +11,7 @@ import com.crs.repository.RatePlanRepository;
 import com.crs.util.CodeValidator;
 import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,7 +44,10 @@ public class RatePlanController {
   
   private Integer getCurrentTenantId() {
       Integer tenantId = TenantContext.getTenantId();
-      return tenantId != null ? tenantId : 1;
+      if (tenantId == null) {
+          throw new RuntimeException("Tenant context missing");
+      }
+      return tenantId;
   }
   
   private boolean validateHotelTenant(String hotelCode) {
@@ -79,7 +83,6 @@ public class RatePlanController {
       Map<String, Object> data = new HashMap<>();
       data.put("id", ratePlan.getId());
       data.put("tenantId", ratePlan.getTenantId());
-      data.put("hotelId", ratePlan.getHotelId());
       data.put("hotelCode", ratePlan.getHotelCode());
       data.put("sourceGroupRateCode", ratePlan.getSourceGroupRateCode());
 
@@ -151,25 +154,16 @@ public class RatePlanController {
             @RequestParam(required = false) String rateCategory,
             @RequestParam(required = false) String status) {
         List<RatePlan> ratePlans;
+        Integer tenantId = getCurrentTenantId();
 
         if (hotelCode != null && !hotelCode.isEmpty()) {
-            // 关联查询原则：必须使用 tenantId + hotelCode 双维度，防止跨租户泄露
-            Integer tenantId = getCurrentTenantId();
             if (status != null) {
                 ratePlans = ratePlanRepository.findByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, status);
             } else {
                 ratePlans = ratePlanRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
             }
-        } else if (hotelId != null) {
-            // 已废弃：兼容旧应用传 hotelId 的情况
-            logger.warn("getRatePlans 收到旧参数 hotelId={}. 请升级为使用 hotelCode 参数", hotelId);
-            if (status != null) {
-                ratePlans = ratePlanRepository.findByHotelIdAndStatus(hotelId, status);
-            } else {
-                ratePlans = ratePlanRepository.findByHotelId(hotelId);
-            }
         } else {
-            ratePlans = ratePlanRepository.findAll();
+            ratePlans = ratePlanRepository.findByTenantId(tenantId);
         }
         
         Map<String, Object> response = new HashMap<>();
@@ -187,20 +181,16 @@ public class RatePlanController {
     public ResponseEntity<Map<String, Object>> getRatePlanById(@PathVariable Integer id) {
         Map<String, Object> response = new HashMap<>();
         try {
-            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id);
+            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id)
+                    .filter(rp -> rp.getTenantId() != null && rp.getTenantId().equals(getCurrentTenantId()));
+            
             if (!ratePlanOpt.isPresent()) {
                 response.put("success", false);
-                response.put("message", "价格计划不存在");
-                return ResponseEntity.badRequest().body(response);
+                response.put("message", "价格计划不存在或无权访问");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
 
             RatePlan ratePlan = ratePlanOpt.get();
-            if (!isBlank(ratePlan.getHotelCode()) && !validateHotelTenant(ratePlan.getHotelCode())) {
-                response.put("success", false);
-                response.put("message", "无权访问该酒店数据");
-                return ResponseEntity.status(403).body(response);
-            }
-
             response.put("success", true);
             response.put("data", buildRatePlanDetailData(ratePlan));
             return ResponseEntity.ok(response);
@@ -223,21 +213,13 @@ public class RatePlanController {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
             
-            if (ratePlan.getHotelId() == null && ratePlan.getHotelCode() != null && !ratePlan.getHotelCode().isEmpty()) {
-                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(ratePlan.getHotelCode(), getCurrentTenantId());
-                if (hotelOpt.isEmpty()) {
-                    return ResponseEntity.status(403).body(Map.of("error", "无权操作该酒店数据"));
-                }
-                ratePlan.setHotelId(hotelOpt.get().getId());
-            }
-            
-            if (ratePlan.getHotelId() == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "缺少酒店信息(hotelId或hotelCode)"));
+            if (ratePlan.getHotelCode() == null || ratePlan.getHotelCode().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "缺少酒店信息(hotelCode)"));
             }
             
             ratePlan.setTenantId(getCurrentTenantId());
             
-            if (ratePlanRepository.existsByHotelIdAndRateCode(ratePlan.getHotelId(), ratePlan.getRateCode())) {
+            if (ratePlanRepository.existsByTenantIdAndHotelCodeAndRateCode(getCurrentTenantId(), ratePlan.getHotelCode(), ratePlan.getRateCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "价格计划代码在该酒店内已存在"));
             }
             if (groupRateCodeRepository.findByRateCodeAndGroupId(ratePlan.getRateCode(), getCurrentTenantId()) != null) {
@@ -263,33 +245,30 @@ public class RatePlanController {
             if (ratePlan.getRateCode() != null && !CodeValidator.isValid(ratePlan.getRateCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            Optional<RatePlan> existingOpt = ratePlanRepository.findById(id);
+            Integer tenantId = getCurrentTenantId();
+            Optional<RatePlan> existingOpt = ratePlanRepository.findById(id)
+                    .filter(rp -> rp.getTenantId() != null && rp.getTenantId().equals(tenantId));
+            
             if (!existingOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("价格计划不存在或无权访问");
             }
             
             RatePlan existingRatePlan = existingOpt.get();
             
-            if (ratePlan.getHotelId() == null && ratePlan.getHotelCode() != null && !ratePlan.getHotelCode().isEmpty()) {
-                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(ratePlan.getHotelCode(), getCurrentTenantId());
-                if (hotelOpt.isPresent()) {
-                    ratePlan.setHotelId(hotelOpt.get().getId());
-                } else {
-                    ratePlan.setHotelId(existingRatePlan.getHotelId());
-                }
+            if (ratePlan.getHotelCode() == null || ratePlan.getHotelCode().isEmpty()) {
+                ratePlan.setHotelCode(existingRatePlan.getHotelCode());
+            } else if (!validateHotelTenant(ratePlan.getHotelCode())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("无权将价格计划移动到该酒店");
             }
             
-            if (ratePlan.getHotelId() == null) {
-                ratePlan.setHotelId(existingRatePlan.getHotelId());
-            }
-            
-            Optional<RatePlan> duplicateOpt = ratePlanRepository.findByHotelIdAndRateCode(
-                    ratePlan.getHotelId(), ratePlan.getRateCode());
+            Optional<RatePlan> duplicateOpt = ratePlanRepository.findByTenantIdAndHotelCodeAndRateCode(
+                    tenantId, ratePlan.getHotelCode(), ratePlan.getRateCode());
             if (duplicateOpt.isPresent() && !duplicateOpt.get().getId().equals(id)) {
                 return ResponseEntity.badRequest().body("价格计划代码在该酒店内已存在");
             }
             
             ratePlan.setId(id);
+            ratePlan.setTenantId(tenantId);
             ratePlan.setCreatedAt(existingRatePlan.getCreatedAt());
             
             RatePlan updatedRatePlan = ratePlanRepository.save(ratePlan);
@@ -307,11 +286,14 @@ public class RatePlanController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteRatePlan(@PathVariable Integer id) {
         try {
-            if (!ratePlanRepository.existsById(id)) {
-                return ResponseEntity.notFound().build();
+            Optional<RatePlan> existing = ratePlanRepository.findById(id)
+                    .filter(rp -> rp.getTenantId() != null && rp.getTenantId().equals(getCurrentTenantId()));
+            
+            if (!existing.isPresent()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("价格计划不存在或无权访问");
             }
             
-            ratePlanRepository.deleteById(id);
+            ratePlanRepository.delete(existing.get());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(500).body("删除价格计划失败: " + e.getMessage());
@@ -326,9 +308,11 @@ public class RatePlanController {
     @PutMapping("/{id}/enable")
     public ResponseEntity<?> enableRatePlan(@PathVariable Integer id) {
         try {
-            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id);
+            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id)
+                    .filter(rp -> rp.getTenantId() != null && rp.getTenantId().equals(getCurrentTenantId()));
+            
             if (!ratePlanOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("价格计划不存在或无权访问");
             }
             
             RatePlan ratePlan = ratePlanOpt.get();
@@ -349,9 +333,11 @@ public class RatePlanController {
     @PutMapping("/{id}/disable")
     public ResponseEntity<?> disableRatePlan(@PathVariable Integer id) {
         try {
-            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id);
+            Optional<RatePlan> ratePlanOpt = ratePlanRepository.findById(id)
+                    .filter(rp -> rp.getTenantId() != null && rp.getTenantId().equals(getCurrentTenantId()));
+            
             if (!ratePlanOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("价格计划不存在或无权访问");
             }
             
             RatePlan ratePlan = ratePlanOpt.get();
@@ -381,27 +367,19 @@ public class RatePlanController {
             @RequestParam(required = false) Integer id) {
         Map<String, Object> response = new HashMap<>();
         try {
-            boolean exists;
-            if (hotelCode != null && !hotelCode.isEmpty()) {
-                // 优先使用 hotelCode 查重（符合CODE关联规范）
-                if (id != null) {
-                    exists = ratePlanRepository.existsByHotelCodeAndRateCodeAndIdNot(hotelCode, code, id);
-                } else {
-                    exists = ratePlanRepository.existsByHotelCodeAndRateCode(hotelCode, code);
-                }
-            } else if (hotelId != null) {
-                // 已废弃：兼容旧应用
-                logger.warn("checkRateCodeUnique 收到旧参数 hotelId={}. 请升级为使用 hotelCode 参数", hotelId);
-                if (id != null) {
-                    exists = ratePlanRepository.existsByHotelIdAndRateCodeAndIdNot(hotelId, code, id);
-                } else {
-                    exists = ratePlanRepository.existsByHotelIdAndRateCode(hotelId, code);
-                }
-            } else {
+            if (isBlank(hotelCode)) {
                 response.put("success", false);
-                response.put("message", "缺少酒店标识（hotelCode 或 hotelId）");
+                response.put("message", "缺少酒店代码(hotelCode)");
                 return ResponseEntity.badRequest().body(response);
             }
+
+            boolean exists;
+            if (id != null) {
+                exists = ratePlanRepository.existsByTenantIdAndHotelCodeAndRateCodeAndIdNot(getCurrentTenantId(), hotelCode, code, id);
+            } else {
+                exists = ratePlanRepository.existsByTenantIdAndHotelCodeAndRateCode(getCurrentTenantId(), hotelCode, code);
+            }
+            
             response.put("success", true);
             response.put("exists", exists);
             return ResponseEntity.ok(response);
@@ -485,9 +463,9 @@ public class RatePlanController {
       @RequestParam(required = false) String targetDerivativeLevel,
       @RequestParam(required = false) Integer excludeId) {
     try {
-      List<RatePlan> parentRatePlans = ratePlanRepository.findAll().stream()
+      List<RatePlan> parentRatePlans = ratePlanRepository.findByTenantId(getCurrentTenantId()).stream()
           .filter(rp -> "basic".equals(rp.getRateType()))
-          .filter(rp -> !rp.getId().equals(excludeId))
+          .filter(rp -> excludeId == null || !rp.getId().equals(excludeId))
           .collect(java.util.stream.Collectors.toList());
       
       return ResponseEntity.ok(parentRatePlans);

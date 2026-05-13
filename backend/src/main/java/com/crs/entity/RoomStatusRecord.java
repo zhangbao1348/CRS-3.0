@@ -1,19 +1,13 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-
 import jakarta.persistence.*;
 import java.util.Date;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "room_status", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"tenant_id", "hotel_code", "dimension_type", "dimension_code", "status_date"})
 })
+
 /**
  * RoomStatusRecord 实体类
  * 
@@ -64,4 +58,23 @@ public class RoomStatusRecord {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getDimensionType() { return dimensionType; }
+    public void setDimensionType(String dimensionType) { this.dimensionType = dimensionType; }
+    public String getDimensionCode() { return dimensionCode; }
+    public void setDimensionCode(String dimensionCode) { this.dimensionCode = dimensionCode; }
+    public Date getStatusDate() { return statusDate; }
+    public void setStatusDate(Date statusDate) { this.statusDate = statusDate; }
+    public Boolean getIsOpen() { return isOpen; }
+    public void setIsOpen(Boolean isOpen) { this.isOpen = isOpen; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

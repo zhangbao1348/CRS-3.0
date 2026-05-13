@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -19,9 +16,9 @@ import java.util.Date;
  *     <li>**担保方式**：`guaranteeSubType` 区分信用卡担保、现金担保、公司账号担保等。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "guarantee_policies")
 public class GuaranteePolicy {
@@ -94,5 +91,50 @@ public class GuaranteePolicy {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    /** 是否为默认政策 (0: 否, 1: 是) */
+    @Column(name = "is_default")
+    private Integer isDefault = 0;
+
+    /** 信用卡类型 (若是信用卡担保，如 'visa', 'mastercard') */
+    @Column(name = "card_type", length = 50)
+    private String cardType;
+
+    /** 最晚入住时刻 (冗余字段，部分逻辑使用) */
+    @Column(name = "latest_check_in_time", length = 10)
+    private String latestCheckInTime;
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public String getGuaranteeSubType() { return guaranteeSubType; }
+    public void setGuaranteeSubType(String guaranteeSubType) { this.guaranteeSubType = guaranteeSubType; }
+    public String getGuaranteeAmount() { return guaranteeAmount; }
+    public void setGuaranteeAmount(String guaranteeAmount) { this.guaranteeAmount = guaranteeAmount; }
+    public String getLatestArrivalTime() { return latestArrivalTime; }
+    public void setLatestArrivalTime(String latestArrivalTime) { this.latestArrivalTime = latestArrivalTime; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Integer getGroupId() { return groupId; }
+    public void setGroupId(Integer groupId) { this.groupId = groupId; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    public Integer getIsDefault() { return isDefault; }
+    public void setIsDefault(Integer isDefault) { this.isDefault = isDefault; }
+    public String getCardType() { return cardType; }
+    public void setCardType(String cardType) { this.cardType = cardType; }
+    public String getLatestCheckInTime() { return latestCheckInTime; }
+    public void setLatestCheckInTime(String latestCheckInTime) { this.latestCheckInTime = latestCheckInTime; }
 }
 

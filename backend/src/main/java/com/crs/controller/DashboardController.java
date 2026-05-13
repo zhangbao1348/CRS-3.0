@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -106,16 +107,16 @@ public class DashboardController {
                 hotelData.put("totalRooms", hotel.getTotalRooms());
 
                 // 今日入住数
-                hotelData.put("todayCheckIn", reservationRepo.countByTenantIdAndHotelIdAndCheckInDateAndStatusNot(
-                        tenantId, hotel.getId(), today, Reservation.Status.cancelled));
+                hotelData.put("todayCheckIn", reservationRepo.countByTenantIdAndHotelCodeAndCheckInDateAndStatusNot(
+                        tenantId, hotel.getHotelCode(), today, Reservation.Status.cancelled));
                 // 今日退房数
-                hotelData.put("todayCheckOut", reservationRepo.countByTenantIdAndHotelIdAndCheckOutDateAndStatusNot(
-                        tenantId, hotel.getId(), today, Reservation.Status.cancelled));
+                hotelData.put("todayCheckOut", reservationRepo.countByTenantIdAndHotelCodeAndCheckOutDateAndStatusNot(
+                        tenantId, hotel.getHotelCode(), today, Reservation.Status.cancelled));
                 // 本月收入
-                hotelData.put("monthRevenue", reservationRepo.sumTotalPriceByTenantIdAndHotelIdAndDateRange(
-                        tenantId, hotel.getId(), monthStart, monthEnd));
+                hotelData.put("monthRevenue", reservationRepo.sumTotalPriceByTenantIdAndHotelCodeAndDateRange(
+                        tenantId, hotel.getHotelCode(), monthStart, monthEnd));
                 // 今日可用库存
-                List<Inventory> todayInv = inventoryRepo.findByHotelIdAndDate(hotel.getId(), today);
+                List<Inventory> todayInv = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), today);
                 int todayAvailable = todayInv.stream().mapToInt(Inventory::getAvailableRooms).sum();
                 hotelData.put("todayAvailableRooms", todayAvailable);
 
@@ -144,7 +145,7 @@ public class DashboardController {
             data.put("channelDistribution", channels);
 
             // === 模块 E: 库存预警（未来7天可用<=2） ===
-            List<Inventory> lowInv = inventoryRepo.findLowInventory(2, today, sevenDaysLater);
+            List<Inventory> lowInv = inventoryRepo.findLowInventory(tenantId, 2, today, sevenDaysLater);
             List<Map<String, Object>> alerts = lowInv.stream().limit(20).map(inv -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("hotelCode", inv.getHotelCode());
@@ -204,17 +205,17 @@ public class DashboardController {
 
             // === 模块 A: 核心 KPI ===
             Map<String, Object> stats = new LinkedHashMap<>();
-            long todayCheckIn = reservationRepo.countByTenantIdAndHotelIdAndCheckInDateAndStatusNot(
-                    tenantId, hotel.getId(), today, Reservation.Status.cancelled);
-            long todayCheckOut = reservationRepo.countByTenantIdAndHotelIdAndCheckOutDateAndStatusNot(
-                    tenantId, hotel.getId(), today, Reservation.Status.cancelled);
-            long inHouse = reservationRepo.countByTenantIdAndHotelIdAndCheckInDateLessThanEqualAndCheckOutDateGreaterThanAndStatus(
-                    tenantId, hotel.getId(), today, today, Reservation.Status.active);
-            long todayNewOrders = reservationRepo.countByTenantIdAndHotelIdAndCreatedAtGreaterThanEqual(
-                    tenantId, hotel.getId(), today);
+            long todayCheckIn = reservationRepo.countByTenantIdAndHotelCodeAndCheckInDateAndStatusNot(
+                    tenantId, hotel.getHotelCode(), today, Reservation.Status.cancelled);
+            long todayCheckOut = reservationRepo.countByTenantIdAndHotelCodeAndCheckOutDateAndStatusNot(
+                    tenantId, hotel.getHotelCode(), today, Reservation.Status.cancelled);
+            long inHouse = reservationRepo.countByTenantIdAndHotelCodeAndCheckInDateLessThanEqualAndCheckOutDateGreaterThanAndStatus(
+                    tenantId, hotel.getHotelCode(), today, today, Reservation.Status.active);
+            long todayNewOrders = reservationRepo.countByTenantIdAndHotelCodeAndCreatedAtGreaterThanEqual(
+                    tenantId, hotel.getHotelCode(), today);
 
             // 今日可售
-            List<Inventory> todayInv = inventoryRepo.findByHotelIdAndDate(hotel.getId(), today);
+            List<Inventory> todayInv = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), today);
             int todayAvailable = todayInv.stream().mapToInt(Inventory::getAvailableRooms).sum();
 
             // 出租率
@@ -227,12 +228,12 @@ public class DashboardController {
             stats.put("todayNewOrders", todayNewOrders);
             stats.put("todayAvailable", todayAvailable);
             stats.put("occupancyRate", Math.round(occupancyRate * 10) / 10.0);
-            stats.put("monthRevenue", reservationRepo.sumTotalPriceByTenantIdAndHotelIdAndDateRange(
-                    tenantId, hotel.getId(), monthStart, monthEnd));
+            stats.put("monthRevenue", reservationRepo.sumTotalPriceByTenantIdAndHotelCodeAndDateRange(
+                    tenantId, hotel.getHotelCode(), monthStart, monthEnd));
             data.put("stats", stats);
 
             // === 模块 B: 未来7天库存日历 ===
-            List<Inventory> weekInv = inventoryRepo.findByHotelIdAndDateBetween(hotel.getId(), today, sevenDaysLater);
+            List<Inventory> weekInv = inventoryRepo.findByTenantIdAndHotelCodeAndDateBetween(tenantId, hotel.getHotelCode(), today, sevenDaysLater);
             // 按日期分组汇总可用库存
             Map<String, Integer> dailyInventory = new LinkedHashMap<>();
             Calendar cal = Calendar.getInstance();
@@ -250,28 +251,76 @@ public class DashboardController {
             data.put("weekInventory", dailyInventory);
 
             // === 模块 C: 今日订单列表 ===
-            List<Reservation> recentOrders = reservationRepo.findTop10ByTenantIdAndHotelIdOrderByCreatedAtDesc(tenantId, hotel.getId());
+            List<Reservation> recentOrders = reservationRepo.findTop10ByTenantIdAndHotelCodeOrderByCreatedAtDesc(tenantId, hotel.getHotelCode());
             data.put("recentOrders", recentOrders.stream().map(this::mapReservation).collect(Collectors.toList()));
 
-            // === 模块 D: 本周预订趋势 ===
-            List<Object[]> trendRaw = reservationRepo.countByHotelAndDateGrouped(tenantId, hotel.getId(), sevenDaysAgo);
-            List<Map<String, Object>> trend = trendRaw.stream().map(row -> {
+            // === 模块 D: 经营趋势透视 (OCC & ADR) ===
+            Date trendStart = getDaysAgo(30);
+            List<Object[]> dailyStats = reservationRepo.getDailyStatsByCheckIn(tenantId, hotel.getHotelCode(), trendStart, today);
+            List<Map<String, Object>> trends = dailyStats.stream().map(row -> {
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("date", row[0] != null ? row[0].toString() : "");
-                m.put("count", ((Number) row[1]).longValue());
+                m.put("date", sdf.format((Date)row[0]));
+                long soldNights = ((Number)row[1]).longValue();
+                BigDecimal revenue = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+                double occ = totalRooms > 0 ? Math.min(100.0, (double)soldNights * 100 / totalRooms) : 0;
+                BigDecimal adr = soldNights > 0 ? revenue.divide(BigDecimal.valueOf(soldNights), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                m.put("occ", Math.round(occ * 10) / 10.0);
+                m.put("adr", adr);
                 return m;
             }).collect(Collectors.toList());
-            data.put("bookingTrend", trend);
+            data.put("trends", trends);
 
-            // === 模块 E: 渠道订单分布 ===
-            List<Object[]> channelRaw = reservationRepo.countByHotelAndChannelGrouped(tenantId, hotel.getId(), monthStart);
-            List<Map<String, Object>> channels = channelRaw.stream().map(row -> {
+            // === 模块 E: 渠道价值矩阵 ===
+            List<Object[]> channelStats = reservationRepo.getChannelMatrixStats(tenantId, hotel.getHotelCode(), monthStart);
+            List<Map<String, Object>> channelMatrix = channelStats.stream().map(row -> {
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("channelName", row[0] != null ? row[0].toString() : "未知");
-                m.put("count", ((Number) row[1]).longValue());
+                m.put("channel", row[0]);
+                m.put("bookings", row[1]);
+                BigDecimal revenue = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+                long totalNights = row[3] != null ? ((Number)row[3]).longValue() : 0;
+                BigDecimal adr = totalNights > 0 ? revenue.divide(BigDecimal.valueOf(totalNights), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                m.put("adr", adr);
                 return m;
             }).collect(Collectors.toList());
-            data.put("channelDistribution", channels);
+            data.put("channelMatrix", channelMatrix);
+
+            // === 模块 F: 预订流速监测 (Pacing) ===
+            List<Object[]> pickupRaw = reservationRepo.getRecentPickupStatsByHotel(tenantId, hotel.getHotelCode(), getDaysAgo(7));
+            // 简单算法：今日 vs 过去3天均值
+            long todayPickup = 0;
+            double avgPickup = 0;
+            if (!pickupRaw.isEmpty()) {
+                todayPickup = ((Number)pickupRaw.get(pickupRaw.size()-1)[1]).longValue();
+                if (pickupRaw.size() > 1) {
+                    avgPickup = pickupRaw.stream().limit(pickupRaw.size()-1).mapToLong(r -> ((Number)r[1]).longValue()).average().orElse(0);
+                }
+            }
+            
+            String velocity = "正常";
+            if (todayPickup > avgPickup * 1.5) velocity = "非常快";
+            else if (todayPickup > avgPickup * 1.2) velocity = "快";
+            else if (todayPickup < avgPickup * 0.5) velocity = "非常慢";
+            else if (todayPickup < avgPickup * 0.8) velocity = "慢";
+            
+            Map<String, Object> pacing = new LinkedHashMap<>();
+            pacing.put("velocity", velocity);
+            pacing.put("todayPickup", todayPickup);
+            pacing.put("avgPickup", Math.round(avgPickup));
+            data.put("pacing", pacing);
+
+            // === 模块 G: 异常订单监控 ===
+            List<Map<String, Object>> exceptions = new ArrayList<>();
+            // 示例：查询待确认订单
+            long pendingConfirm = reservationRepo.countByTenantIdAndHotelCodeAndReservationStatus(tenantId, hotel.getHotelCode(), "wait_for_confirmation");
+            if (pendingConfirm > 0) {
+                exceptions.add(Map.of("type", "待确认", "detail", "有 " + pendingConfirm + " 笔订单等待确认", "level", "warning"));
+            }
+            // 示例：库存不足预警
+            List<Inventory> lowInv = inventoryRepo.findLowInventoryByHotel(tenantId, hotel.getHotelCode(), 0, today, getDaysLater(3));
+            if (!lowInv.isEmpty()) {
+                exceptions.add(Map.of("type", "超卖预警", "detail", "未来3天存在库存为0的房型", "level", "error"));
+            }
+            data.put("exceptions", exceptions);
 
             return ResponseEntity.ok(data);
         } catch (Exception e) {

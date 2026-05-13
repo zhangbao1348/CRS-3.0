@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 渠道房型映射实体类
  * 对应数据库channel_room_type_mappings表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "channel_room_type_mappings")
 public class ChannelRoomTypeMapping {
@@ -22,8 +19,8 @@ public class ChannelRoomTypeMapping {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "channel_id", nullable = false)
-    private Integer channelId;
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     @Column(name = "channel_code", length = 50)
     private String channelCode;
@@ -31,17 +28,11 @@ public class ChannelRoomTypeMapping {
     @Column(name = "channel_name", length = 50)
     private String channelName;
     
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
-    
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
     
     @Column(name = "hotel_name", length = 100)
     private String hotelName;
-    
-    @Column(name = "room_type_id", nullable = false)
-    private Integer roomTypeId;
     
     @Column(name = "room_type_name", length = 100)
     private String roomTypeName;
@@ -70,4 +61,31 @@ public class ChannelRoomTypeMapping {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getChannelCode() { return channelCode; }
+    public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
+    public String getChannelName() { return channelName; }
+    public void setChannelName(String channelName) { this.channelName = channelName; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getHotelName() { return hotelName; }
+    public void setHotelName(String hotelName) { this.hotelName = hotelName; }
+    public String getRoomTypeName() { return roomTypeName; }
+    public void setRoomTypeName(String roomTypeName) { this.roomTypeName = roomTypeName; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public String getChannelRoomTypeCode() { return channelRoomTypeCode; }
+    public void setChannelRoomTypeCode(String channelRoomTypeCode) { this.channelRoomTypeCode = channelRoomTypeCode; }
+    public String getChannelRoomTypeName() { return channelRoomTypeName; }
+    public void setChannelRoomTypeName(String channelRoomTypeName) { this.channelRoomTypeName = channelRoomTypeName; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

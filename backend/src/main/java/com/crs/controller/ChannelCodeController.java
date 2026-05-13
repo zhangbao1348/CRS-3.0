@@ -30,6 +30,14 @@ public class ChannelCodeController {
     @Autowired
     private ChannelHotelMappingRepository channelHotelMappingRepository;
 
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 获取所有渠道码（树形结构）
      */
@@ -45,19 +53,29 @@ public class ChannelCodeController {
     }
 
     /**
+     * 兼容性接口：根据 groupId 获取所有渠道码（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<Map<String, Object>>> getChannelCodesByGroupId(@PathVariable Integer groupId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getAllChannelCodes();
+    }
+
+    /**
      * 获取第三级（叶子节点）渠道码
      */
     @GetMapping("/third-level")
     public ResponseEntity<List<ChannelCode>> getThirdLevelChannelCodes() {
         try {
             // 获取第3级渠道码，如果没有3级则获取第2级中没有子节点的
-            List<ChannelCode> level3 = channelCodeRepository.findByTenantIdAndLevel(1, 3);
+            Integer tenantId = getCurrentTenantId();
+            List<ChannelCode> level3 = channelCodeRepository.findByTenantIdAndLevel(tenantId, 3);
             if (level3.isEmpty()) {
                 // 回退到第2级
-                level3 = channelCodeRepository.findByTenantIdAndLevel(1, 2);
+                level3 = channelCodeRepository.findByTenantIdAndLevel(tenantId, 2);
             }
             if (level3.isEmpty()) {
-                level3 = channelCodeRepository.findByTenantIdAndLevel(1, 1);
+                level3 = channelCodeRepository.findByTenantIdAndLevel(tenantId, 1);
             }
             return ResponseEntity.ok(level3);
         } catch (Exception e) {
@@ -96,6 +114,14 @@ public class ChannelCodeController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    /**
+     * 兼容性接口：根据 groupId 和 ID 获取渠道码
+     */
+    @GetMapping("/group/{groupId}/{id}")
+    public ResponseEntity<ChannelCode> getChannelCodeByGroupIdAndId(@PathVariable Integer groupId, @PathVariable Integer id) {
+        return getChannelCodeById(id);
     }
 
     /**
@@ -138,13 +164,24 @@ public class ChannelCodeController {
     }
 
     /**
-     * 删除渠道码
+     * 兼容性接口：根据 groupId 和 ID 更新渠道码
      */
+    @PutMapping("/group/{groupId}/{id}")
+    public ResponseEntity<?> updateChannelCodeByGroupId(@PathVariable Integer groupId, @PathVariable Integer id, @RequestBody ChannelCode channelCode) {
+        return updateChannelCode(id, channelCode);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteChannelCode(@PathVariable Integer id) {
         try {
-            // 检查是否被渠道映射引用
-            long refCount = channelHotelMappingRepository.countByChannelId(id);
+            // 获取渠道码对象以取得其业务编码
+            ChannelCode channelCode = channelCodeRepository.findById(id).orElse(null);
+            if (channelCode == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "渠道码不存在"));
+            }
+            
+            // 检查是否被渠道映射引用 (使用业务编码)
+            long refCount = channelHotelMappingRepository.countByTenantIdAndChannelCode(getCurrentTenantId(), channelCode.getCode());
             if (refCount > 0) {
                 return ResponseEntity.badRequest().body(Map.of("error", "该渠道码已被引用，无法删除"));
             }
@@ -154,6 +191,14 @@ public class ChannelCodeController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * 兼容性接口：根据 groupId 和 ID 删除渠道码
+     */
+    @DeleteMapping("/group/{groupId}/{id}")
+    public ResponseEntity<?> deleteChannelCodeByGroupId(@PathVariable Integer groupId, @PathVariable Integer id) {
+        return deleteChannelCode(id);
     }
 
     /**

@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 操作日志实体类
  * 对应数据库operation_logs表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "operation_logs")
 public class OperationLog {
@@ -41,4 +38,19 @@ public class OperationLog {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt = new Date();
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getOperator() { return operator; }
+    public void setOperator(String operator) { this.operator = operator; }
+    public Date getTime() { return time; }
+    public void setTime(Date time) { this.time = time; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+    public String getDetails() { return details; }
+    public void setDetails(String details) { this.details = details; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }

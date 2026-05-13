@@ -25,6 +25,14 @@ public class HotelRoomTypeAllocationService {
     @Autowired
     private HotelRoomTypeAllocationRepository hotelRoomTypeAllocationRepository;
 
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     // =====================================================================
     // 合规方法：使用 hotelCode / roomTypeCode 作为关联条件（符合CODE关联规范）
     // =====================================================================
@@ -34,7 +42,7 @@ public class HotelRoomTypeAllocationService {
      * 关联查询原则：tenantId + hotelCode
      */
     public List<HotelRoomTypeAllocation> getAllocationsByHotelCode(String hotelCode) {
-        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCode(com.crs.util.TenantContext.getTenantId(), hotelCode);
+        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
 
     /**
@@ -42,60 +50,34 @@ public class HotelRoomTypeAllocationService {
      * 关联查询原则：tenantId + hotelCode + roomTypeCode
      */
     public HotelRoomTypeAllocation getAllocationByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode) {
-        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(com.crs.util.TenantContext.getTenantId(), hotelCode, roomTypeCode);
+        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(getCurrentTenantId(), hotelCode, roomTypeCode);
     }
 
     /**
      * 根据 hotelCode 获取已分配的房型列表
      */
     public List<HotelRoomTypeAllocation> getAllocatedRoomTypesByHotelCode(String hotelCode) {
-        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCodeAndAllocated(com.crs.util.TenantContext.getTenantId(), hotelCode, true);
+        return hotelRoomTypeAllocationRepository.findByTenantIdAndHotelCodeAndAllocated(getCurrentTenantId(), hotelCode, true);
     }
 
     /**
      * 根据 hotelCode 删除所有分配
      */
     public void deleteAllocationsByHotelCode(String hotelCode) {
-        hotelRoomTypeAllocationRepository.deleteByTenantIdAndHotelCode(com.crs.util.TenantContext.getTenantId(), hotelCode);
+        hotelRoomTypeAllocationRepository.deleteByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
 
-    // =====================================================================
-    // 已废弃方法：使用 hotelId / roomTypeId（保留兼容，内部可重定向至Code版本）
-    // =====================================================================
-
-    /** @deprecated 请使用 getAllocationsByHotelCode(String hotelCode) */
-    @Deprecated
-    public List<HotelRoomTypeAllocation> getAllocationsByHotelId(Integer hotelId) {
-        return hotelRoomTypeAllocationRepository.findByHotelId(hotelId);
-    }
-    
-    /** @deprecated 请使用 getAllocationByHotelCodeAndRoomTypeCode(String, String) */
-    @Deprecated
-    public HotelRoomTypeAllocation getAllocationByHotelAndRoomType(Integer hotelId, Integer roomTypeId) {
-        return hotelRoomTypeAllocationRepository.findByHotelIdAndRoomTypeId(hotelId, roomTypeId);
-    }
-    
-    /** @deprecated 请使用 getAllocatedRoomTypesByHotelCode(String hotelCode) */
-    @Deprecated
-    public List<HotelRoomTypeAllocation> getAllocatedRoomTypesByHotelId(Integer hotelId) {
-        return hotelRoomTypeAllocationRepository.findByHotelIdAndAllocated(hotelId, true);
-    }
-    
     public HotelRoomTypeAllocation createAllocation(HotelRoomTypeAllocation allocation) {
+        allocation.setTenantId(getCurrentTenantId());
         return hotelRoomTypeAllocationRepository.save(allocation);
     }
     
     public HotelRoomTypeAllocation updateAllocation(HotelRoomTypeAllocation allocation) {
+        allocation.setTenantId(getCurrentTenantId());
         return hotelRoomTypeAllocationRepository.save(allocation);
     }
     
     public void deleteAllocation(Integer id) {
         hotelRoomTypeAllocationRepository.deleteById(id);
-    }
-
-    /** @deprecated 请使用 deleteAllocationsByHotelCode(String hotelCode) */
-    @Deprecated
-    public void deleteAllocationsByHotelId(Integer hotelId) {
-        hotelRoomTypeAllocationRepository.deleteByHotelId(hotelId);
     }
 }

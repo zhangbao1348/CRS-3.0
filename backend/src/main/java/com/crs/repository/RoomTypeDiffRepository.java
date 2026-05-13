@@ -65,5 +65,7 @@ public interface RoomTypeDiffRepository extends JpaRepository<RoomTypeDiff, Inte
 
     List<RoomTypeDiff> findBySystemCodeAndRoomTypeCode(String systemCode, String roomTypeCode);
 
+    List<RoomTypeDiff> findByTenantId(Integer tenantId);
+
     void deleteBySystemCode(String systemCode);
 }

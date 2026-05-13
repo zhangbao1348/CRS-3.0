@@ -49,9 +49,9 @@ public class InventoryController {
      * @param hotelId 酒店ID
      * @return 库存列表
      */
-    @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<List<Inventory>> getInventoriesByHotelId(@PathVariable Integer hotelId) {
-        List<Inventory> inventories = inventoryService.getInventoriesByHotelId(hotelId);
+    @GetMapping("/hotel/{hotelCode}")
+    public ResponseEntity<List<Inventory>> getInventoriesByHotelCode(@PathVariable String hotelCode) {
+        List<Inventory> inventories = inventoryService.getInventoriesByHotelCode(hotelCode);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -64,11 +64,11 @@ public class InventoryController {
      */
     @GetMapping("/search")
     public ResponseEntity<List<Inventory>> getInventoriesByParams(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId) {
-        List<Inventory> inventories = inventoryService.getInventoriesByHotelIdAndRatePlanIdAndRoomTypeId(
-                hotelId, ratePlanId, roomTypeId);
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode) {
+        List<Inventory> inventories = inventoryService.getInventoriesByCode(
+                hotelCode, ratePlanCode, roomTypeCode);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -81,10 +81,10 @@ public class InventoryController {
      */
     @GetMapping("/date-range")
     public ResponseEntity<List<Inventory>> getInventoriesByDateRange(
-            @RequestParam Integer hotelId,
+            @RequestParam String hotelCode,
             @RequestParam Date startDate,
             @RequestParam Date endDate) {
-        List<Inventory> inventories = inventoryService.getInventoriesByDateRange(hotelId, startDate, endDate);
+        List<Inventory> inventories = inventoryService.getInventoriesByDateRange(hotelCode, startDate, endDate);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -154,14 +154,14 @@ public class InventoryController {
      */
     @PutMapping("/batch-update")
     public ResponseEntity<String> batchUpdateInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
             @RequestParam Date startDate,
             @RequestParam Date endDate,
             @RequestParam Integer availableRooms) {
         int updatedCount = inventoryService.batchUpdateInventory(
-                hotelId, ratePlanId, roomTypeId, startDate, endDate, availableRooms);
+                hotelCode, ratePlanCode, roomTypeCode, startDate, endDate, availableRooms);
         return new ResponseEntity<>("Updated " + updatedCount + " inventories", HttpStatus.OK);
     }
     
@@ -191,13 +191,13 @@ public class InventoryController {
      */
     @GetMapping("/check-availability")
     public ResponseEntity<Boolean> checkInventoryAvailability(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
             @RequestParam Date date,
             @RequestParam Integer requiredRooms) {
         boolean isAvailable = inventoryService.checkInventoryAvailability(
-                hotelId, ratePlanId, roomTypeId, date, requiredRooms);
+                hotelCode, ratePlanCode, roomTypeCode, date, requiredRooms);
         return new ResponseEntity<>(isAvailable, HttpStatus.OK);
     }
     
@@ -212,13 +212,13 @@ public class InventoryController {
      */
     @PostMapping("/reserve")
     public ResponseEntity<Boolean> reserveInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
             @RequestParam Date date,
             @RequestParam Integer reservedRooms) {
         boolean isReserved = inventoryService.reserveInventory(
-                hotelId, ratePlanId, roomTypeId, date, reservedRooms);
+                hotelCode, ratePlanCode, roomTypeCode, date, reservedRooms);
         return new ResponseEntity<>(isReserved, HttpStatus.OK);
     }
     
@@ -233,13 +233,13 @@ public class InventoryController {
      */
     @PostMapping("/release")
     public ResponseEntity<Boolean> releaseInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
             @RequestParam Date date,
             @RequestParam Integer releasedRooms) {
         boolean isReleased = inventoryService.releaseInventory(
-                hotelId, ratePlanId, roomTypeId, date, releasedRooms);
+                hotelCode, ratePlanCode, roomTypeCode, date, releasedRooms);
         return new ResponseEntity<>(isReleased, HttpStatus.OK);
     }
     
@@ -248,9 +248,9 @@ public class InventoryController {
      * @param channelId 渠道ID
      * @return 库存列表
      */
-    @GetMapping("/channel/{channelId}")
-    public ResponseEntity<List<Inventory>> getInventoriesByChannelId(@PathVariable Integer channelId) {
-        List<Inventory> inventories = inventoryService.getInventoriesByChannelId(channelId);
+    @GetMapping("/channel/{channelCode}")
+    public ResponseEntity<List<Inventory>> getInventoriesByChannelCode(@PathVariable String channelCode) {
+        List<Inventory> inventories = inventoryService.getInventoriesByChannelCode(channelCode);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -260,11 +260,11 @@ public class InventoryController {
      * @param channelId 渠道ID
      * @return 库存列表
      */
-    @GetMapping("/hotel/{hotelId}/channel/{channelId}")
-    public ResponseEntity<List<Inventory>> getInventoriesByHotelIdAndChannelId(
-            @PathVariable Integer hotelId,
-            @PathVariable Integer channelId) {
-        List<Inventory> inventories = inventoryService.getInventoriesByHotelIdAndChannelId(hotelId, channelId);
+    @GetMapping("/hotel/{hotelCode}/channel/{channelCode}")
+    public ResponseEntity<List<Inventory>> getInventoriesByHotelCodeAndChannelCode(
+            @PathVariable String hotelCode,
+            @PathVariable String channelCode) {
+        List<Inventory> inventories = inventoryService.getInventoriesByHotelCodeAndChannelCode(hotelCode, channelCode);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -277,13 +277,13 @@ public class InventoryController {
      * @return 库存列表
      */
     @GetMapping("/channel/date-range")
-    public ResponseEntity<List<Inventory>> getInventoriesByHotelIdAndChannelIdAndDateRange(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer channelId,
+    public ResponseEntity<List<Inventory>> getInventoriesByHotelCodeAndChannelCodeAndDateRange(
+            @RequestParam String hotelCode,
+            @RequestParam String channelCode,
             @RequestParam Date startDate,
             @RequestParam Date endDate) {
-        List<Inventory> inventories = inventoryService.getInventoriesByHotelIdAndChannelIdAndDateRange(
-                hotelId, channelId, startDate, endDate);
+        List<Inventory> inventories = inventoryService.getInventoriesByHotelCodeAndChannelCodeAndDateRange(
+                hotelCode, channelCode, startDate, endDate);
         return new ResponseEntity<>(inventories, HttpStatus.OK);
     }
     
@@ -299,14 +299,14 @@ public class InventoryController {
      */
     @GetMapping("/channel/check-availability")
     public ResponseEntity<Boolean> checkChannelInventoryAvailability(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
-            @RequestParam Integer channelId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
+            @RequestParam String channelCode,
             @RequestParam Date date,
             @RequestParam Integer requiredRooms) {
         boolean isAvailable = inventoryService.checkChannelInventoryAvailability(
-                hotelId, ratePlanId, roomTypeId, channelId, date, requiredRooms);
+                hotelCode, ratePlanCode, roomTypeCode, channelCode, date, requiredRooms);
         return new ResponseEntity<>(isAvailable, HttpStatus.OK);
     }
     
@@ -322,14 +322,14 @@ public class InventoryController {
      */
     @PostMapping("/channel/reserve")
     public ResponseEntity<Boolean> reserveChannelInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
-            @RequestParam Integer channelId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
+            @RequestParam String channelCode,
             @RequestParam Date date,
             @RequestParam Integer reservedRooms) {
         boolean isReserved = inventoryService.reserveChannelInventory(
-                hotelId, ratePlanId, roomTypeId, channelId, date, reservedRooms);
+                hotelCode, ratePlanCode, roomTypeCode, channelCode, date, reservedRooms);
         return new ResponseEntity<>(isReserved, HttpStatus.OK);
     }
     
@@ -345,14 +345,14 @@ public class InventoryController {
      */
     @PostMapping("/channel/release")
     public ResponseEntity<Boolean> releaseChannelInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
-            @RequestParam Integer channelId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
+            @RequestParam String channelCode,
             @RequestParam Date date,
             @RequestParam Integer releasedRooms) {
         boolean isReleased = inventoryService.releaseChannelInventory(
-                hotelId, ratePlanId, roomTypeId, channelId, date, releasedRooms);
+                hotelCode, ratePlanCode, roomTypeCode, channelCode, date, releasedRooms);
         return new ResponseEntity<>(isReleased, HttpStatus.OK);
     }
     
@@ -369,15 +369,15 @@ public class InventoryController {
      */
     @PutMapping("/channel/batch-update")
     public ResponseEntity<String> batchUpdateChannelInventory(
-            @RequestParam Integer hotelId,
-            @RequestParam Integer ratePlanId,
-            @RequestParam Integer roomTypeId,
-            @RequestParam Integer channelId,
+            @RequestParam String hotelCode,
+            @RequestParam String ratePlanCode,
+            @RequestParam String roomTypeCode,
+            @RequestParam String channelCode,
             @RequestParam Date startDate,
             @RequestParam Date endDate,
             @RequestParam Integer availableRooms) {
         int updatedCount = inventoryService.batchUpdateChannelInventory(
-                hotelId, ratePlanId, roomTypeId, channelId, startDate, endDate, availableRooms);
+                hotelCode, ratePlanCode, roomTypeCode, channelCode, startDate, endDate, availableRooms);
         return new ResponseEntity<>("Updated " + updatedCount + " channel inventories", HttpStatus.OK);
     }
 }

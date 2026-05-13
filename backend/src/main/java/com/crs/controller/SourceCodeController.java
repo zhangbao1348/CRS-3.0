@@ -26,37 +26,37 @@ public class SourceCodeController {
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
 
-    // 默认租户ID
-    private static final Integer DEFAULT_TENANT_ID = 1;
-
     /**
      * 获取所有来源码（树形结构）
      */
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> getAllSourceCodes(
-            @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<List<Map<String, Object>>> getAllSourceCodes() {
         try {
-            Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-            List<Map<String, Object>> treeData = sourceCodeService.getAllSourceCodesAsTreeByTenantId(actualTenantId);
+            List<Map<String, Object>> treeData = sourceCodeService.getAllSourceCodesAsTree();
             return ResponseEntity.ok(treeData);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    /**
+     * 兼容性接口：根据 groupId 获取所有来源码（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<Map<String, Object>>> getSourceCodesByGroupId(@PathVariable Integer groupId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getAllSourceCodes();
     }
 
     /**
      * 获取第三级来源码
      */
     @GetMapping("/third-level")
-    public ResponseEntity<List<SourceCode>> getThirdLevelSourceCodes(
-            @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<List<SourceCode>> getThirdLevelSourceCodes() {
         try {
-            Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-            List<SourceCode> thirdLevelCodes = sourceCodeService.getThirdLevelSourceCodes(actualTenantId);
+            List<SourceCode> thirdLevelCodes = sourceCodeService.getThirdLevelSourceCodes();
             return ResponseEntity.ok(thirdLevelCodes);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -70,7 +70,6 @@ public class SourceCodeController {
             List<SourceCode> sourceCodes = sourceCodeService.getSourceCodesByParentId(parentId);
             return ResponseEntity.ok(sourceCodes);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -88,7 +87,6 @@ public class SourceCodeController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -97,20 +95,15 @@ public class SourceCodeController {
      * 创建来源码
      */
     @PostMapping
-    public ResponseEntity<?> createSourceCode(@RequestBody SourceCode sourceCode,
-                                                        @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<?> createSourceCode(@RequestBody SourceCode sourceCode) {
         try {
             if (sourceCode.getCode() != null && !CodeValidator.isValid(sourceCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            if (sourceCode.getTenantId() == null && tenantId != null) {
-                sourceCode.setTenantId(tenantId);
-            }
             SourceCode createdSourceCode = sourceCodeService.createSourceCode(sourceCode);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdSourceCode);
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -131,8 +124,7 @@ public class SourceCodeController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -144,15 +136,16 @@ public class SourceCodeController {
         try {
             // 检查是否被房价码引用
             SourceCode existing = sourceCodeService.getSourceCodeById(id);
-            long refCount = existing != null ? groupRateCodeRepository.countBySourceCode(existing.getCode()) : 0;
-            if (refCount > 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "该来源码已被 " + refCount + " 个房价码引用，无法删除"));
+            if (existing != null) {
+                long refCount = groupRateCodeRepository.countBySourceCode(existing.getCode());
+                if (refCount > 0) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "该来源码已被 " + refCount + " 个房价码引用，无法删除"));
+                }
             }
             sourceCodeService.deleteSourceCode(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -161,14 +154,11 @@ public class SourceCodeController {
      */
     @GetMapping("/check-code")
     public ResponseEntity<Map<String, Boolean>> checkCodeUnique(@RequestParam String code, 
-                                                                  @RequestParam(required = false) Integer id,
-                                                                  @RequestParam(required = false) Integer tenantId) {
+                                                                   @RequestParam(required = false) Integer id) {
         try {
-            Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-            boolean isUnique = sourceCodeService.isCodeUniqueByTenantId(actualTenantId, code, id);
+            boolean isUnique = sourceCodeService.isCodeUnique(code, id);
             return ResponseEntity.ok(Map.of("unique", isUnique));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }

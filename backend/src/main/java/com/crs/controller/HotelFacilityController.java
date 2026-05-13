@@ -37,33 +37,23 @@ public class HotelFacilityController {
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
     
     private boolean validateHotelTenant(String hotelCode) {
         return hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId()).isPresent();
     }
     
-    @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<List<HotelFacility>> getFacilitiesByHotelId(@PathVariable Integer hotelId) {
-        List<HotelFacility> facilities = hotelFacilityService.getFacilitiesByHotelId(hotelId);
-        return ResponseEntity.ok(facilities);
-    }
-    
-    @GetMapping("/hotel/{hotelId}/type/{type}")
-    public ResponseEntity<List<HotelFacility>> getFacilitiesByType(@PathVariable Integer hotelId, @PathVariable String type) {
-        List<HotelFacility> facilities = hotelFacilityService.getFacilitiesByType(hotelId, type);
-        return ResponseEntity.ok(facilities);
-    }
-    
     @PostMapping
     public ResponseEntity<HotelFacility> createFacility(@RequestBody HotelFacility facility) {
-        if (facility.getHotelId() == null && facility.getHotelCode() != null && !facility.getHotelCode().isEmpty()) {
-            Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(facility.getHotelCode(), getCurrentTenantId());
-            if (hotelOpt.isEmpty()) {
-                return ResponseEntity.status(403).build();
-            }
-            facility.setHotelId(hotelOpt.get().getId());
+        if (facility.getHotelCode() == null || facility.getHotelCode().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (!validateHotelTenant(facility.getHotelCode())) {
+            return ResponseEntity.status(403).build();
         }
         HotelFacility createdFacility = hotelFacilityService.createFacility(facility);
         return ResponseEntity.ok(createdFacility);
@@ -84,12 +74,6 @@ public class HotelFacilityController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteFacility(@PathVariable Integer id) {
         hotelFacilityService.deleteFacility(id);
-        return ResponseEntity.ok().build();
-    }
-    
-    @DeleteMapping("/hotel/{hotelId}")
-    public ResponseEntity<Void> deleteFacilitiesByHotelId(@PathVariable Integer hotelId) {
-        hotelFacilityService.deleteFacilitiesByHotelId(hotelId);
         return ResponseEntity.ok().build();
     }
     

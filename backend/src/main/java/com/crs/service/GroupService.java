@@ -21,19 +21,33 @@ public class GroupService {
     }
     
     /**
-     * 获取所有集团列表
-     * @return 集团列表
+     * 获取当前租户对应的集团
+     * @return 集团列表（仅包含当前租户集团）
      */
     public List<Group> getAllGroups() {
-        return groupRepository.findAll();
+        Integer tenantId = getCurrentTenantId();
+        return groupRepository.findById(tenantId)
+                .map(java.util.List::of)
+                .orElse(java.util.Collections.emptyList());
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 根据ID获取集团
      * @param id 集团ID
      * @return 集团信息
      */
     public Optional<Group> getGroupById(Integer id) {
+        if (!id.equals(getCurrentTenantId())) {
+            return Optional.empty();
+        }
         return groupRepository.findById(id);
     }
     
@@ -43,7 +57,8 @@ public class GroupService {
      * @return 集团信息
      */
     public Optional<Group> getGroupByCode(String groupCode) {
-        return groupRepository.findByGroupCode(groupCode);
+        return groupRepository.findByGroupCode(groupCode)
+                .filter(g -> g.getId().equals(getCurrentTenantId()));
     }
     
     /**
@@ -52,7 +67,7 @@ public class GroupService {
      * @return 创建的集团信息
      */
     public Group createGroup(Group group) {
-        // 检查集团代码是否已存在
+        // 创建集团通常是超级管理员权限，此处简单校验
         if (groupRepository.existsByGroupCode(group.getGroupCode())) {
             throw new RuntimeException("Group code already exists");
         }
@@ -66,6 +81,10 @@ public class GroupService {
      * @return 更新后的集团信息
      */
     public Group updateGroup(Integer id, Group group) {
+        if (!id.equals(getCurrentTenantId())) {
+            throw new RuntimeException("Access denied");
+        }
+        
         Group existingGroup = groupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Group not found"));
         
@@ -88,6 +107,9 @@ public class GroupService {
      * @param id 集团ID
      */
     public void deleteGroup(Integer id) {
+        if (!id.equals(getCurrentTenantId())) {
+            throw new RuntimeException("Access denied");
+        }
         if (!groupRepository.existsById(id)) {
             throw new RuntimeException("Group not found");
         }
@@ -100,7 +122,10 @@ public class GroupService {
      * @return 集团列表
      */
     public List<Group> getGroupsByStatus(Group.Status status) {
-        return groupRepository.findByStatus(status);
+        return groupRepository.findById(getCurrentTenantId())
+                .filter(g -> g.getStatus() == status)
+                .map(java.util.List::of)
+                .orElse(java.util.Collections.emptyList());
     }
     
     /**
@@ -109,6 +134,8 @@ public class GroupService {
      * @return 集团列表
      */
     public List<Group> searchGroupsByName(String groupName) {
-        return groupRepository.findByGroupNameContaining(groupName);
+        return groupRepository.findByGroupNameContaining(groupName).stream()
+                .filter(g -> g.getId().equals(getCurrentTenantId()))
+                .collect(java.util.stream.Collectors.toList());
     }
 }

@@ -18,9 +18,11 @@ import java.util.Map;
 public class RoomTypeDiffSystemController {
     
     private final RoomTypeDiffSystemService roomTypeDiffSystemService;
+    private final com.crs.repository.HotelRepository hotelRepository;
     
-    public RoomTypeDiffSystemController(RoomTypeDiffSystemService roomTypeDiffSystemService) {
+    public RoomTypeDiffSystemController(RoomTypeDiffSystemService roomTypeDiffSystemService, com.crs.repository.HotelRepository hotelRepository) {
         this.roomTypeDiffSystemService = roomTypeDiffSystemService;
+        this.hotelRepository = hotelRepository;
     }
     
     /**
@@ -56,8 +58,9 @@ public class RoomTypeDiffSystemController {
      */
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<?> getRoomTypeDiffSystemsByHotelId(@PathVariable Integer hotelId) {
-        List<RoomTypeDiffSystem> roomTypeDiffSystems = roomTypeDiffSystemService.getRoomTypeDiffSystemsByHotelId(hotelId);
-        return ResponseEntity.ok(roomTypeDiffSystems);
+        return hotelRepository.findById(hotelId)
+                .map(hotel -> ResponseEntity.ok(roomTypeDiffSystemService.getRoomTypeDiffSystemsByHotelCode(hotel.getHotelCode())))
+                .orElse(ResponseEntity.notFound().build());
     }
     
     /**

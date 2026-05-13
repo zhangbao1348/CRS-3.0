@@ -40,7 +40,10 @@ public class RoomStatusController {
 
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
 
     private String decode(String s) {

@@ -13,31 +13,18 @@ import java.util.List;
 @Repository
 public interface ChannelHotelMappingRepository extends JpaRepository<ChannelHotelMapping, Integer> {
     
-    /**
-     * 根据渠道ID查询映射
-     * @param channelId 渠道ID
-     * @return 映射列表
-     */
-    List<ChannelHotelMapping> findByChannelId(Integer channelId);
-    
-    /**
-     * 根据酒店ID查询映射
-     * @param hotelId 酒店ID
-     * @return 映射列表
-     */
-    List<ChannelHotelMapping> findByHotelId(Integer hotelId);
-    
-    /**
-     * 根据渠道ID和酒店ID查询映射
-     * @param channelId 渠道ID
-     * @param hotelId 酒店ID
-     * @return 映射列表
-     */
-    List<ChannelHotelMapping> findByChannelIdAndHotelId(Integer channelId, Integer hotelId);
+    /** 获取指定租户下的所有酒店映射 */
+    List<ChannelHotelMapping> findByTenantId(Integer tenantId);
 
-    List<ChannelHotelMapping> findByChannelCode(String channelCode);
-    List<ChannelHotelMapping> findByHotelCode(String hotelCode);
-    List<ChannelHotelMapping> findByChannelCodeAndHotelCode(String channelCode, String hotelCode);
+    /** 根据租户和渠道编码查询酒店映射列表 */
+    List<ChannelHotelMapping> findByTenantIdAndChannelCode(Integer tenantId, String channelCode);
 
-    long countByChannelId(Integer channelId);
+    /** 根据租户和酒店编码查询映射列表 */
+    List<ChannelHotelMapping> findByTenantIdAndHotelCode(Integer tenantId, String hotelCode);
+
+    /** 根据租户、渠道编码和酒店编码精确查找映射记录 */
+    List<ChannelHotelMapping> findByTenantIdAndChannelCodeAndHotelCode(Integer tenantId, String channelCode, String hotelCode);
+
+    /** 统计特定租户和渠道下的映射数量 */
+    long countByTenantIdAndChannelCode(Integer tenantId, String channelCode);
 }

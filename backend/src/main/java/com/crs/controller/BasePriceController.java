@@ -2,6 +2,7 @@ package com.crs.controller;
 
 import com.crs.entity.BasePrice;
 import com.crs.service.BasePriceService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,8 +11,8 @@ import java.util.Map;
 import java.util.Date;
 
 /**
- * 基础价格控制器
- * 用于处理HTTP请求并调用基础价格服务
+ * 基础价格控制器 (BasePriceController)
+ * 已根据【CODE关联规范】重构，所有基于酒店维度的查询均使用 hotelCode。
  */
 @RestController
 @RequestMapping("/api/base-prices")
@@ -34,8 +35,8 @@ public class BasePriceController {
     }
     
     /**
-     * 根据ID获取基础价格详情
-     * @param id 基础价格ID
+     * 根据内部 ID 获取基础价格详情 (仅用于系统内精确定位)
+     * @param id 基础价格记录 ID
      * @return 基础价格详情
      */
     @GetMapping("/{id}")
@@ -50,35 +51,33 @@ public class BasePriceController {
     }
     
     /**
-     * 根据酒店ID获取基础价格列表
-     * @param hotelId 酒店ID
+     * 根据酒店编码获取基础价格列表 (符合规范)
+     * @param hotelCode 酒店编码
      * @return 基础价格列表
      */
-    @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<?> getBasePricesByHotelId(@PathVariable Integer hotelId) {
-        List<BasePrice> basePrices = basePriceService.getBasePricesByHotelId(hotelId);
+    @GetMapping("/hotel/{hotelCode}")
+    public ResponseEntity<?> getBasePricesByHotelCode(@PathVariable String hotelCode) {
+        List<BasePrice> basePrices = basePriceService.getBasePricesByHotelCode(hotelCode);
         return ResponseEntity.ok(basePrices);
     }
     
     /**
-     * 根据日期范围获取基础价格
-     * @param hotelId 酒店ID
+     * 根据日期范围和酒店编码获取基础价格
+     * @param hotelCode 酒店编码
      * @param startDate 开始日期
      * @param endDate 结束日期
      * @return 基础价格列表
      */
     @GetMapping("/date-range")
     public ResponseEntity<?> getBasePricesByDateRange(
-            @RequestParam Integer hotelId,
-            @RequestParam String startDate,
-            @RequestParam String endDate) {
+            @RequestParam String hotelCode,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date startDate,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") Date endDate) {
         try {
-            Date start = new Date(startDate);
-            Date end = new Date(endDate);
-            List<BasePrice> basePrices = basePriceService.getBasePricesByDateRange(hotelId, start, end);
+            List<BasePrice> basePrices = basePriceService.getBasePricesByDateRange(hotelCode, startDate, endDate);
             return ResponseEntity.ok(basePrices);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid date format"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid parameters or date format"));
         }
     }
     
@@ -114,7 +113,7 @@ public class BasePriceController {
     
     /**
      * 更新基础价格
-     * @param id 基础价格ID
+     * @param id 基础价格记录 ID
      * @param basePrice 基础价格信息
      * @return 更新后的基础价格信息
      */
@@ -130,7 +129,7 @@ public class BasePriceController {
     
     /**
      * 删除基础价格
-     * @param id 基础价格ID
+     * @param id 基础价格记录 ID
      * @return 删除响应
      */
     @DeleteMapping("/{id}")

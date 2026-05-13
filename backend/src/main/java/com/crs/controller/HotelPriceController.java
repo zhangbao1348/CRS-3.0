@@ -50,7 +50,10 @@ public class HotelPriceController {
 
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
 
     private String getOperatorName() {
@@ -352,10 +355,10 @@ public class HotelPriceController {
             Integer hotelId = hotel.getId();
             
             // 2. 获取该酒店的所有价格计划
-            List<RatePlan> ratePlans = ratePlanRepository.findByHotelId(hotelId);
+            List<RatePlan> ratePlans = ratePlanRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
             
             // 3. 获取该酒店的所有房型
-            List<RoomType> roomTypes = roomTypeRepository.findByHotelId(hotelId);
+            List<RoomType> roomTypes = roomTypeRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
             
             // 4. 获取价格数据
             List<HotelPrice> prices;
@@ -399,7 +402,7 @@ public class HotelPriceController {
         try {
             // 查找以当前房价码为父级的所有 active 衍生价格计划
             List<RatePlan> childPlans = ratePlanRepository
-                    .findByHotelCodeAndParentRateCodeAndStatus(hotelCode, rateCode, "active");
+                    .findByTenantIdAndHotelCodeAndParentRateCodeAndStatus(tenantId, hotelCode, rateCode, "active");
             
             if (childPlans.isEmpty()) return;
             

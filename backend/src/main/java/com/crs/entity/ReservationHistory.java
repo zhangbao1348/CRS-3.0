@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,9 +17,9 @@ import java.util.Date;
  * 
  * @since 2026-05-10
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "reservation_history")
 public class ReservationHistory {
@@ -58,4 +55,24 @@ public class ReservationHistory {
     @Column(name = "operation_time")
     @Temporal(TemporalType.TIMESTAMP)
     private Date operationTime = new Date();
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getReservationId() { return reservationId; }
+    public void setReservationId(Integer reservationId) { this.reservationId = reservationId; }
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public String getResult() { return result; }
+    public void setResult(String result) { this.result = result; }
+    public String getOperator() { return operator; }
+    public void setOperator(String operator) { this.operator = operator; }
+    public String getOperatorType() { return operatorType; }
+    public void setOperatorType(String operatorType) { this.operatorType = operatorType; }
+    public String getDetail() { return detail; }
+    public void setDetail(String detail) { this.detail = detail; }
+    public Integer getLogId() { return logId; }
+    public void setLogId(Integer logId) { this.logId = logId; }
+    public Date getOperationTime() { return operationTime; }
+    public void setOperationTime(Date operationTime) { this.operationTime = operationTime; }
 }

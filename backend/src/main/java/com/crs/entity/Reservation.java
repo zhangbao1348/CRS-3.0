@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -26,9 +23,9 @@ import java.util.Date;
  * <li>**生命周期**：记录创建、修改、取消及完成的时间和操作人，支持完整的审计追踪。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "reservation")
 public class Reservation {
@@ -54,10 +51,6 @@ public class Reservation {
     @Column(name = "pms_number", length = 100)
     private String pmsNumber;
 
-    /** 酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
-
     /** 酒店外部编码 */
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
@@ -65,10 +58,6 @@ public class Reservation {
     /** 酒店名称冗余 */
     @Column(name = "hotel_name", length = 200)
     private String hotelName;
-
-    /** 房型 ID */
-    @Column(name = "room_type_id", nullable = false)
-    private Integer roomTypeId;
 
     /** 房型外部编码 */
     @Column(name = "room_type_code", length = 50)
@@ -78,10 +67,6 @@ public class Reservation {
     @Column(name = "room_type_name", length = 200)
     private String roomTypeName;
 
-    /** 价格计划 ID */
-    @Column(name = "rate_plan_id", nullable = false)
-    private Integer ratePlanId;
-
     /** 价格计划编码 */
     @Column(name = "rate_plan_code", length = 50)
     private String ratePlanCode;
@@ -89,10 +74,6 @@ public class Reservation {
     /** 价格计划名称冗余 */
     @Column(name = "rate_plan_name", length = 200)
     private String ratePlanName;
-
-    /** 下单渠道 ID */
-    @Column(name = "channel_id", nullable = false)
-    private Integer channelId;
 
     /** 渠道编码 (如 'OTA', 'WECHAT') */
     @Column(name = "channel_code", length = 50)
@@ -102,17 +83,9 @@ public class Reservation {
     @Column(name = "channel_name", length = 100)
     private String channelName;
 
-    /** 市场码 ID */
-    @Column(name = "market_code_id")
-    private Integer marketCodeId;
-
     /** 市场码编码冗余 */
     @Column(name = "market_code", length = 50)
     private String marketCode;
-
-    /** 来源码 ID */
-    @Column(name = "source_code_id")
-    private Integer sourceCodeId;
 
     /** 来源码编码冗余 */
     @Column(name = "source_code", length = 50)
@@ -314,19 +287,19 @@ public class Reservation {
     @Column(name = "credit_card_info", length = 255)
     private String creditCardInfo;
 
-    /** 关联酒店实体 */
+    /** 关联酒店实体 (基于 hotel_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
 
-    /** 关联价格计划实体 */
+    /** 关联价格计划实体 (基于 rate_plan_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rate_plan_id", insertable = false, updatable = false)
+    @JoinColumn(name = "rate_plan_code", referencedColumnName = "rate_code", insertable = false, updatable = false)
     private RatePlan ratePlan;
 
-    /** 关联房型实体 */
+    /** 关联房型实体 (基于 room_type_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "room_type_code", referencedColumnName = "code", insertable = false, updatable = false)
     private RoomType roomType;
 
     /**
@@ -375,4 +348,112 @@ public class Reservation {
             return contactEmail;
         return guestEmail;
     }
+
+    public void setContactName(String contactName) { this.contactName = contactName; }
+    public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
+    public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
+
+    // 手写常用 Getter/Setter 以保障环境兼容性
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getReservationCode() { return reservationCode; }
+    public void setReservationCode(String reservationCode) { this.reservationCode = reservationCode; }
+    public String getChannelOrderNumber() { return channelOrderNumber; }
+    public void setChannelOrderNumber(String channelOrderNumber) { this.channelOrderNumber = channelOrderNumber; }
+    public String getPmsNumber() { return pmsNumber; }
+    public void setPmsNumber(String pmsNumber) { this.pmsNumber = pmsNumber; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getHotelName() { return hotelName; }
+    public void setHotelName(String hotelName) { this.hotelName = hotelName; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public String getRoomTypeName() { return roomTypeName; }
+    public void setRoomTypeName(String roomTypeName) { this.roomTypeName = roomTypeName; }
+    public String getRatePlanCode() { return ratePlanCode; }
+    public void setRatePlanCode(String ratePlanCode) { this.ratePlanCode = ratePlanCode; }
+    public String getRatePlanName() { return ratePlanName; }
+    public void setRatePlanName(String ratePlanName) { this.ratePlanName = ratePlanName; }
+    public String getChannelCode() { return channelCode; }
+    public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
+    public String getChannelName() { return channelName; }
+    public void setChannelName(String channelName) { this.channelName = channelName; }
+    public Date getCheckInDate() { return checkInDate; }
+    public void setCheckInDate(Date checkInDate) { this.checkInDate = checkInDate; }
+    public Date getCheckOutDate() { return checkOutDate; }
+    public void setCheckOutDate(Date checkOutDate) { this.checkOutDate = checkOutDate; }
+    public Integer getNights() { return nights; }
+    public void setNights(Integer nights) { this.nights = nights; }
+    public Integer getRoomCount() { return roomCount; }
+    public void setRoomCount(Integer roomCount) { this.roomCount = roomCount; }
+    public Integer getAdultCount() { return adultCount; }
+    public void setAdultCount(Integer adultCount) { this.adultCount = adultCount; }
+    public Integer getChildCount() { return childCount; }
+    public void setChildCount(Integer childCount) { this.childCount = childCount; }
+    public String getMemberNo() { return memberNo; }
+    public void setMemberNo(String memberNo) { this.memberNo = memberNo; }
+    public String getMemberLevel() { return memberLevel; }
+    public void setMemberLevel(String memberLevel) { this.memberLevel = memberLevel; }
+    public BigDecimal getOriginalPrice() { return originalPrice; }
+    public void setOriginalPrice(BigDecimal originalPrice) { this.originalPrice = originalPrice; }
+    public BigDecimal getTotalPrice() { return totalPrice; }
+    public void setTotalPrice(BigDecimal totalPrice) { this.totalPrice = totalPrice; }
+    public String getCurrency() { return currency; }
+    public void setCurrency(String currency) { this.currency = currency; }
+    public String getGuaranteeType() { return guaranteeType; }
+    public void setGuaranteeType(String guaranteeType) { this.guaranteeType = guaranteeType; }
+    public String getGuaranteeInfo() { return guaranteeInfo; }
+    public void setGuaranteeInfo(String guaranteeInfo) { this.guaranteeInfo = guaranteeInfo; }
+    public String getCancellationPolicyCode() { return cancellationPolicyCode; }
+    public void setCancellationPolicyCode(String cancellationPolicyCode) { this.cancellationPolicyCode = cancellationPolicyCode; }
+    public String getCancellationPolicyDesc() { return cancellationPolicyDesc; }
+    public void setCancellationPolicyDesc(String cancellationPolicyDesc) { this.cancellationPolicyDesc = cancellationPolicyDesc; }
+    public String getGuaranteePolicyCode() { return guaranteePolicyCode; }
+    public void setGuaranteePolicyCode(String guaranteePolicyCode) { this.guaranteePolicyCode = guaranteePolicyCode; }
+    public String getGuaranteePolicyDesc() { return guaranteePolicyDesc; }
+    public void setGuaranteePolicyDesc(String guaranteePolicyDesc) { this.guaranteePolicyDesc = guaranteePolicyDesc; }
+    public String getSpecialRequest() { return specialRequest; }
+    public void setSpecialRequest(String specialRequest) { this.specialRequest = specialRequest; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public String getGuestRemark() { return guestRemark; }
+    public void setGuestRemark(String guestRemark) { this.guestRemark = guestRemark; }
+    public String getHotelRemark() { return hotelRemark; }
+    public void setHotelRemark(String hotelRemark) { this.hotelRemark = hotelRemark; }
+    public Boolean getIsManual() { return isManual; }
+    public void setIsManual(Boolean isManual) { this.isManual = isManual; }
+    public String getManualReason() { return manualReason; }
+    public void setManualReason(String manualReason) { this.manualReason = manualReason; }
+    public BigDecimal getCommissionRate() { return commissionRate; }
+    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; }
+    public BigDecimal getCommissionAmount() { return commissionAmount; }
+    public void setCommissionAmount(BigDecimal commissionAmount) { this.commissionAmount = commissionAmount; }
+    public String getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+    public String getReservationStatus() { return reservationStatus; }
+    public void setReservationStatus(String reservationStatus) { this.reservationStatus = reservationStatus; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public String getOrderSource() { return orderSource; }
+    public void setOrderSource(String orderSource) { this.orderSource = orderSource; }
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+    public String getModifiedBy() { return modifiedBy; }
+    public void setModifiedBy(String modifiedBy) { this.modifiedBy = modifiedBy; }
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+    public Date getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(Date cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCancelReason() { return cancelReason; }
+    public void setCancelReason(String cancelReason) { this.cancelReason = cancelReason; }
+    public Date getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Date completedAt) { this.completedAt = completedAt; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    public Date getPaymentDeadline() { return paymentDeadline; }
+    public void setPaymentDeadline(Date paymentDeadline) { this.paymentDeadline = paymentDeadline; }
 }

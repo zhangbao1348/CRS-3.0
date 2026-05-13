@@ -1,6 +1,7 @@
 package com.crs.repository;
 
 import com.crs.entity.GroupRoomType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -15,12 +16,16 @@ import java.util.Optional;
 @Repository
 public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, Integer> {
     
+    @EntityGraph(attributePaths = {"roomTypeCategory"})
+    Optional<GroupRoomType> findById(Integer id);
+
     /**
      * 获取指定集团下的所有房型模板。
      * 
      * @param groupId 集团 ID
      * @return 集团房型列表
      */
+    @EntityGraph(attributePaths = {"roomTypeCategory"})
     List<GroupRoomType> findByGroupId(Integer groupId);
     
     /**
@@ -30,6 +35,7 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @param status 状态 (active/inactive)
      * @return 集团房型列表
      */
+    @EntityGraph(attributePaths = {"roomTypeCategory"})
     List<GroupRoomType> findByGroupIdAndStatus(Integer groupId, String status);
     
     /**
@@ -47,6 +53,7 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      * @param roomTypeCode 房型代码
      * @return 集团房型实体的 Optional 对象
      */
+    @EntityGraph(attributePaths = {"roomTypeCategory"})
     Optional<GroupRoomType> findByGroupIdAndRoomTypeCode(Integer groupId, String roomTypeCode);
     
     /**

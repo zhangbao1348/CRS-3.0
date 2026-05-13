@@ -42,28 +42,14 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
     List<Hotel> findByTenantIdAndStatus(Integer tenantId, Hotel.Status status);
     
     /**
-     * 根据中文名称模糊匹配酒店。
-     * 
-     * @param chineseName 中文名称关键字
-     * @return 匹配的酒店列表
+     * 根据中文名称模糊匹配酒店（限租户内）。
      */
-    List<Hotel> findByChineseNameContaining(String chineseName);
+    List<Hotel> findByTenantIdAndChineseNameContaining(Integer tenantId, String chineseName);
     
     /**
-     * 根据城市查找酒店。
-     * 
-     * @param city 城市名称
-     * @return 酒店列表
+     * 根据城市查找酒店（限租户内）。
      */
-    List<Hotel> findByCity(String city);
-    
-    /**
-     * 全局查找特定状态的酒店（跨租户，慎用，通常用于系统管理）。
-     * 
-     * @param status 状态
-     * @return 酒店列表
-     */
-    List<Hotel> findByStatus(Hotel.Status status);
+    List<Hotel> findByTenantIdAndCity(Integer tenantId, String city);
     
     /**
      * 校验在指定租户下是否存在该酒店编码。
@@ -89,13 +75,13 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
     @org.springframework.data.jpa.repository.Query("SELECT h FROM Hotel h WHERE h.tenantId = :tenantId AND h.status = :status " +
             "AND (:city IS NULL OR :city = '' OR h.city = :city) " +
             "AND (:keyword IS NULL OR :keyword = '' OR h.chineseName LIKE %:keyword% OR h.englishName LIKE %:keyword%) " +
-            "AND h.id IN :hotelIds")
+            "AND h.hotelCode IN :hotelCodes")
     org.springframework.data.domain.Page<Hotel> findWithFilters(
             @org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
             @org.springframework.data.repository.query.Param("status") Hotel.Status status,
             @org.springframework.data.repository.query.Param("city") String city,
             @org.springframework.data.repository.query.Param("keyword") String keyword,
-            @org.springframework.data.repository.query.Param("hotelIds") java.util.Collection<Integer> hotelIds,
+            @org.springframework.data.repository.query.Param("hotelCodes") java.util.Collection<String> hotelCodes,
             org.springframework.data.domain.Pageable pageable);
 }
 

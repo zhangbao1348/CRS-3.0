@@ -61,51 +61,76 @@ public class ReservationService {
         this.inventoryDeductionService = inventoryDeductionService;
     }
 
-    public Page<Reservation> listReservations(Integer tenantId, Integer hotelId, String orderNo,
-                                               String reservationStatus, Integer channelId,
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
+    public Page<Reservation> listReservations(Integer tenantId, String hotelCode, String orderNo,
+                                               String reservationStatus, String channelCode,
                                                String guestName, Date startDate, Date endDate,
                                                Date checkInStart, Date checkInEnd,
                                                int page, int pageSize) {
         Pageable pageable = PageRequest.of(page - 1, pageSize);
-        return reservationRepository.findWithFilters(tenantId, hotelId, orderNo,
-                reservationStatus, channelId, guestName, startDate, endDate,
+        return reservationRepository.findWithFiltersByCode(getCurrentTenantId(), hotelCode, orderNo,
+                reservationStatus, channelCode, guestName, startDate, endDate,
                 checkInStart, checkInEnd, pageable);
     }
 
-    public List<Reservation> listReservationsForExport(Integer tenantId, Integer hotelId, String orderNo,
-                                                       String reservationStatus, Integer channelId,
+    public List<Reservation> listReservationsForExport(Integer tenantId, String hotelCode, String orderNo,
+                                                       String reservationStatus, String channelCode,
                                                        String guestName, Date startDate, Date endDate,
                                                        Date checkInStart, Date checkInEnd) {
-        return reservationRepository.findListWithFilters(tenantId, hotelId, orderNo,
-                reservationStatus, channelId, guestName, startDate, endDate,
+        return reservationRepository.findListWithFiltersByCode(getCurrentTenantId(), hotelCode, orderNo,
+                reservationStatus, channelCode, guestName, startDate, endDate,
                 checkInStart, checkInEnd);
     }
 
     public Optional<Reservation> getReservationById(Integer id) {
-        return reservationRepository.findById(id);
+        return reservationRepository.findById(id)
+                .filter(r -> r.getTenantId() != null && r.getTenantId().equals(getCurrentTenantId()));
     }
 
     public Reservation getReservationByCode(String reservationCode) {
-        return reservationRepository.findByReservationCode(reservationCode);
+        return reservationRepository.findByTenantIdAndReservationCode(getCurrentTenantId(), reservationCode).orElse(null);
     }
 
     public List<ReservationDailyPrice> getDailyPrices(Integer reservationId) {
+        // 先验证订单所有权
+        if (getReservationById(reservationId).isEmpty()) {
+            return Collections.emptyList();
+        }
         return dailyPriceRepository.findByReservationIdOrderByPriceDateAsc(reservationId);
     }
 
     public List<ReservationGuest> getGuests(Integer reservationId) {
+        if (getReservationById(reservationId).isEmpty()) {
+            return Collections.emptyList();
+        }
         return guestRepository.findByReservationIdOrderBySortOrderAsc(reservationId);
     }
 
     public List<ReservationPayment> getPayments(Integer reservationId) {
+        if (getReservationById(reservationId).isEmpty()) {
+            return Collections.emptyList();
+        }
         return paymentRepository.findByReservationIdOrderByCreatedAtDesc(reservationId);
     }
 
     public List<ReservationPromotion> getPromotions(Integer reservationId) {
+        if (getReservationById(reservationId).isEmpty()) {
+            return Collections.emptyList();
+        }
         return promotionRepository.findByReservationId(reservationId);
     }
 
     public List<ReservationHistory> getHistory(Integer reservationId) {
+        if (getReservationById(reservationId).isEmpty()) {
+            return Collections.emptyList();
+        }
         return historyRepository.findByReservationIdOrderByOperationTimeDesc(reservationId);
     }
 
@@ -114,6 +139,9 @@ public class ReservationService {
                                           List<ReservationDailyPrice> dailyPrices,
                                           List<ReservationGuest> guests,
                                           List<ReservationPromotion> promotions) {
+        // 强制设置当前租户ID，防止入参篡改
+        reservation.setTenantId(getCurrentTenantId());
+        
         if (reservation.getReservationCode() == null || reservation.getReservationCode().isBlank()) {
             reservation.setReservationCode(generateReservationCode());
         }
@@ -153,8 +181,8 @@ public class ReservationService {
 
     @Transactional
     public Reservation cancelReservation(Integer id, String cancelledBy, String cancelReason) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Reservation reservation = getReservationById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
         if (!"confirmed".equals(reservation.getReservationStatus())
                 && !"pending".equals(reservation.getReservationStatus())
@@ -193,8 +221,8 @@ public class ReservationService {
 
     @Transactional
     public Reservation updateReservationStatus(Integer id, String newStatus, String operator) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Reservation reservation = getReservationById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
         String oldStatus = reservation.getReservationStatus();
         validateStatusTransition(oldStatus, newStatus);
@@ -229,8 +257,8 @@ public class ReservationService {
 
     @Transactional
     public Reservation manualIntervene(Integer id, String reason, String operator) {
-        Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("订单不存在"));
+        Reservation reservation = getReservationById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
         reservation.setIsManual(true);
         reservation.setManualReason(reason);
@@ -343,20 +371,15 @@ public class ReservationService {
         return csv.toString();
     }
 
-    public List<Reservation> getReservationsByHotelId(Integer hotelId) {
-        return reservationRepository.findByHotelId(hotelId);
+    public List<Reservation> getReservationsByHotelCode(String hotelCode) {
+        return reservationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
 
-    public List<Reservation> getReservationsByHotelIdAndReservationStatus(Integer hotelId, String reservationStatus) {
-        return reservationRepository.findByHotelIdAndReservationStatus(hotelId, reservationStatus);
+    public List<Reservation> getReservationsByHotelCodeAndReservationStatus(String hotelCode, String reservationStatus) {
+        return reservationRepository.findByTenantIdAndHotelCodeAndReservationStatus(getCurrentTenantId(), hotelCode, reservationStatus);
     }
 
-    public List<Reservation> getInHouseReservations(Integer hotelId, Date date) {
-        return reservationRepository.findByHotelIdAndCheckInDateLessThanEqualAndCheckOutDateGreaterThanAndStatus(
-                hotelId, date, date, Reservation.Status.active);
-    }
-
-    public List<Reservation> getTodayReservations(Integer hotelId) {
+    public List<Reservation> getTodayReservations(Integer tenantId, String hotelCode) {
         Calendar cal = Calendar.getInstance();
         cal.set(Calendar.HOUR_OF_DAY, 0);
         cal.set(Calendar.MINUTE, 0);
@@ -364,6 +387,6 @@ public class ReservationService {
         Date today = cal.getTime();
         cal.add(Calendar.DATE, 1);
         Date tomorrow = cal.getTime();
-        return reservationRepository.findByHotelIdAndCreatedAtBetween(hotelId, today, tomorrow);
+        return reservationRepository.findByTenantIdAndHotelCodeAndCreatedAtBetween(getCurrentTenantId(), hotelCode, today, tomorrow);
     }
 }

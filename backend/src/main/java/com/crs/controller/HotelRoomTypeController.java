@@ -43,7 +43,10 @@ public class HotelRoomTypeController {
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
     
     private boolean validateHotelTenant(String hotelCode) {
@@ -59,7 +62,12 @@ public class HotelRoomTypeController {
     public ResponseEntity<Map<String, Object>> getHotelRoomTypes(@PathVariable Integer hotelId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypes(hotelId);
+            Hotel hotel = hotelRepository.findById(hotelId)
+                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
+            if (!hotel.getTenantId().equals(getCurrentTenantId())) {
+                throw new RuntimeException("Access denied");
+            }
+            List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypes(hotel.getHotelCode());
             response.put("success", true);
             response.put("data", roomTypes);
             return ResponseEntity.ok(response);

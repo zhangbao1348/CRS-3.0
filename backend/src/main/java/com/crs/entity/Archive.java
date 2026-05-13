@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 档案实体类
  * 对应数据库archives表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "archives")
 public class Archive {
@@ -73,4 +70,6 @@ public class Archive {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
 }

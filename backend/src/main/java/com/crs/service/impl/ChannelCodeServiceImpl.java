@@ -32,15 +32,18 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Autowired
     private ChannelCodeRepository channelCodeRepository;
 
-    @Override
-    public List<Map<String, Object>> getAllChannelCodesAsTree() {
+    private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
         if (tenantId == null) {
-            tenantId = 1;
+            throw new RuntimeException("Tenant context missing");
         }
-        
+        return tenantId;
+    }
+
+    @Override
+    public List<Map<String, Object>> getAllChannelCodesAsTree() {
         try {
-            List<ChannelCode> allChannelCodes = channelCodeRepository.findByTenantId(tenantId);
+            List<ChannelCode> allChannelCodes = channelCodeRepository.findByTenantId(getCurrentTenantId());
             List<Map<String, Object>> treeData = new ArrayList<>();
 
             for (ChannelCode channelCode : allChannelCodes) {
@@ -60,29 +63,18 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
 
     @Override
     public List<ChannelCode> getChannelCodesByParentId(Integer tenantId, Integer parentId) {
-        Integer currentTenantId = TenantContext.getTenantId();
-        if (currentTenantId == null) {
-            currentTenantId = 1;
-        }
-        return channelCodeRepository.findByTenantIdAndParentId(currentTenantId, parentId);
+        return channelCodeRepository.findByTenantIdAndParentId(getCurrentTenantId(), parentId);
     }
 
     @Override
     public ChannelCode getChannelCodeById(Integer id) {
-        Integer tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1;
-        }
-        return channelCodeRepository.findByTenantIdAndId(tenantId, id);
+        return channelCodeRepository.findByTenantIdAndId(getCurrentTenantId(), id);
     }
 
     @Override
     @Transactional
     public ChannelCode createChannelCode(ChannelCode channelCode) {
-        Integer tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1;
-        }
+        Integer tenantId = getCurrentTenantId();
         channelCode.setTenantId(tenantId);
         
         if (channelCode.getParentId() != null) {
@@ -102,11 +94,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Override
     @Transactional
     public ChannelCode updateChannelCode(ChannelCode channelCode) {
-        Integer tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1;
-        }
-        
+        Integer tenantId = getCurrentTenantId();
         ChannelCode existing = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getId());
         if (existing != null) {
             existing.setName(channelCode.getName());
@@ -121,11 +109,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Override
     @Transactional
     public void deleteChannelCode(Integer id) {
-        Integer tenantId = TenantContext.getTenantId();
-        if (tenantId == null) {
-            tenantId = 1;
-        }
-        
+        Integer tenantId = getCurrentTenantId();
         try {
             ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(tenantId, id);
             if (channelCode != null) {
@@ -138,11 +122,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
 
     @Override
     public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
-        Integer currentTenantId = TenantContext.getTenantId();
-        if (currentTenantId == null) {
-            currentTenantId = 1;
-        }
-        
+        Integer currentTenantId = getCurrentTenantId();
         try {
             if (excludeId != null) {
                 return !channelCodeRepository.existsByTenantIdAndCodeAndIdNot(currentTenantId, code, excludeId);
@@ -162,58 +142,53 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
             for (ChannelCode child : children) {
                 deleteRecursive(child.getId(), tenantId);
             }
-            channelCodeRepository.deleteById(parentId);
+            // 确保删除操作携带租户过滤
+            ChannelCode cc = channelCodeRepository.findByTenantIdAndId(tenantId, parentId);
+            if (cc != null) {
+                channelCodeRepository.delete(cc);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private List<Map<String, Object>> buildChildNodes(Integer parentId, List<ChannelCode> allChannelCodes) {
-        List<Map<String, Object>> childNodes = new ArrayList<>();
-        for (ChannelCode channelCode : allChannelCodes) {
-            if (parentId.equals(channelCode.getParentId())) {
-                Map<String, Object> childNode = buildTreeNode(channelCode);
-                List<Map<String, Object>> grandchildren = buildChildNodes(channelCode.getId(), allChannelCodes);
-                if (!grandchildren.isEmpty()) {
-                    childNode.put("children", grandchildren);
-                }
-                childNodes.add(childNode);
-            }
-        }
-        return childNodes;
     }
 
     private Map<String, Object> buildTreeNode(ChannelCode channelCode) {
         Map<String, Object> node = new HashMap<>();
         node.put("key", channelCode.getId().toString());
         node.put("title", channelCode.getName());
-        node.put("code", channelCode.getCode());
         node.put("id", channelCode.getId());
+        node.put("code", channelCode.getCode());
+        node.put("name", channelCode.getName());
+        node.put("description", channelCode.getDescription());
         node.put("parentId", channelCode.getParentId());
         node.put("level", channelCode.getLevel());
         node.put("status", channelCode.getStatus());
         return node;
     }
 
+    private List<Map<String, Object>> buildChildNodes(Integer parentId, List<ChannelCode> allChannelCodes) {
+        List<Map<String, Object>> children = new ArrayList<>();
+        for (ChannelCode channelCode : allChannelCodes) {
+            if (parentId.equals(channelCode.getParentId())) {
+                Map<String, Object> childNode = buildTreeNode(channelCode);
+                childNode.put("children", buildChildNodes(channelCode.getId(), allChannelCodes));
+                children.add(childNode);
+            }
+        }
+        return children;
+    }
+
     @Override
     @Transactional
     public List<ChannelCode> batchCreateChannelCodes(Integer tenantId, List<ChannelCode> channelCodes) {
-        Integer currentTenantId = TenantContext.getTenantId();
-        if (currentTenantId == null) {
-            currentTenantId = 1;
-        }
-        
-        if (tenantId == null) {
-            tenantId = currentTenantId;
-        }
-        
+        Integer currentTenantId = getCurrentTenantId();
         List<ChannelCode> savedChannelCodes = new ArrayList<>();
         
         for (ChannelCode channelCode : channelCodes) {
-            channelCode.setTenantId(tenantId);
+            channelCode.setTenantId(currentTenantId);
             
             if (channelCode.getParentId() != null) {
-                ChannelCode parent = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getParentId());
+                ChannelCode parent = channelCodeRepository.findByTenantIdAndId(currentTenantId, channelCode.getParentId());
                 if (parent != null) {
                     channelCode.setLevel(parent.getLevel() + 1);
                 } else {
@@ -232,19 +207,11 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Override
     @Transactional
     public List<ChannelCode> initDefaultChannelCodesForTenant(Integer tenantId) {
-        Integer currentTenantId = TenantContext.getTenantId();
-        if (currentTenantId == null) {
-            currentTenantId = 1;
-        }
-        
-        if (tenantId == null) {
-            tenantId = currentTenantId;
-        }
-        
+        Integer currentTenantId = getCurrentTenantId();
         List<ChannelCode> defaultCodes = new ArrayList<>();
         
         ChannelCode online = new ChannelCode();
-        online.setTenantId(tenantId);
+        online.setTenantId(currentTenantId);
         online.setCode("ONLINE");
         online.setName("在线渠道");
         online.setDescription("在线销售渠道");
@@ -254,7 +221,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(online));
         
         ChannelCode offline = new ChannelCode();
-        offline.setTenantId(tenantId);
+        offline.setTenantId(currentTenantId);
         offline.setCode("OFFLINE");
         offline.setName("线下渠道");
         offline.setDescription("线下销售渠道");
@@ -264,7 +231,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(offline));
         
         ChannelCode ota = new ChannelCode();
-        ota.setTenantId(tenantId);
+        ota.setTenantId(currentTenantId);
         ota.setCode("OTA");
         ota.setName("OTA渠道");
         ota.setDescription("在线旅行社渠道");
@@ -274,7 +241,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(ota));
         
         ChannelCode direct = new ChannelCode();
-        direct.setTenantId(tenantId);
+        direct.setTenantId(currentTenantId);
         direct.setCode("DIRECT");
         direct.setName("直销渠道");
         direct.setDescription("直接销售渠道");
@@ -284,7 +251,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(direct));
         
         ChannelCode travel = new ChannelCode();
-        travel.setTenantId(tenantId);
+        travel.setTenantId(currentTenantId);
         travel.setCode("TRAVEL");
         travel.setName("旅行社");
         travel.setDescription("旅行社渠道");
@@ -294,7 +261,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(travel));
         
         ChannelCode corp = new ChannelCode();
-        corp.setTenantId(tenantId);
+        corp.setTenantId(currentTenantId);
         corp.setCode("CORP");
         corp.setName("企业协议");
         corp.setDescription("企业协议渠道");
@@ -304,7 +271,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(corp));
         
         ChannelCode ctrip = new ChannelCode();
-        ctrip.setTenantId(tenantId);
+        ctrip.setTenantId(currentTenantId);
         ctrip.setCode("CTRIP");
         ctrip.setName("携程");
         ctrip.setDescription("携程旅行网");
@@ -314,7 +281,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(ctrip));
         
         ChannelCode meituan = new ChannelCode();
-        meituan.setTenantId(tenantId);
+        meituan.setTenantId(currentTenantId);
         meituan.setCode("MEITUAN");
         meituan.setName("美团");
         meituan.setDescription("美团酒店");
@@ -324,7 +291,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(meituan));
         
         ChannelCode fliggy = new ChannelCode();
-        fliggy.setTenantId(tenantId);
+        fliggy.setTenantId(currentTenantId);
         fliggy.setCode("FLIGGY");
         fliggy.setName("飞猪");
         fliggy.setDescription("飞猪旅行");
@@ -334,7 +301,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(fliggy));
         
         ChannelCode website = new ChannelCode();
-        website.setTenantId(tenantId);
+        website.setTenantId(currentTenantId);
         website.setCode("WEBSITE");
         website.setName("官网");
         website.setDescription("官方网站");
@@ -344,7 +311,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(website));
         
         ChannelCode app = new ChannelCode();
-        app.setTenantId(tenantId);
+        app.setTenantId(currentTenantId);
         app.setCode("APP");
         app.setName("APP");
         app.setDescription("手机应用");
@@ -354,7 +321,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(app));
         
         ChannelCode callcenter = new ChannelCode();
-        callcenter.setTenantId(tenantId);
+        callcenter.setTenantId(currentTenantId);
         callcenter.setCode("CALLCENTER");
         callcenter.setName("呼叫中心");
         callcenter.setDescription("电话预订");
@@ -364,7 +331,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(callcenter));
         
         ChannelCode fortune500 = new ChannelCode();
-        fortune500.setTenantId(tenantId);
+        fortune500.setTenantId(currentTenantId);
         fortune500.setCode("FORTUNE500");
         fortune500.setName("世界500强");
         fortune500.setDescription("世界500强企业协议");
@@ -374,7 +341,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(fortune500));
         
         ChannelCode gov = new ChannelCode();
-        gov.setTenantId(tenantId);
+        gov.setTenantId(currentTenantId);
         gov.setCode("GOV");
         gov.setName("政府协议");
         gov.setDescription("政府机关协议");
@@ -384,7 +351,7 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
         defaultCodes.add(channelCodeRepository.save(gov));
         
         ChannelCode mice = new ChannelCode();
-        mice.setTenantId(tenantId);
+        mice.setTenantId(currentTenantId);
         mice.setCode("MICE");
         mice.setName("MICE协议");
         mice.setDescription("会议展览协议");

@@ -49,13 +49,13 @@ public class RoomTypeController {
     }
     
     /**
-     * 根据酒店ID获取酒店房型列表
-     * @param hotelId 酒店ID
+     * 根据酒店代码获取酒店房型列表
+     * @param hotelCode 酒店代码
      * @return 酒店房型列表
      */
-    @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<?> getRoomTypesByHotelId(@PathVariable Integer hotelId) {
-        List<RoomType> roomTypes = roomTypeService.getRoomTypesByHotelId(hotelId);
+    @GetMapping("/hotel/{hotelCode}")
+    public ResponseEntity<?> getRoomTypesByHotelCode(@PathVariable String hotelCode) {
+        List<RoomType> roomTypes = roomTypeService.getRoomTypesByHotelCode(hotelCode);
         return ResponseEntity.ok(roomTypes);
     }
     

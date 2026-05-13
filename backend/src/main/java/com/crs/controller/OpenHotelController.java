@@ -72,9 +72,9 @@ public class OpenHotelController {
     }
 
     /** 校验渠道是否有权访问该酒店 */
-    private boolean hasHotelAccess(TenantChannel channel, Integer hotelId) {
+    private boolean hasHotelAccess(TenantChannel channel, String hotelCode) {
         List<ChannelHotelMapping> mappings = channelHotelMappingRepo
-                .findByChannelIdAndHotelId(channel.getId(), hotelId);
+                .findByTenantIdAndChannelCodeAndHotelCode(channel.getTenantId(), channel.getChannelCode(), hotelCode);
         return mappings.stream().anyMatch(m -> "active".equals(m.getStatus()));
     }
 
@@ -94,20 +94,20 @@ public class OpenHotelController {
             TenantChannel channel = getChannel(req);
             if (pageSize > 50) pageSize = 50;
 
-            // 获取该渠道有权访问的酒店ID列表
-            List<ChannelHotelMapping> mappings = channelHotelMappingRepo.findByChannelId(channel.getId())
+            // 获取该渠道有权访问的酒店CODE列表
+            List<ChannelHotelMapping> mappings = channelHotelMappingRepo.findByTenantIdAndChannelCode(channel.getTenantId(), channel.getChannelCode())
                     .stream().filter(m -> "active".equals(m.getStatus())).collect(Collectors.toList());
-            Set<Integer> allowedHotelIds = mappings.stream()
-                    .map(ChannelHotelMapping::getHotelId).collect(Collectors.toSet());
+            Set<String> allowedHotelCodes = mappings.stream()
+                    .map(ChannelHotelMapping::getHotelCode).collect(Collectors.toSet());
 
-            if (allowedHotelIds.isEmpty()) {
+            if (allowedHotelCodes.isEmpty()) {
                 return ResponseEntity.ok(ok(Map.of("total", 0, "page", page, "pageSize", pageSize, "list", List.of())));
             }
 
             // 使用数据库分页查询
             org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page - 1, pageSize);
             org.springframework.data.domain.Page<Hotel> hotelPage = hotelRepo.findWithFilters(
-                    channel.getTenantId(), Hotel.Status.active, cityId, keyword, allowedHotelIds, pageable);
+                    channel.getTenantId(), Hotel.Status.active, cityId, keyword, allowedHotelCodes, pageable);
 
             List<Map<String, Object>> list = new ArrayList<>();
             for (Hotel hotel : hotelPage.getContent()) {
@@ -154,7 +154,7 @@ public class OpenHotelController {
         m.put("startingPrice", startingPrice);
 
         // 图片
-        List<HotelImage> images = imageRepo.findByHotelIdOrderBySortOrderAsc(hotel.getId());
+        List<HotelImage> images = imageRepo.findByHotelCodeOrderBySortOrderAsc(hotel.getHotelCode());
         m.put("images", images.stream().map(img -> {
             Map<String, Object> im = new LinkedHashMap<>();
             im.put("imageType", img.getImageType());
@@ -166,7 +166,7 @@ public class OpenHotelController {
         }).collect(Collectors.toList()));
 
         // 设施
-        List<HotelFacility> facilities = facilityRepo.findByHotelIdAndAvailable(hotel.getId(), true);
+        List<HotelFacility> facilities = facilityRepo.findByHotelCodeAndAvailable(hotel.getHotelCode(), true);
         m.put("facilities", facilities.stream().map(f -> {
             Map<String, Object> fm = new LinkedHashMap<>();
             fm.put("facilityType", f.getFacilityType());
@@ -176,7 +176,7 @@ public class OpenHotelController {
         }).collect(Collectors.toList()));
 
         // 房型静态信息
-        List<HotelRoomType> roomTypes = roomTypeRepo.findByHotelIdAndStatus(hotel.getId(), "active");
+        List<HotelRoomType> roomTypes = roomTypeRepo.findDistinctByTenantIdAndHotelCodeAndStatus(hotel.getTenantId(), hotel.getHotelCode(), "active");
         m.put("roomTypes", roomTypes.stream().map(rt -> buildRoomTypeSummary(rt)).collect(Collectors.toList()));
 
         return m;
@@ -201,7 +201,7 @@ public class OpenHotelController {
         m.put("image", null); // 房型图片暂无独立图片表，预留
 
         // 房型设施
-        List<RoomTypeFacility> rtFacilities = roomTypeFacilityRepo.findByRoomTypeId(rt.getId())
+        List<RoomTypeFacility> rtFacilities = roomTypeFacilityRepo.findByHotelCodeAndRoomTypeCode(rt.getHotelCode(), rt.getRoomTypeCode())
                 .stream().filter(f -> Boolean.TRUE.equals(f.getAvailable())).collect(Collectors.toList());
         m.put("facilities", rtFacilities.stream().map(f -> {
             Map<String, Object> fm = new LinkedHashMap<>();
@@ -235,7 +235,7 @@ public class OpenHotelController {
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
                 return ResponseEntity.status(404).body(err(404, "酒店不存在"));
             }
-            if (!hasHotelAccess(channel, hotel.getId())) {
+            if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
             }
 
@@ -260,7 +260,7 @@ public class OpenHotelController {
             hotelInfo.put("totalRooms", hotel.getTotalRooms());
             hotelInfo.put("introduction", hotel.getIntroduction());
 
-            List<HotelImage> images = imageRepo.findByHotelIdOrderBySortOrderAsc(hotel.getId());
+            List<HotelImage> images = imageRepo.findByHotelCodeOrderBySortOrderAsc(hotel.getHotelCode());
             hotelInfo.put("images", images.stream().map(img -> {
                 Map<String, Object> im = new LinkedHashMap<>();
                 im.put("imageType", img.getImageType()); im.put("imagePath", img.getImagePath());
@@ -268,7 +268,7 @@ public class OpenHotelController {
                 im.put("sortOrder", img.getSortOrder()); return im;
             }).collect(Collectors.toList()));
 
-            List<HotelFacility> facilities = facilityRepo.findByHotelIdAndAvailable(hotel.getId(), true);
+            List<HotelFacility> facilities = facilityRepo.findByHotelCodeAndAvailable(hotel.getHotelCode(), true);
             hotelInfo.put("facilities", facilities.stream().map(f -> {
                 Map<String, Object> fm = new LinkedHashMap<>();
                 fm.put("facilityType", f.getFacilityType()); fm.put("facilityCode", f.getFacilityCode());
@@ -276,8 +276,8 @@ public class OpenHotelController {
             }).collect(Collectors.toList()));
 
             // 1. 获取基础数据列表
-            List<HotelRoomType> roomTypes = roomTypeRepo.findByHotelIdAndStatus(hotel.getId(), "active");
-            List<RatePlan> allRatePlans = ratePlanRepo.findByHotelIdAndStatus(hotel.getId(), "active");
+            List<HotelRoomType> roomTypes = roomTypeRepo.findDistinctByTenantIdAndHotelCodeAndStatus(hotel.getTenantId(), hotel.getHotelCode(), "active");
+            List<RatePlan> allRatePlans = ratePlanRepo.findByTenantIdAndHotelCodeAndStatus(hotel.getTenantId(), hotel.getHotelCode(), "active");
 
             // 2. 预加载所有价格、库存、房态、规则（一次性批量查询）
             Calendar cal = Calendar.getInstance();
@@ -293,11 +293,11 @@ public class OpenHotelController {
                     p -> p, (a, b) -> a));
 
             // 批量查询库存
-            List<Inventory> allInventory = inventoryRepo.findByHotelIdAndChannelIdAndDateBetween(
-                    hotel.getId(), channel.getId(), checkInDate, lastNight);
-            // 组装库存 Map: "ratePlanId_roomTypeId_date" -> Integer
+            List<Inventory> allInventory = inventoryRepo.findByTenantIdAndHotelCodeAndChannelCodeAndDateBetween(
+                    channel.getTenantId(), hotel.getHotelCode(), channel.getChannelCode(), checkInDate, lastNight);
+            // 组装库存 Map: "ratePlanCode_roomTypeCode_date" -> Integer
             Map<String, Integer> invMap = allInventory.stream().collect(Collectors.toMap(
-                    i -> i.getRatePlanId() + "_" + i.getRoomTypeId() + "_" + formatDate(i.getDate()),
+                    i -> i.getRatePlanCode() + "_" + i.getRoomTypeCode() + "_" + formatDate(i.getDate()),
                     Inventory::getAvailableRooms, (a, b) -> Math.min(a, b)));
 
             // 批量查询发布记录
@@ -354,7 +354,7 @@ public class OpenHotelController {
                     int minAvail = Integer.MAX_VALUE;
                     cal.setTime(checkInDate);
                     for (int i = 0; i < nights; i++) {
-                        String key = rp.getId() + "_" + rt.getId() + "_" + formatDate(cal.getTime());
+                        String key = rp.getRateCode() + "_" + rt.getRoomTypeCode() + "_" + formatDate(cal.getTime());
                         minAvail = Math.min(minAvail, invMap.getOrDefault(key, 0));
                         cal.add(Calendar.DATE, 1);
                     }
@@ -369,8 +369,8 @@ public class OpenHotelController {
                     rpMap.put("currency", "CNY");
                     rpMap.put("dailyPrices", dailyPrices);
                     rpMap.put("packages", parsePackages(rp.getPackages()));
-                    rpMap.put("cancellationPolicy", buildCancellationPolicy(rp.getCancellationRule()));
-                    rpMap.put("guaranteePolicy", buildGuaranteePolicy(rp.getGuaranteeRule()));
+                    rpMap.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), rp.getCancellationRule()));
+                    rpMap.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), rp.getGuaranteeRule()));
                     ratePlanResults.add(rpMap);
                 }
                 
@@ -429,18 +429,18 @@ public class OpenHotelController {
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
                 return ResponseEntity.status(409).body(unavailable("HOTEL_INACTIVE", "酒店不存在或已停用", null));
             }
-            if (!hasHotelAccess(channel, hotel.getId())) {
+            if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
             }
 
             // 2. 房型有效性
-            HotelRoomType roomType = roomTypeRepo.findByHotelIdAndRoomTypeCode(hotel.getId(), roomTypeCode).orElse(null);
+            HotelRoomType roomType = roomTypeRepo.findByTenantIdAndHotelCodeAndRoomTypeCode(hotel.getTenantId(), hotel.getHotelCode(), roomTypeCode).orElse(null);
             if (roomType == null || !"active".equals(roomType.getStatus())) {
                 return ResponseEntity.status(409).body(unavailable("ROOM_TYPE_INACTIVE", "房型不存在或已停用", null));
             }
 
             // 3. 价格计划有效性
-            RatePlan ratePlan = ratePlanRepo.findByHotelIdAndRateCode(hotel.getId(), ratePlanCode).orElse(null);
+            RatePlan ratePlan = ratePlanRepo.findByTenantIdAndHotelCodeAndRateCode(hotel.getTenantId(), hotel.getHotelCode(), ratePlanCode).orElse(null);
             if (ratePlan == null || !"active".equals(ratePlan.getStatus())) {
                 return ResponseEntity.status(409).body(unavailable("RATE_PLAN_INACTIVE", "价格计划不存在或已停用", null));
             }
@@ -543,8 +543,8 @@ public class OpenHotelController {
             data.put("totalPrice", totalPrice);
             data.put("currency", "CNY");
             data.put("packages", parsePackages(ratePlan.getPackages()));
-            data.put("cancellationPolicy", buildCancellationPolicy(ratePlan.getCancellationRule()));
-            data.put("guaranteePolicy", buildGuaranteePolicy(ratePlan.getGuaranteeRule()));
+            data.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), ratePlan.getCancellationRule()));
+            data.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), ratePlan.getGuaranteeRule()));
             return ResponseEntity.ok(ok(data));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(err(500, e.getMessage()));
@@ -596,9 +596,9 @@ public class OpenHotelController {
     }
 
 
-    private Map<String, Object> buildCancellationPolicy(String ruleCode) {
+    private Map<String, Object> buildCancellationPolicy(Integer tenantId, String ruleCode) {
         if (ruleCode == null || ruleCode.isBlank()) return null;
-        CancellationPolicy policy = cancellationPolicyRepo.findByCode(ruleCode);
+        CancellationPolicy policy = cancellationPolicyRepo.findByTenantIdAndCode(tenantId, ruleCode);
         if (policy == null) return null;
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("type", policy.getType());
@@ -609,9 +609,9 @@ public class OpenHotelController {
         return m;
     }
 
-    private Map<String, Object> buildGuaranteePolicy(String ruleCode) {
+    private Map<String, Object> buildGuaranteePolicy(Integer tenantId, String ruleCode) {
         if (ruleCode == null || ruleCode.isBlank()) return null;
-        GuaranteePolicy policy = guaranteePolicyRepo.findByCode(ruleCode);
+        GuaranteePolicy policy = guaranteePolicyRepo.findByTenantIdAndCode(tenantId, ruleCode);
         if (policy == null) return null;
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("type", policy.getType());

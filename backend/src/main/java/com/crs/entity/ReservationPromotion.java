@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -21,9 +18,9 @@ import java.util.Date;
  * 
  * @since 2026-05-10
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "reservation_promotion")
 public class ReservationPromotion {
@@ -31,6 +28,9 @@ public class ReservationPromotion {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+
+    @Column(name = "tenant_id")
+    private Integer tenantId;
 
     @Column(name = "reservation_id", nullable = false)
     private Integer reservationId;
@@ -56,4 +56,24 @@ public class ReservationPromotion {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt = new Date();
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Integer getReservationId() { return reservationId; }
+    public void setReservationId(Integer reservationId) { this.reservationId = reservationId; }
+    public String getPromotionName() { return promotionName; }
+    public void setPromotionName(String promotionName) { this.promotionName = promotionName; }
+    public String getDiscountType() { return discountType; }
+    public void setDiscountType(String discountType) { this.discountType = discountType; }
+    public BigDecimal getDiscountValue() { return discountValue; }
+    public void setDiscountValue(BigDecimal discountValue) { this.discountValue = discountValue; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
+    public String getPromotionCode() { return promotionCode; }
+    public void setPromotionCode(String promotionCode) { this.promotionCode = promotionCode; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }

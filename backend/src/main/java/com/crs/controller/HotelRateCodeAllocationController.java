@@ -42,7 +42,10 @@ public class HotelRateCodeAllocationController {
 
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
 
     private boolean validateHotelTenant(String hotelCode) {
@@ -57,15 +60,18 @@ public class HotelRateCodeAllocationController {
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<List<Map<String, Object>>> getAllocationsByHotelId(@PathVariable Integer hotelId) {
         try {
-            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
+            Integer currentTenantId = getCurrentTenantId();
+            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
+                    .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+            
             if (!hotelOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(403).build();
             }
             Hotel hotel = hotelOpt.get();
             String hotelCode = hotel.getHotelCode();
 
             // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户泄露
-            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
+            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(currentTenantId, hotelCode);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (HotelRateCodeAllocation allocation : allocations) {
@@ -82,7 +88,7 @@ public class HotelRateCodeAllocationController {
                 item.put("promotionEditable", allocation.getPromotionEditable());
                 item.put("hotelId", hotelId);
 
-                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), getCurrentTenantId());
+                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), currentTenantId);
                 if (rateCode != null) {
                     item.put("groupRateCodeId", rateCode.getId());
                 }
@@ -92,7 +98,6 @@ public class HotelRateCodeAllocationController {
 
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).body(null);
         }
     }
@@ -105,16 +110,19 @@ public class HotelRateCodeAllocationController {
     @PostMapping
     public ResponseEntity<HotelRateCodeAllocation> createAllocation(@RequestBody Map<String, Object> allocationData) {
         try {
+            Integer currentTenantId = getCurrentTenantId();
             Integer hotelId = allocationData.get("hotelId") instanceof Number ? ((Number) allocationData.get("hotelId")).intValue() : null;
             String hotelCodeParam = allocationData.get("hotelCode") instanceof String ? (String) allocationData.get("hotelCode") : null;
             Integer rateCodeId = allocationData.get("rateCodeId") instanceof Number ? ((Number) allocationData.get("rateCodeId")).intValue() : null;
 
             Hotel hotel = null;
             if (hotelCodeParam != null && !hotelCodeParam.isEmpty()) {
-                hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCodeParam, getCurrentTenantId()).orElse(null);
+                hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCodeParam, currentTenantId).orElse(null);
             }
             if (hotel == null && hotelId != null) {
-                hotel = hotelRepository.findById(hotelId).orElse(null);
+                hotel = hotelRepository.findById(hotelId)
+                        .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId))
+                        .orElse(null);
             }
 
             if (hotel == null) {
@@ -123,14 +131,16 @@ public class HotelRateCodeAllocationController {
 
             GroupRateCode rateCode = null;
             if (rateCodeId != null) {
-                rateCode = groupRateCodeRepository.findById(rateCodeId).orElse(null);
+                rateCode = groupRateCodeRepository.findById(rateCodeId)
+                        .filter(rc -> rc.getGroupId() != null && rc.getGroupId().equals(currentTenantId))
+                        .orElse(null);
             }
             if (rateCode == null) {
                 return ResponseEntity.badRequest().build();
             }
 
             HotelRateCodeAllocation allocation = new HotelRateCodeAllocation();
-            allocation.setTenantId(hotel.getTenantId());
+            allocation.setTenantId(currentTenantId);
             allocation.setHotelCode(hotel.getHotelCode());
             allocation.setRateCode(rateCode.getRateCode());
             allocation.setAllocated((Boolean) allocationData.getOrDefault("allocated", false));
@@ -143,7 +153,6 @@ public class HotelRateCodeAllocationController {
             HotelRateCodeAllocation saved = allocationRepository.save(allocation);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).body(null);
         }
     }
@@ -159,9 +168,12 @@ public class HotelRateCodeAllocationController {
             @PathVariable Integer id,
             @RequestBody Map<String, Object> allocationData) {
         try {
-            Optional<HotelRateCodeAllocation> existingOpt = allocationRepository.findById(id);
+            Integer currentTenantId = getCurrentTenantId();
+            Optional<HotelRateCodeAllocation> existingOpt = allocationRepository.findById(id)
+                    .filter(a -> a.getTenantId() != null && a.getTenantId().equals(currentTenantId));
+            
             if (!existingOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(403).build();
             }
 
             HotelRateCodeAllocation allocation = existingOpt.get();
@@ -188,7 +200,6 @@ public class HotelRateCodeAllocationController {
             HotelRateCodeAllocation saved = allocationRepository.save(allocation);
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).body(null);
         }
     }
@@ -201,16 +212,19 @@ public class HotelRateCodeAllocationController {
     @DeleteMapping("/hotel/{hotelId}")
     public ResponseEntity<Void> deleteAllocationsByHotelId(@PathVariable Integer hotelId) {
         try {
-            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
+            Integer currentTenantId = getCurrentTenantId();
+            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
+                    .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+            
             if (!hotelOpt.isPresent()) {
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(403).build();
             }
 
             Hotel hotel = hotelOpt.get();
-            allocationRepository.deleteByHotelCode(hotel.getHotelCode());
+            // 安全删除：必须带 tenantId 防止跨租户越权删除
+            allocationRepository.deleteByTenantIdAndHotelCode(currentTenantId, hotel.getHotelCode());
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }
@@ -218,12 +232,13 @@ public class HotelRateCodeAllocationController {
     @GetMapping("/by-code/hotel/{hotelCode}")
     public ResponseEntity<List<Map<String, Object>>> getAllocationsByHotelCode(@PathVariable String hotelCode) {
         try {
+            Integer currentTenantId = getCurrentTenantId();
             if (!validateHotelTenant(hotelCode)) {
                 return ResponseEntity.status(403).build();
             }
 
             // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户泄露
-            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
+            List<HotelRateCodeAllocation> allocations = allocationRepository.findByTenantIdAndHotelCode(currentTenantId, hotelCode);
 
             List<Map<String, Object>> result = new ArrayList<>();
             for (HotelRateCodeAllocation allocation : allocations) {
@@ -239,7 +254,7 @@ public class HotelRateCodeAllocationController {
                 item.put("guaranteeRuleEditable", allocation.getGuaranteeRuleEditable());
                 item.put("promotionEditable", allocation.getPromotionEditable());
 
-                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), getCurrentTenantId());
+                GroupRateCode rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(allocation.getRateCode(), currentTenantId);
                 if (rateCode != null) {
                     item.put("groupRateCodeId", rateCode.getId());
                 }
@@ -249,7 +264,6 @@ public class HotelRateCodeAllocationController {
 
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).body(null);
         }
     }
@@ -257,15 +271,15 @@ public class HotelRateCodeAllocationController {
     @DeleteMapping("/by-code/hotel/{hotelCode}")
     public ResponseEntity<Void> deleteAllocationsByHotelCode(@PathVariable String hotelCode) {
         try {
+            Integer currentTenantId = getCurrentTenantId();
             if (!validateHotelTenant(hotelCode)) {
                 return ResponseEntity.status(403).build();
             }
 
             // 关联查询原则：必须带 tenantId 防止跨租户越权删除
-            allocationRepository.deleteByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
+            allocationRepository.deleteByTenantIdAndHotelCode(currentTenantId, hotelCode);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }

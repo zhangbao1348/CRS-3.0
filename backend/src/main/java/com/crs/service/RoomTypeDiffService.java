@@ -22,12 +22,20 @@ public class RoomTypeDiffService {
         this.roomTypeDiffRepository = roomTypeDiffRepository;
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 获取所有房型差价列表
      * @return 房型差价列表
      */
     public List<RoomTypeDiff> getAllRoomTypeDiffs() {
-        return roomTypeDiffRepository.findAll();
+        return roomTypeDiffRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -36,7 +44,8 @@ public class RoomTypeDiffService {
      * @return 房型差价详情
      */
     public Optional<RoomTypeDiff> getRoomTypeDiffById(Integer id) {
-        return roomTypeDiffRepository.findById(id);
+        return roomTypeDiffRepository.findById(id)
+                .filter(d -> d.getTenantId() != null && d.getTenantId().equals(getCurrentTenantId()));
     }
     
     /**
@@ -45,7 +54,9 @@ public class RoomTypeDiffService {
      * @return 房型差价列表
      */
     public List<RoomTypeDiff> getRoomTypeDiffsBySystemId(Integer systemId) {
-        return roomTypeDiffRepository.findBySystemId(systemId);
+        return roomTypeDiffRepository.findBySystemId(systemId).stream()
+                .filter(d -> d.getTenantId() != null && d.getTenantId().equals(getCurrentTenantId()))
+                .collect(Collectors.toList());
     }
     
     /**
@@ -55,7 +66,9 @@ public class RoomTypeDiffService {
      * @return 房型差价列表
      */
     public List<RoomTypeDiff> getRoomTypeDiffsBySystemIdAndStatus(Integer systemId, RoomTypeDiff.Status status) {
-        return roomTypeDiffRepository.findBySystemIdAndStatus(systemId, status);
+        return roomTypeDiffRepository.findBySystemIdAndStatus(systemId, status).stream()
+                .filter(d -> d.getTenantId() != null && d.getTenantId().equals(getCurrentTenantId()))
+                .collect(Collectors.toList());
     }
     
     /**
@@ -64,6 +77,7 @@ public class RoomTypeDiffService {
      * @return 创建的房型差价信息
      */
     public RoomTypeDiff createRoomTypeDiff(RoomTypeDiff roomTypeDiff) {
+        roomTypeDiff.setTenantId(getCurrentTenantId());
         return roomTypeDiffRepository.save(roomTypeDiff);
     }
     
@@ -73,6 +87,8 @@ public class RoomTypeDiffService {
      * @return 创建的房型差价列表
      */
     public List<RoomTypeDiff> createBatchRoomTypeDiffs(List<RoomTypeDiff> roomTypeDiffs) {
+        Integer tenantId = getCurrentTenantId();
+        roomTypeDiffs.forEach(d -> d.setTenantId(tenantId));
         return roomTypeDiffRepository.saveAll(roomTypeDiffs);
     }
     
@@ -83,8 +99,8 @@ public class RoomTypeDiffService {
      * @return 更新后的房型差价信息
      */
     public RoomTypeDiff updateRoomTypeDiff(Integer id, RoomTypeDiff roomTypeDiff) {
-        RoomTypeDiff existingRoomTypeDiff = roomTypeDiffRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room type diff not found"));
+        RoomTypeDiff existingRoomTypeDiff = getRoomTypeDiffById(id)
+                .orElseThrow(() -> new RuntimeException("Room type diff not found or access denied"));
         
         existingRoomTypeDiff.setSystemId(roomTypeDiff.getSystemId());
         existingRoomTypeDiff.setRoomTypeId(roomTypeDiff.getRoomTypeId());
@@ -104,10 +120,9 @@ public class RoomTypeDiffService {
      * @param id 房型差价ID
      */
     public void deleteRoomTypeDiff(Integer id) {
-        if (!roomTypeDiffRepository.existsById(id)) {
-            throw new RuntimeException("Room type diff not found");
-        }
-        roomTypeDiffRepository.deleteById(id);
+        RoomTypeDiff existing = getRoomTypeDiffById(id)
+                .orElseThrow(() -> new RuntimeException("Room type diff not found or access denied"));
+        roomTypeDiffRepository.delete(existing);
     }
     
     /**
@@ -115,7 +130,11 @@ public class RoomTypeDiffService {
      * @param systemId 差价体系ID
      */
     public void deleteRoomTypeDiffsBySystemId(Integer systemId) {
-        roomTypeDiffRepository.deleteBySystemId(systemId);
+        // 先获取所有权
+        List<RoomTypeDiff> diffs = roomTypeDiffRepository.findBySystemId(systemId).stream()
+                .filter(d -> d.getTenantId() != null && d.getTenantId().equals(getCurrentTenantId()))
+                .collect(Collectors.toList());
+        roomTypeDiffRepository.deleteAll(diffs);
     }
 
     /**

@@ -18,13 +18,6 @@ public interface CancellationPolicyService {
     List<CancellationPolicy> getAllPolicies();
     
     /**
-     * 根据租户ID获取取消政策
-     * @param tenantId 租户ID
-     * @return 取消政策列表
-     */
-    List<CancellationPolicy> getByTenantId(Integer tenantId);
-    
-    /**
      * 根据ID获取取消政策
      * @param id 政策ID
      * @return 取消政策
@@ -32,19 +25,11 @@ public interface CancellationPolicyService {
     Optional<CancellationPolicy> getById(Integer id);
     
     /**
-     * 根据集团ID获取取消政策
-     * @param groupId 集团ID
-     * @return 取消政策列表
-     */
-    List<CancellationPolicy> getByGroupId(Integer groupId);
-    
-    /**
      * 创建取消政策
-     * @param tenantId 租户ID
      * @param policy 取消政策
      * @return 创建的取消政策
      */
-    CancellationPolicy create(Integer tenantId, CancellationPolicy policy);
+    CancellationPolicy create(CancellationPolicy policy);
     
     /**
      * 更新取消政策

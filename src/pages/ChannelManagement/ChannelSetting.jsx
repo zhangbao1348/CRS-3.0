@@ -3,6 +3,7 @@ import { Form, Input, Select, Radio, Button, Tabs, Card, Checkbox, Table, messag
 import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { tenantChannelApi, channelPublishApi } from '../../utils/api'
+import { useHotelContext } from '../../contexts/HotelContext.jsx'
 
 const { TabPane } = Tabs
 const { Option } = Select
@@ -21,8 +22,7 @@ const ChannelSetting = () => {
   const [rateCodes, setRateCodes] = useState([])
   const [publishedRecords, setPublishedRecords] = useState([])
 
-  // 当前酒店ID和酒店代码（从页面顶部选择器获取）
-  const currentHotelCode = localStorage.getItem('crs_selected_hotel_code') || 'JJSH001'
+  const { selectedHotel } = useHotelContext()
 
   const filteredRateCodes = rateCodes.filter(rc =>
     rc.name.includes(priceCodeSearch) || rc.code.toLowerCase().includes(priceCodeSearch.toLowerCase())
@@ -31,12 +31,12 @@ const ChannelSetting = () => {
   useEffect(() => {
     loadChannelData()
     loadRateCodes()
-  }, [channelCode])
+  }, [channelCode, selectedHotel])
 
   // 加载已发布记录并回显选中状态
   const loadPublishedRecords = async () => {
     try {
-      const records = await channelPublishApi.getPublishedRecords(1, currentHotelCode, channelCode)
+      const records = await channelPublishApi.getPublishedRecords(1, selectedHotel, channelCode)
       if (records && records.length > 0) {
         const codes = new Set()
         const roomMap = {}
@@ -49,6 +49,10 @@ const ChannelSetting = () => {
         }
         setSelectedPriceCodes([...codes])
         setSelectedRoomTypesMap(roomMap)
+      } else {
+        // 关键修复：如果新酒店没有发布记录，必须清空上个酒店遗留的状态
+        setSelectedPriceCodes([])
+        setSelectedRoomTypesMap({})
       }
     } catch (error) {
       console.error('加载已发布记录失败:', error)
@@ -57,7 +61,7 @@ const ChannelSetting = () => {
 
   const loadRateCodes = async () => {
     try {
-      const data = await channelPublishApi.getRateCodesWithRoomTypesByCode(currentHotelCode)
+      const data = await channelPublishApi.getRateCodesWithRoomTypesByCode(selectedHotel)
       const formatted = (data || []).map(rc => ({
         code: rc.rateCode,
         name: rc.rateName,
@@ -76,12 +80,21 @@ const ChannelSetting = () => {
     try {
       const data = await tenantChannelApi.getChannelByCode(channelCode, 1)
       setChannelData(data)
+      const getChannelTypeText = (type) => {
+        const types = {
+          'Real_Time_API': '实时接口 (API)',
+          'Push_API': '推送接口',
+          'Manual': '手动录入',
+          'Web_Service': 'Web服务'
+        }
+        return types[type] || type
+      }
+
       form.setFieldsValue({
         channelName: data.channelName,
         channelCode: data.channelCode,
-        switchChannel: data.switchChannel,
+        switchChannel: getChannelTypeText(data.switchChannel),
         accessKey: data.accessKey || '',
-        accessSecret: data.accessSecret || '',
         priceRounding: data.priceRounding || 'keep',
         prepaidCommissionType: data.prepaidCommissionType || 'percentage',
         prepaidCommissionValue: data.prepaidCommissionValue || '',
@@ -100,15 +113,17 @@ const ChannelSetting = () => {
     try {
       const values = await form.validateFields()
       setSaving(true)
-      await tenantChannelApi.updateChannelByCode(channelCode, {
+      
+      const updateData = {
         accessKey: values.accessKey,
-        accessSecret: values.accessSecret,
         priceRounding: values.priceRounding,
         prepaidCommissionType: values.prepaidCommissionType,
         prepaidCommissionValue: values.prepaidCommissionValue || null,
         postpaidCommissionType: values.postpaidCommissionType,
         postpaidCommissionValue: values.postpaidCommissionValue || null
-      }, 1)
+      }
+
+      await tenantChannelApi.updateChannelByCode(channelCode, updateData, 1)
       message.success('保存成功')
     } catch (error) {
       console.error('保存失败:', error)
@@ -140,7 +155,7 @@ const ChannelSetting = () => {
       }
       await channelPublishApi.batchPublish({
         tenantId: 1,
-        hotelCode: currentHotelCode,
+        hotelCode: selectedHotel,
         channelCode: channelCode,
         rateCodeRoomTypesMap
       })
@@ -200,16 +215,15 @@ const ChannelSetting = () => {
               </div>
             </Card>
 
-            <Card title="接口配置" style={{ marginBottom: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <Form.Item name="accessKey" label="对接 Key">
-                  <Input placeholder="请输入对接 Key" />
-                </Form.Item>
-                <Form.Item name="accessSecret" label="对接秘钥">
-                  <Input.Password placeholder="请输入对接秘钥" />
-                </Form.Item>
-              </div>
-            </Card>
+            {channelCode !== 'WXMINI' && (
+              <Card title="接口配置" style={{ marginBottom: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 16 }}>
+                  <Form.Item name="accessKey" label="对接 Key">
+                    <Input placeholder="请输入对接 Key" />
+                  </Form.Item>
+                </div>
+              </Card>
+            )}
 
             <Card title="价格设置" style={{ marginBottom: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

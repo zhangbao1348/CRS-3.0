@@ -32,19 +32,23 @@ public class PackageController {
     private GroupRateCodeRepository groupRateCodeRepository;
     
     // 默认租户ID
-    private static final Integer DEFAULT_TENANT_ID = 1;
-    
     /**
      * 获取所有包价列表
-     * @param tenantId 租户ID（可选）
      * @return 包价列表
      */
     @GetMapping
-    public ResponseEntity<List<Package>> getAllPackages(
-            @RequestParam(required = false) Integer tenantId) {
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-        List<Package> packages = packageService.getAllPackages(actualTenantId);
+    public ResponseEntity<List<Package>> getAllPackages() {
+        List<Package> packages = packageService.getAllPackages();
         return ResponseEntity.ok(packages);
+    }
+
+    /**
+     * 兼容性接口：根据 groupId 获取所有包价（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<Package>> getPackagesByGroupId(@PathVariable Integer groupId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getAllPackages();
     }
     
     /**
@@ -58,48 +62,42 @@ public class PackageController {
         if (pkg.isPresent()) {
             return ResponseEntity.ok(pkg.get());
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("包价不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "包价不存在或无权访问"));
         }
     }
     
     /**
      * 根据代码获取包价
      * @param code 包价代码
-     * @param tenantId 租户ID（可选）
      * @return 包价详情
      */
     @GetMapping("/code/{code}")
-    public ResponseEntity<?> getPackageByCode(
-            @PathVariable String code,
-            @RequestParam(required = false) Integer tenantId) {
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-        Optional<Package> pkg = packageService.getPackageByCode(actualTenantId, code);
+    public ResponseEntity<?> getPackageByCode(@PathVariable String code) {
+        Optional<Package> pkg = packageService.getPackageByCode(code);
         if (pkg.isPresent()) {
             return ResponseEntity.ok(pkg.get());
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("包价不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "包价不存在或无权访问"));
         }
     }
     
     /**
      * 创建新包价
      * @param pkg 包价信息
-     * @param tenantId 租户ID（可选）
      * @return 创建的包价
      */
     @PostMapping
-    public ResponseEntity<?> createPackage(
-            @RequestBody Package pkg,
-            @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<?> createPackage(@RequestBody Package pkg) {
         try {
             if (pkg.getCode() != null && !CodeValidator.isValid(pkg.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-            Package createdPackage = packageService.createPackage(actualTenantId, pkg);
+            Package createdPackage = packageService.createPackage(pkg);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdPackage);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
     
@@ -118,7 +116,9 @@ public class PackageController {
             Package updatedPackage = packageService.updatePackage(id, pkg);
             return ResponseEntity.ok(updatedPackage);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
     
@@ -140,41 +140,39 @@ public class PackageController {
                 }
             }
             packageService.deletePackage(id);
-            return ResponseEntity.ok("包价删除成功");
+            return ResponseEntity.ok(Map.of("message", "包价删除成功"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
     
     /**
      * 搜索包价
      * @param params 搜索参数
-     * @param tenantId 租户ID（可选）
      * @return 包价列表
      */
     @PostMapping("/search")
-    public ResponseEntity<List<Package>> searchPackages(
-            @RequestBody Map<String, String> params,
-            @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<List<Package>> searchPackages(@RequestBody Map<String, String> params) {
         String name = params.get("name");
         String type = params.get("type");
         String status = params.get("status");
         
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
         List<Package> packages;
         if (name != null && !name.isEmpty()) {
-            packages = packageService.searchPackagesByName(actualTenantId, name);
+            packages = packageService.searchPackagesByName(name);
         } else if (type != null && !type.isEmpty()) {
-            packages = packageService.searchPackagesByType(actualTenantId, type);
+            packages = packageService.searchPackagesByType(type);
         } else if (status != null && !status.isEmpty()) {
             try {
                 Package.Status packageStatus = Package.Status.valueOf(status);
-                packages = packageService.searchPackagesByStatus(actualTenantId, packageStatus);
+                packages = packageService.searchPackagesByStatus(packageStatus);
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(null);
             }
         } else {
-            packages = packageService.getAllPackages(actualTenantId);
+            packages = packageService.getAllPackages();
         }
         
         return ResponseEntity.ok(packages);
@@ -183,15 +181,11 @@ public class PackageController {
     /**
      * 检查包价代码是否存在
      * @param code 包价代码
-     * @param tenantId 租户ID（可选）
      * @return 是否存在
      */
     @GetMapping("/check/code/{code}")
-    public ResponseEntity<Map<String, Boolean>> checkCodeExists(
-            @PathVariable String code,
-            @RequestParam(required = false) Integer tenantId) {
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-        boolean exists = packageService.existsByCode(actualTenantId, code);
+    public ResponseEntity<Map<String, Boolean>> checkCodeExists(@PathVariable String code) {
+        boolean exists = packageService.existsByCode(code);
         return ResponseEntity.ok(Map.of("exists", exists));
     }
     
@@ -201,24 +195,21 @@ public class PackageController {
      * 根据包价代码更新包价
      * @param code 包价代码
      * @param pkg 包价信息
-     * @param tenantId 租户ID（可选）
      * @return 更新后的包价
      */
     @PutMapping("/code/{code}")
-    public ResponseEntity<?> updatePackageByCode(
-            @PathVariable String code,
-            @RequestBody Package pkg,
-            @RequestParam(required = false) Integer tenantId) {
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-        Optional<Package> existing = packageRepository.findByTenantIdAndCode(actualTenantId, code);
+    public ResponseEntity<?> updatePackageByCode(@PathVariable String code, @RequestBody Package pkg) {
+        Optional<Package> existing = packageService.getPackageByCode(code);
         if (existing.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("包价不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "包价不存在或无权访问"));
         }
         try {
             Package updatedPackage = packageService.updatePackage(existing.get().getId(), pkg);
             return ResponseEntity.ok(updatedPackage);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 }

@@ -25,15 +25,10 @@ public class HotelFacilityService {
     @Autowired
     private HotelFacilityRepository hotelFacilityRepository;
     
-    public List<HotelFacility> getFacilitiesByHotelId(Integer hotelId) {
-        return hotelFacilityRepository.findByHotelId(hotelId);
-    }
-    
-    public List<HotelFacility> getFacilitiesByType(Integer hotelId, String facilityType) {
-        return hotelFacilityRepository.findByHotelIdAndFacilityType(hotelId, facilityType);
-    }
-    
     public HotelFacility createFacility(HotelFacility facility) {
+        if (facility.getTenantId() == null) {
+            facility.setTenantId(com.crs.util.TenantContext.getTenantId());
+        }
         return hotelFacilityRepository.save(facility);
     }
     
@@ -45,10 +40,6 @@ public class HotelFacilityService {
         hotelFacilityRepository.deleteById(id);
     }
     
-    public void deleteFacilitiesByHotelId(Integer hotelId) {
-        hotelFacilityRepository.deleteAll(getFacilitiesByHotelId(hotelId));
-    }
-    
     public List<HotelFacility> getFacilitiesByHotelCode(String hotelCode) {
         return hotelFacilityRepository.findByTenantIdAndHotelCode(com.crs.util.TenantContext.getTenantId(), hotelCode);
     }
@@ -58,7 +49,7 @@ public class HotelFacilityService {
     }
 
     public void deleteFacilitiesByHotelCode(String hotelCode) {
-        hotelFacilityRepository.deleteAll(getFacilitiesByHotelCode(hotelCode));
+        hotelFacilityRepository.deleteByTenantIdAndHotelCode(com.crs.util.TenantContext.getTenantId(), hotelCode);
     }
 
     public List<HotelFacility> getAllFacilities() {

@@ -4,6 +4,7 @@ import { SearchOutlined, ReloadOutlined, ExportOutlined, DownOutlined, PhoneOutl
 import { useNavigate } from 'react-router-dom'
 import { reservationApi } from '../../utils/api'
 import { getCurrentTenantId } from '../../utils/tenantUtils'
+import { useHotelContext } from '../../contexts/HotelContext'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -43,6 +44,7 @@ const ReservationList = () => {
   const [orderData, setOrderData] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
   const navigate = useNavigate()
+  const { selectedHotel } = useHotelContext()
 
   const fetchOrders = async (page = 1, pageSize = 20) => {
     setLoading(true)
@@ -51,6 +53,7 @@ const ReservationList = () => {
       const formValues = form.getFieldsValue()
       const params = {
         tenantId: tenantId || undefined,
+        hotelCode: selectedHotel || undefined,
         page,
         pageSize,
         reservationStatus: statusFilterMap[formValues.status] || undefined,
@@ -130,7 +133,7 @@ const ReservationList = () => {
 
   useEffect(() => {
     fetchOrders()
-  }, [])
+  }, [selectedHotel])
 
   return (
     <div className="fade-in">

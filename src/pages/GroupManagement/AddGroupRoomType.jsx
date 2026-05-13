@@ -104,7 +104,6 @@ const AddGroupRoomType = () => {
       if (response && response.success && response.data && response.data.length > 0) {
         const formattedHotelData = response.data.map((hotel, index) => ({
           key: String(hotel.id || index),
-          hotelId: hotel.id,
           hotelCode: hotel.hotelCode,
           hotel: hotel.chineseName,
           region: hotel.province,
@@ -257,7 +256,6 @@ const AddGroupRoomType = () => {
       
       const allocationData = hotelData.map(item => ({
         groupRoomTypeId: currentId,
-        hotelId: item.hotelId,
         hotelCode: item.hotelCode,
         allocated: item.allocated,
         roomInfoEditable: item.roomInfoEditable
@@ -304,7 +302,6 @@ const AddGroupRoomType = () => {
       
       const allocationData = hotelData.map(item => ({
         groupRoomTypeId: roomTypeId,
-        hotelId: item.hotelId,
         hotelCode: item.hotelCode,
         allocated: item.allocated,
         roomInfoEditable: item.roomInfoEditable

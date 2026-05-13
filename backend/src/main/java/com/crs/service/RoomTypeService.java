@@ -2,6 +2,7 @@ package com.crs.service;
 
 import com.crs.entity.RoomType;
 import com.crs.repository.RoomTypeRepository;
+import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,12 +21,20 @@ public class RoomTypeService {
         this.roomTypeRepository = roomTypeRepository;
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 获取所有酒店房型列表
      * @return 酒店房型列表
      */
     public List<RoomType> getAllRoomTypes() {
-        return roomTypeRepository.findAll();
+        return roomTypeRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -34,26 +43,21 @@ public class RoomTypeService {
      * @return 酒店房型信息
      */
     public Optional<RoomType> getRoomTypeById(Integer id) {
-        return roomTypeRepository.findById(id);
+        return roomTypeRepository.findById(id)
+                .filter(rt -> rt.getTenantId() != null && rt.getTenantId().equals(getCurrentTenantId()));
     }
     
     /**
-     * 根据酒店ID获取酒店房型列表
-     * @param hotelId 酒店ID
+     * 根据酒店代码获取酒店房型列表
+     * @param hotelCode 酒店代码
      * @return 酒店房型列表
      */
-    public List<RoomType> getRoomTypesByHotelId(Integer hotelId) {
-        return roomTypeRepository.findByHotelId(hotelId);
+    public List<RoomType> getRoomTypesByHotelCode(String hotelCode) {
+        return roomTypeRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
     
-    /**
-     * 根据酒店ID和房型代码获取酒店房型
-     * @param hotelId 酒店ID
-     * @param code 房型代码
-     * @return 酒店房型信息
-     */
-    public Optional<RoomType> getRoomTypeByHotelIdAndCode(Integer hotelId, String code) {
-        return roomTypeRepository.findByHotelIdAndCode(hotelId, code);
+    public Optional<RoomType> getRoomTypeByHotelCodeAndCode(String hotelCode, String code) {
+        return roomTypeRepository.findByTenantIdAndHotelCodeAndCode(getCurrentTenantId(), hotelCode, code);
     }
     
     /**
@@ -62,8 +66,10 @@ public class RoomTypeService {
      * @return 创建的酒店房型信息
      */
     public RoomType createRoomType(RoomType roomType) {
+        Integer tenantId = getCurrentTenantId();
+        roomType.setTenantId(tenantId);
         // 检查酒店内房型代码是否已存在
-        if (roomTypeRepository.existsByHotelIdAndCode(roomType.getHotelId(), roomType.getCode())) {
+        if (roomTypeRepository.existsByTenantIdAndHotelCodeAndCode(tenantId, roomType.getHotelCode(), roomType.getCode())) {
             throw new RuntimeException("Room type code already exists in this hotel");
         }
         return roomTypeRepository.save(roomType);
@@ -76,17 +82,18 @@ public class RoomTypeService {
      * @return 更新后的酒店房型信息
      */
     public RoomType updateRoomType(Integer id, RoomType roomType) {
-        RoomType existingRoomType = roomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room type not found"));
+        RoomType existingRoomType = getRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Room type not found or access denied"));
         
+        Integer tenantId = getCurrentTenantId();
         // 如果房型代码变更，检查新代码是否已存在
         if (!existingRoomType.getCode().equals(roomType.getCode()) && 
-                roomTypeRepository.existsByHotelIdAndCode(roomType.getHotelId(), roomType.getCode())) {
+                roomTypeRepository.existsByTenantIdAndHotelCodeAndCode(tenantId, roomType.getHotelCode(), roomType.getCode())) {
             throw new RuntimeException("Room type code already exists in this hotel");
         }
         
-        existingRoomType.setHotelId(roomType.getHotelId());
-        existingRoomType.setGroupRoomTypeId(roomType.getGroupRoomTypeId());
+        existingRoomType.setHotelCode(roomType.getHotelCode());
+        existingRoomType.setGroupRoomTypeCode(roomType.getGroupRoomTypeCode());
         existingRoomType.setCode(roomType.getCode());
         existingRoomType.setName(roomType.getName());
         existingRoomType.setDescription(roomType.getDescription());
@@ -100,10 +107,9 @@ public class RoomTypeService {
      * @param id 酒店房型ID
      */
     public void deleteRoomType(Integer id) {
-        if (!roomTypeRepository.existsById(id)) {
-            throw new RuntimeException("Room type not found");
-        }
-        roomTypeRepository.deleteById(id);
+        RoomType existing = getRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Room type not found or access denied"));
+        roomTypeRepository.delete(existing);
     }
     
     /**
@@ -112,6 +118,6 @@ public class RoomTypeService {
      * @return 酒店房型列表
      */
     public List<RoomType> getRoomTypesByStatus(RoomType.Status status) {
-        return roomTypeRepository.findByStatus(status);
+        return roomTypeRepository.findByTenantIdAndStatus(getCurrentTenantId(), status);
     }
 }

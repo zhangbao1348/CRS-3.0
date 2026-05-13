@@ -13,7 +13,7 @@ class ProductPrice extends React.Component {
     super(props);
     this.state = {
       activeTab: '1',
-      hotelId: 1,
+      hotelCode: 'SHBLJ001',
       roomTypeDiffs: {
         '1': {
           diffName: '默认差价',

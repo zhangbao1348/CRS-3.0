@@ -2,6 +2,7 @@ package com.crs.service;
 
 import com.crs.entity.Inventory;
 import com.crs.repository.InventoryRepository;
+import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,12 +22,20 @@ public class InventoryService {
         this.inventoryRepository = inventoryRepository;
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+    
     /**
      * 获取所有库存列表
      * @return 库存列表
      */
     public List<Inventory> getAllInventories() {
-        return inventoryRepository.findAll();
+        return inventoryRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -35,38 +44,39 @@ public class InventoryService {
      * @return 库存信息
      */
     public Optional<Inventory> getInventoryById(Integer id) {
-        return inventoryRepository.findById(id);
+        return inventoryRepository.findById(id)
+                .filter(i -> i.getTenantId() != null && i.getTenantId().equals(getCurrentTenantId()));
+    }
+
+    /**
+     * 根据酒店编码获取库存列表
+     * @param hotelCode 酒店编码
+     * @return 库存列表
+     */
+    public List<Inventory> getInventoriesByHotelCode(String hotelCode) {
+        return inventoryRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
     
     /**
-     * 根据酒店ID获取库存列表
-     * @param hotelId 酒店ID
+     * 根据酒店编码、价格计划编码和房型编码获取库存列表
+     * @param hotelCode 酒店编码
+     * @param ratePlanCode 价格计划编码
+     * @param roomTypeCode 房型编码
      * @return 库存列表
      */
-    public List<Inventory> getInventoriesByHotelId(Integer hotelId) {
-        return inventoryRepository.findByHotelId(hotelId);
-    }
-    
-    /**
-     * 根据酒店ID、价格计划ID和房型ID获取库存列表
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
-     * @return 库存列表
-     */
-    public List<Inventory> getInventoriesByHotelIdAndRatePlanIdAndRoomTypeId(Integer hotelId, Integer ratePlanId, Integer roomTypeId) {
-        return inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeId(hotelId, ratePlanId, roomTypeId);
+    public List<Inventory> getInventoriesByCode(String hotelCode, String ratePlanCode, String roomTypeCode) {
+        return inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCode(getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode);
     }
     
     /**
      * 根据日期范围获取库存
-     * @param hotelId 酒店ID
+     * @param hotelCode 酒店编码
      * @param startDate 开始日期
      * @param endDate 结束日期
      * @return 库存列表
      */
-    public List<Inventory> getInventoriesByDateRange(Integer hotelId, Date startDate, Date endDate) {
-        return inventoryRepository.findByHotelIdAndDateBetween(hotelId, startDate, endDate);
+    public List<Inventory> getInventoriesByDateRange(String hotelCode, Date startDate, Date endDate) {
+        return inventoryRepository.findByTenantIdAndHotelCodeAndDateBetween(getCurrentTenantId(), hotelCode, startDate, endDate);
     }
     
     /**
@@ -75,6 +85,7 @@ public class InventoryService {
      * @return 创建的库存信息
      */
     public Inventory createInventory(Inventory inventory) {
+        inventory.setTenantId(getCurrentTenantId());
         return inventoryRepository.save(inventory);
     }
     
@@ -84,6 +95,8 @@ public class InventoryService {
      * @return 创建的库存列表
      */
     public List<Inventory> createBatchInventories(List<Inventory> inventories) {
+        Integer tenantId = getCurrentTenantId();
+        inventories.forEach(i -> i.setTenantId(tenantId));
         return inventoryRepository.saveAll(inventories);
     }
     
@@ -94,12 +107,13 @@ public class InventoryService {
      * @return 更新后的库存信息
      */
     public Inventory updateInventory(Integer id, Inventory inventory) {
-        Inventory existingInventory = inventoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Inventory not found"));
+        Inventory existingInventory = getInventoryById(id)
+                .orElseThrow(() -> new RuntimeException("Inventory not found or access denied"));
         
-        existingInventory.setHotelId(inventory.getHotelId());
-        existingInventory.setRatePlanId(inventory.getRatePlanId());
-        existingInventory.setRoomTypeId(inventory.getRoomTypeId());
+        existingInventory.setHotelCode(inventory.getHotelCode());
+        existingInventory.setRatePlanCode(inventory.getRatePlanCode());
+        existingInventory.setRoomTypeCode(inventory.getRoomTypeCode());
+        existingInventory.setChannelCode(inventory.getChannelCode());
         existingInventory.setDate(inventory.getDate());
         existingInventory.setAvailableRooms(inventory.getAvailableRooms());
         existingInventory.setAllocatedRooms(inventory.getAllocatedRooms());
@@ -115,8 +129,8 @@ public class InventoryService {
      * @return 更新后的库存信息
      */
     public Inventory updateAvailableRooms(Integer id, Integer availableRooms) {
-        Inventory existingInventory = inventoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Inventory not found"));
+        Inventory existingInventory = getInventoryById(id)
+                .orElseThrow(() -> new RuntimeException("Inventory not found or access denied"));
         
         existingInventory.setAvailableRooms(availableRooms);
         return inventoryRepository.save(existingInventory);
@@ -124,17 +138,17 @@ public class InventoryService {
     
     /**
      * 批量更新库存
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
+     * @param hotelCode 酒店编码
+     * @param ratePlanCode 价格计划编码
+     * @param roomTypeCode 房型编码
      * @param startDate 开始日期
      * @param endDate 结束日期
      * @param availableRooms 可用房间数量
      * @return 更新的库存数量
      */
-    public int batchUpdateInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date startDate, Date endDate, Integer availableRooms) {
-        List<Inventory> inventories = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndDateBetween(
-                hotelId, ratePlanId, roomTypeId, startDate, endDate);
+    public int batchUpdateInventory(String hotelCode, String ratePlanCode, String roomTypeCode, Date startDate, Date endDate, Integer availableRooms) {
+        List<Inventory> inventories = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDateBetween(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, startDate, endDate);
         
         inventories.forEach(inventory -> {
             inventory.setAvailableRooms(availableRooms);
@@ -149,10 +163,9 @@ public class InventoryService {
      * @param id 库存ID
      */
     public void deleteInventory(Integer id) {
-        if (!inventoryRepository.existsById(id)) {
-            throw new RuntimeException("Inventory not found");
-        }
-        inventoryRepository.deleteById(id);
+        Inventory existing = getInventoryById(id)
+                .orElseThrow(() -> new RuntimeException("Inventory not found or access denied"));
+        inventoryRepository.delete(existing);
     }
     
     /**
@@ -164,9 +177,9 @@ public class InventoryService {
      * @param requiredRooms 需要的房间数量
      * @return 是否充足
      */
-    public boolean checkInventoryAvailability(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date date, Integer requiredRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndDate(
-                hotelId, ratePlanId, roomTypeId, date);
+    public boolean checkInventoryAvailability(String hotelCode, String ratePlanCode, String roomTypeCode, Date date, Integer requiredRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, date);
         
         return inventory != null && inventory.getAvailableRooms() >= requiredRooms;
     }
@@ -180,9 +193,9 @@ public class InventoryService {
      * @param reservedRooms 预留的房间数量
      * @return 是否成功
      */
-    public boolean reserveInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date date, Integer reservedRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndDate(
-                hotelId, ratePlanId, roomTypeId, date);
+    public boolean reserveInventory(String hotelCode, String ratePlanCode, String roomTypeCode, Date date, Integer reservedRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, date);
         
         if (inventory == null || inventory.getAvailableRooms() < reservedRooms) {
             return false;
@@ -204,9 +217,9 @@ public class InventoryService {
      * @param releasedRooms 释放的房间数量
      * @return 是否成功
      */
-    public boolean releaseInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date date, Integer releasedRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndDate(
-                hotelId, ratePlanId, roomTypeId, date);
+    public boolean releaseInventory(String hotelCode, String ratePlanCode, String roomTypeCode, Date date, Integer releasedRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, date);
         
         if (inventory == null || inventory.getAllocatedRooms() < releasedRooms) {
             return false;
@@ -220,66 +233,48 @@ public class InventoryService {
     }
     
     /**
-     * 根据渠道ID获取库存列表
-     * @param channelId 渠道ID
+     * 根据渠道编码获取库存列表
+     * @param channelCode 渠道编码
      * @return 库存列表
      */
-    public List<Inventory> getInventoriesByChannelId(Integer channelId) {
-        return inventoryRepository.findByChannelId(channelId);
+    public List<Inventory> getInventoriesByChannelCode(String channelCode) {
+        return inventoryRepository.findByTenantId(getCurrentTenantId()).stream()
+                .filter(i -> channelCode.equals(i.getChannelCode()))
+                .collect(java.util.stream.Collectors.toList());
     }
     
     /**
-     * 根据酒店ID和渠道ID获取库存列表
-     * @param hotelId 酒店ID
-     * @param channelId 渠道ID
+     * 根据酒店编码和渠道编码获取库存列表
+     * @param hotelCode 酒店编码
+     * @param channelCode 渠道编码
      * @return 库存列表
      */
-    public List<Inventory> getInventoriesByHotelIdAndChannelId(Integer hotelId, Integer channelId) {
-        return inventoryRepository.findByHotelIdAndChannelId(hotelId, channelId);
+    public List<Inventory> getInventoriesByHotelCodeAndChannelCode(String hotelCode, String channelCode) {
+        return inventoryRepository.findByTenantIdAndHotelCodeAndChannelCode(getCurrentTenantId(), hotelCode, channelCode);
     }
     
     /**
-     * 根据酒店ID、渠道ID和日期范围获取库存
-     * @param hotelId 酒店ID
-     * @param channelId 渠道ID
+     * 根据酒店编码、渠道编码和日期范围获取库存
+     * @param hotelCode 酒店编码
+     * @param channelCode 渠道编码
      * @param startDate 开始日期
      * @param endDate 结束日期
      * @return 库存列表
      */
-    public List<Inventory> getInventoriesByHotelIdAndChannelIdAndDateRange(Integer hotelId, Integer channelId, Date startDate, Date endDate) {
-        return inventoryRepository.findByHotelIdAndChannelIdAndDateBetween(hotelId, channelId, startDate, endDate);
+    public List<Inventory> getInventoriesByHotelCodeAndChannelCodeAndDateRange(String hotelCode, String channelCode, Date startDate, Date endDate) {
+        return inventoryRepository.findByTenantIdAndHotelCodeAndChannelCodeAndDateBetween(getCurrentTenantId(), hotelCode, channelCode, startDate, endDate);
     }
     
-    /**
-     * 检查渠道库存是否充足
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
-     * @param channelId 渠道ID
-     * @param date 日期
-     * @param requiredRooms 需要的房间数量
-     * @return 是否充足
-     */
-    public boolean checkChannelInventoryAvailability(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date date, Integer requiredRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndChannelIdAndDate(
-                hotelId, ratePlanId, roomTypeId, channelId, date);
+    public boolean checkChannelInventoryAvailability(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date, Integer requiredRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, channelCode, date);
         
         return inventory != null && inventory.getAvailableRooms() >= requiredRooms;
     }
     
-    /**
-     * 预留渠道库存
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
-     * @param channelId 渠道ID
-     * @param date 日期
-     * @param reservedRooms 预留的房间数量
-     * @return 是否成功
-     */
-    public boolean reserveChannelInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date date, Integer reservedRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndChannelIdAndDate(
-                hotelId, ratePlanId, roomTypeId, channelId, date);
+    public boolean reserveChannelInventory(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date, Integer reservedRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, channelCode, date);
         
         if (inventory == null || inventory.getAvailableRooms() < reservedRooms) {
             return false;
@@ -292,19 +287,9 @@ public class InventoryService {
         return true;
     }
     
-    /**
-     * 释放渠道预留库存
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
-     * @param channelId 渠道ID
-     * @param date 日期
-     * @param releasedRooms 释放的房间数量
-     * @return 是否成功
-     */
-    public boolean releaseChannelInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date date, Integer releasedRooms) {
-        Inventory inventory = inventoryRepository.findByHotelIdAndRatePlanIdAndRoomTypeIdAndChannelIdAndDate(
-                hotelId, ratePlanId, roomTypeId, channelId, date);
+    public boolean releaseChannelInventory(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date, Integer releasedRooms) {
+        Inventory inventory = inventoryRepository.findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(
+                getCurrentTenantId(), hotelCode, ratePlanCode, roomTypeCode, channelCode, date);
         
         if (inventory == null || inventory.getAllocatedRooms() < releasedRooms) {
             return false;
@@ -317,24 +302,13 @@ public class InventoryService {
         return true;
     }
     
-    /**
-     * 批量更新渠道库存
-     * @param hotelId 酒店ID
-     * @param ratePlanId 价格计划ID
-     * @param roomTypeId 房型ID
-     * @param channelId 渠道ID
-     * @param startDate 开始日期
-     * @param endDate 结束日期
-     * @param availableRooms 可用房间数量
-     * @return 更新的库存数量
-     */
-    public int batchUpdateChannelInventory(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date startDate, Date endDate, Integer availableRooms) {
-        List<Inventory> inventories = inventoryRepository.findByHotelIdAndChannelIdAndDateBetween(
-                hotelId, channelId, startDate, endDate);
+    public int batchUpdateChannelInventory(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date startDate, Date endDate, Integer availableRooms) {
+        List<Inventory> inventories = inventoryRepository.findByTenantIdAndHotelCodeAndChannelCodeAndDateBetween(
+                getCurrentTenantId(), hotelCode, channelCode, startDate, endDate);
         
         // 过滤出匹配价格计划和房型的库存
         inventories = inventories.stream()
-                .filter(inventory -> inventory.getRatePlanId().equals(ratePlanId) && inventory.getRoomTypeId().equals(roomTypeId))
+                .filter(inventory -> ratePlanCode.equals(inventory.getRatePlanCode()) && roomTypeCode.equals(inventory.getRoomTypeCode()))
                 .collect(java.util.stream.Collectors.toList());
         
         inventories.forEach(inventory -> {

@@ -20,12 +20,19 @@ public class RoomTypeDiffSystemService {
         this.roomTypeDiffSystemRepository = roomTypeDiffSystemRepository;
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
-     * 获取所有房型差价体系列表
-     * @return 房型差价体系列表
+     * 获取当前租户下所有房型差价体系列表
      */
     public List<RoomTypeDiffSystem> getAllRoomTypeDiffSystems() {
-        return roomTypeDiffSystemRepository.findAll();
+        return roomTypeDiffSystemRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -34,43 +41,47 @@ public class RoomTypeDiffSystemService {
      * @return 房型差价体系信息
      */
     public Optional<RoomTypeDiffSystem> getRoomTypeDiffSystemById(Integer id) {
-        return roomTypeDiffSystemRepository.findById(id);
+        return roomTypeDiffSystemRepository.findById(id)
+                .filter(s -> s.getTenantId() != null && s.getTenantId().equals(getCurrentTenantId()));
     }
     
     /**
-     * 根据酒店ID获取房型差价体系列表
-     * @param hotelId 酒店ID
+     * 根据酒店编码获取房型差价体系列表
+     * @param hotelCode 酒店编码
      * @return 房型差价体系列表
      */
+    public List<RoomTypeDiffSystem> getRoomTypeDiffSystemsByHotelCode(String hotelCode) {
+        return roomTypeDiffSystemRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
+    }
+    
+    /** @deprecated 请使用 getRoomTypeDiffSystemsByHotelCode */
+    @Deprecated
     public List<RoomTypeDiffSystem> getRoomTypeDiffSystemsByHotelId(Integer hotelId) {
-        return roomTypeDiffSystemRepository.findByHotelId(hotelId);
+        return List.of(); // 快速失败，强制上层重构
     }
     
     /**
      * 创建房型差价体系
-     * @param roomTypeDiffSystem 房型差价体系信息
-     * @return 创建的房型差价体系信息
      */
     public RoomTypeDiffSystem createRoomTypeDiffSystem(RoomTypeDiffSystem roomTypeDiffSystem) {
+        roomTypeDiffSystem.setTenantId(getCurrentTenantId());
         return roomTypeDiffSystemRepository.save(roomTypeDiffSystem);
     }
     
     /**
      * 更新房型差价体系
-     * @param id 房型差价体系ID
-     * @param roomTypeDiffSystem 房型差价体系信息
-     * @return 更新后的房型差价体系信息
      */
     public RoomTypeDiffSystem updateRoomTypeDiffSystem(Integer id, RoomTypeDiffSystem roomTypeDiffSystem) {
-        RoomTypeDiffSystem existingRoomTypeDiffSystem = roomTypeDiffSystemRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Room type diff system not found"));
+        RoomTypeDiffSystem existing = getRoomTypeDiffSystemById(id)
+                .orElseThrow(() -> new RuntimeException("Room type diff system not found or access denied"));
         
-        existingRoomTypeDiffSystem.setHotelId(roomTypeDiffSystem.getHotelId());
-        existingRoomTypeDiffSystem.setName(roomTypeDiffSystem.getName());
-        existingRoomTypeDiffSystem.setDescription(roomTypeDiffSystem.getDescription());
-        existingRoomTypeDiffSystem.setStatus(roomTypeDiffSystem.getStatus());
+        existing.setHotelCode(roomTypeDiffSystem.getHotelCode());
+        existing.setCode(roomTypeDiffSystem.getCode());
+        existing.setName(roomTypeDiffSystem.getName());
+        existing.setDescription(roomTypeDiffSystem.getDescription());
+        existing.setStatus(roomTypeDiffSystem.getStatus());
         
-        return roomTypeDiffSystemRepository.save(existingRoomTypeDiffSystem);
+        return roomTypeDiffSystemRepository.save(existing);
     }
     
     /**
@@ -78,9 +89,8 @@ public class RoomTypeDiffSystemService {
      * @param id 房型差价体系ID
      */
     public void deleteRoomTypeDiffSystem(Integer id) {
-        if (!roomTypeDiffSystemRepository.existsById(id)) {
-            throw new RuntimeException("Room type diff system not found");
-        }
-        roomTypeDiffSystemRepository.deleteById(id);
+        RoomTypeDiffSystem existing = getRoomTypeDiffSystemById(id)
+                .orElseThrow(() -> new RuntimeException("Room type diff system not found or access denied"));
+        roomTypeDiffSystemRepository.delete(existing);
     }
 }

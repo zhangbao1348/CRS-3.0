@@ -3,6 +3,7 @@ package com.crs.service;
 import com.crs.entity.GroupRoomType;
 import com.crs.entity.GroupRoomTypeHotel;
 import com.crs.entity.Hotel;
+import com.crs.entity.HotelRoomType;
 import com.crs.repository.GroupRoomTypeRepository;
 import com.crs.repository.GroupRoomTypeHotelRepository;
 import com.crs.repository.HotelRepository;
@@ -50,25 +51,29 @@ public class GroupRoomTypeService {
         this.hotelRepository = hotelRepository;
     }
     
-    public List<GroupRoomType> getAllGroupRoomTypes() {
-        // 获取当前租户ID
+    private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
         if (tenantId == null) {
-            throw new RuntimeException("Tenant not found");
+            throw new RuntimeException("Tenant context missing");
         }
-        return groupRoomTypeRepository.findByGroupId(tenantId);
+        return tenantId;
+    }
+
+    public List<GroupRoomType> getAllGroupRoomTypes() {
+        return groupRoomTypeRepository.findByGroupId(getCurrentTenantId());
     }
     
     public Optional<GroupRoomType> getGroupRoomTypeById(Integer id) {
-        return groupRoomTypeRepository.findById(id);
+        return groupRoomTypeRepository.findById(id)
+                .filter(rt -> rt.getGroupId() != null && rt.getGroupId().equals(getCurrentTenantId()));
     }
     
     public List<GroupRoomType> getGroupRoomTypesByGroupId(Integer groupId) {
-        return groupRoomTypeRepository.findByGroupId(groupId);
+        return groupRoomTypeRepository.findByGroupId(getCurrentTenantId());
     }
     
     public List<GroupRoomType> getGroupRoomTypesByGroupIdAndCategory(Integer groupId, Integer categoryId) {
-        List<GroupRoomType> allTypes = groupRoomTypeRepository.findByGroupId(groupId);
+        List<GroupRoomType> allTypes = getGroupRoomTypesByGroupId(getCurrentTenantId());
         if (categoryId == null) {
             return allTypes;
         }
@@ -78,33 +83,31 @@ public class GroupRoomTypeService {
     }
     
     public Optional<GroupRoomType> getGroupRoomTypeByCode(String roomTypeCode) {
-        Integer tenantId = TenantContext.getTenantId();
-        return groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(tenantId != null ? tenantId : 1, roomTypeCode);
+        return groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), roomTypeCode);
     }
     
     public GroupRoomType createGroupRoomType(GroupRoomType groupRoomType) {
-        Integer tenantId = TenantContext.getTenantId();
-        if (tenantId == null) tenantId = 1;
+        Integer tenantId = getCurrentTenantId();
         if (groupRoomTypeRepository.existsByGroupIdAndRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode())) {
             throw new RuntimeException("Room type code already exists");
         }
+        groupRoomType.setGroupId(tenantId);
         return groupRoomTypeRepository.save(groupRoomType);
     }
     
     public GroupRoomType updateGroupRoomType(Integer id, GroupRoomType groupRoomType) {
-        GroupRoomType existingGroupRoomType = groupRoomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        GroupRoomType existingGroupRoomType = getGroupRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
         
+        Integer tenantId = getCurrentTenantId();
         if (!existingGroupRoomType.getRoomTypeCode().equals(groupRoomType.getRoomTypeCode()) && 
-                groupRoomTypeRepository.existsByRoomTypeCode(groupRoomType.getRoomTypeCode())) {
+                groupRoomTypeRepository.existsByGroupIdAndRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode())) {
             throw new RuntimeException("Room type code already exists");
         }
         
-        existingGroupRoomType.setGroupId(groupRoomType.getGroupId());
         existingGroupRoomType.setRoomTypeCode(groupRoomType.getRoomTypeCode());
         existingGroupRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
         existingGroupRoomType.setDescription(groupRoomType.getDescription());
-        existingGroupRoomType.setRoomTypeCategoryId(groupRoomType.getRoomTypeCategoryId());
         existingGroupRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
         existingGroupRoomType.setSortOrder(groupRoomType.getSortOrder());
         existingGroupRoomType.setStatus(groupRoomType.getStatus());
@@ -117,18 +120,18 @@ public class GroupRoomTypeService {
     }
     
     private void syncToHotelRoomTypes(GroupRoomType groupRoomType) {
-        var hotelRoomTypes = hotelRoomTypeRepository.findByGroupRoomTypeId(groupRoomType.getId());
-        var allocations = groupRoomTypeHotelRepository.findByGroupRoomTypeId(groupRoomType.getId());
+        Integer tenantId = getCurrentTenantId();
+        var hotelRoomTypes = hotelRoomTypeRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
+        var allocations = groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
         
         for (var hotelRoomType : hotelRoomTypes) {
             var allocation = allocations.stream()
-                    .filter(a -> a.getHotelId().equals(hotelRoomType.getHotelId()))
+                    .filter(a -> a.getHotelCode().equals(hotelRoomType.getHotelCode()))
                     .findFirst();
             
             if (allocation.isPresent() && !allocation.get().getRoomInfoEditable()) {
                 hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
                 hotelRoomType.setDescription(groupRoomType.getDescription());
-                hotelRoomType.setRoomTypeCategoryId(groupRoomType.getRoomTypeCategoryId());
                 hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
                 hotelRoomType.setStatus(groupRoomType.getStatus());
                 hotelRoomTypeRepository.save(hotelRoomType);
@@ -137,8 +140,8 @@ public class GroupRoomTypeService {
     }
     
     public GroupRoomType enableGroupRoomType(Integer id) {
-        GroupRoomType groupRoomType = groupRoomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        GroupRoomType groupRoomType = getGroupRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
         groupRoomType.setStatus("active");
         GroupRoomType updated = groupRoomTypeRepository.save(groupRoomType);
         syncToHotelRoomTypes(updated);
@@ -146,8 +149,8 @@ public class GroupRoomTypeService {
     }
     
     public GroupRoomType disableGroupRoomType(Integer id) {
-        GroupRoomType groupRoomType = groupRoomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Group room type not found"));
+        GroupRoomType groupRoomType = getGroupRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
         groupRoomType.setStatus("inactive");
         GroupRoomType updated = groupRoomTypeRepository.save(groupRoomType);
         syncToHotelRoomTypes(updated);
@@ -156,78 +159,85 @@ public class GroupRoomTypeService {
     
     @Transactional
     public void deleteGroupRoomType(Integer id) {
-        if (!groupRoomTypeRepository.existsById(id)) {
-            throw new RuntimeException("Group room type not found");
-        }
+        GroupRoomType groupRoomType = getGroupRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
         
-        var hotelRoomTypes = hotelRoomTypeRepository.findByGroupRoomTypeId(id);
+        Integer tenantId = getCurrentTenantId();
+        var hotelRoomTypes = hotelRoomTypeRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
         if (!hotelRoomTypes.isEmpty()) {
             throw new RuntimeException("Cannot delete: room type is allocated to hotels");
         }
         
-        groupRoomTypeHotelRepository.deleteByGroupRoomTypeId(id);
-        groupRoomTypeRepository.deleteById(id);
+        groupRoomTypeHotelRepository.deleteByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
+        groupRoomTypeRepository.delete(groupRoomType);
     }
     
     public List<GroupRoomType> getGroupRoomTypesByStatus(String status) {
-        return groupRoomTypeRepository.findByStatus(status);
+        return groupRoomTypeRepository.findByGroupIdAndStatus(getCurrentTenantId(), status);
     }
     
     @Transactional
     public void allocateToHotels(Integer groupRoomTypeId, List<GroupRoomTypeHotel> allocations) {
-        if (!groupRoomTypeRepository.existsById(groupRoomTypeId)) {
-            throw new RuntimeException("Group room type not found");
-        }
+        GroupRoomType groupRoomType = getGroupRoomTypeById(groupRoomTypeId)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied"));
         
-        groupRoomTypeHotelRepository.deleteByGroupRoomTypeId(groupRoomTypeId);
+        Integer tenantId = getCurrentTenantId();
+        groupRoomTypeHotelRepository.deleteByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
         
         for (var allocation : allocations) {
-            allocation.setGroupRoomTypeId(groupRoomTypeId);
+            allocation.setGroupRoomTypeCode(groupRoomType.getRoomTypeCode());
+            allocation.setTenantId(tenantId);
             
-            Integer hotelId = allocation.getHotelId();
-            if ((hotelId == null) && allocation.getHotelCode() != null && !allocation.getHotelCode().isEmpty()) {
-                Integer tenantId = TenantContext.getTenantId();
-                Hotel hotel = hotelRepository.findByHotelCodeAndTenantId(allocation.getHotelCode(), tenantId != null ? tenantId : 1).orElse(null);
-                if (hotel != null) {
-                    hotelId = hotel.getId();
-                    allocation.setHotelId(hotelId);
-                }
+            String hotelCode = allocation.getHotelCode();
+            if (hotelCode == null || hotelCode.isEmpty()) {
+                continue;
             }
             
             groupRoomTypeHotelRepository.save(allocation);
             
-            if (Boolean.TRUE.equals(allocation.getAllocated()) && hotelId != null) {
-                groupRoomTypeHotelService.createOrUpdateHotelRoomType(groupRoomTypeId, hotelId);
-            } else if (hotelId != null) {
-                groupRoomTypeHotelService.deleteHotelRoomType(groupRoomTypeId, hotelId);
+            if (Boolean.TRUE.equals(allocation.getAllocated())) {
+                groupRoomTypeHotelService.createOrUpdateHotelRoomTypeByCode(groupRoomType.getRoomTypeCode(), hotelCode);
+            } else {
+                groupRoomTypeHotelService.deleteHotelRoomTypeByCode(groupRoomType.getRoomTypeCode(), hotelCode);
             }
         }
     }
     
-    public List<GroupRoomTypeHotel> getAllocationsByGroupRoomTypeId(Integer groupRoomTypeId) {
-        return groupRoomTypeHotelRepository.findByGroupRoomTypeId(groupRoomTypeId);
+    public List<GroupRoomTypeHotel> getAllocationsByGroupRoomTypeCode(String groupRoomTypeCode) {
+        return groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCode(getCurrentTenantId(), groupRoomTypeCode);
     }
     
     public long countByGroupId(Integer groupId) {
-        return groupRoomTypeRepository.countByGroupId(groupId);
+        return groupRoomTypeRepository.countByGroupId(getCurrentTenantId());
     }
 
     public List<GroupRoomType> getGroupRoomTypesByGroupCode(String groupCode) {
-        return groupRoomTypeRepository.findByGroupCode(groupCode);
+        // 强制使用当前租户上下文，groupCode 仅作为辅助过滤
+        return groupRoomTypeRepository.findByGroupId(getCurrentTenantId()).stream()
+                .filter(rt -> groupCode.equals(rt.getGroupCode()))
+                .collect(Collectors.toList());
     }
 
     public List<GroupRoomType> getGroupRoomTypesByGroupCodeAndStatus(String groupCode, String status) {
-        return groupRoomTypeRepository.findByGroupCodeAndStatus(groupCode, status);
+        return groupRoomTypeRepository.findByGroupIdAndStatus(getCurrentTenantId(), status).stream()
+                .filter(rt -> groupCode.equals(rt.getGroupCode()))
+                .collect(Collectors.toList());
     }
 
     public Optional<GroupRoomType> getGroupRoomTypeByGroupCodeAndRoomTypeCode(String groupCode, String roomTypeCode) {
-        return groupRoomTypeRepository.findByGroupCodeAndRoomTypeCode(groupCode, roomTypeCode);
+        return groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(getCurrentTenantId(), roomTypeCode)
+                .filter(rt -> groupCode.equals(rt.getGroupCode()));
     }
 
     public List<GroupRoomType> getGroupRoomTypesByGroupCodeAndCategoryCode(String groupCode, String categoryCode) {
+        List<GroupRoomType> all = groupRoomTypeRepository.findByGroupId(getCurrentTenantId()).stream()
+                .filter(rt -> groupCode.equals(rt.getGroupCode()))
+                .collect(Collectors.toList());
         if (categoryCode == null) {
-            return groupRoomTypeRepository.findByGroupCode(groupCode);
+            return all;
         }
-        return groupRoomTypeRepository.findByGroupCodeAndRoomTypeCategoryCode(groupCode, categoryCode);
+        return all.stream()
+                .filter(rt -> categoryCode.equals(rt.getRoomTypeCategoryCode()))
+                .collect(Collectors.toList());
     }
 }

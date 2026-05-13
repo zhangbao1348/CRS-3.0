@@ -2,6 +2,7 @@ package com.crs.service;
 
 import com.crs.entity.*;
 import com.crs.repository.*;
+import com.crs.util.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,12 +48,21 @@ public class ChannelPublishService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 获取酒店的房价码列表及关联房型（用于渠道发布页面）
      */
-    public List<Map<String, Object>> getRateCodesWithRoomTypes(Integer hotelId) {
-        List<RatePlan> ratePlans = ratePlanRepository.findByHotelIdAndStatus(hotelId, "active");
-        List<HotelRoomType> allRoomTypes = hotelRoomTypeRepository.findByHotelIdAndStatus(hotelId, "active");
+    public List<Map<String, Object>> getRateCodesWithRoomTypes(String hotelCode) {
+        Integer tenantId = getCurrentTenantId();
+        List<RatePlan> ratePlans = ratePlanRepository.findByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, "active");
+        List<HotelRoomType> allRoomTypes = hotelRoomTypeRepository.findDistinctByTenantIdAndHotelCodeAndStatus(tenantId, hotelCode, "active");
 
         Map<String, HotelRoomType> codeToRoomType = new HashMap<>();
         for (HotelRoomType rt : allRoomTypes) {
@@ -88,17 +98,18 @@ public class ChannelPublishService {
     /**
      * 获取已发布的记录
      */
-    public List<ChannelPublishRecord> getPublishedRecords(Integer tenantId, String hotelCode, String channelCode) {
+    public List<ChannelPublishRecord> getPublishedRecords(String hotelCode, String channelCode) {
         return publishRecordRepository.findByTenantIdAndHotelCodeAndChannelCodeAndStatus(
-                tenantId, hotelCode, channelCode, "published");
+                getCurrentTenantId(), hotelCode, channelCode, "published");
     }
 
     /**
      * 批量发布（按房价码独立发布各自的房型）
      */
     @Transactional
-    public int batchPublish(Integer tenantId, String hotelCode, String channelCode,
+    public int batchPublish(String hotelCode, String channelCode,
                             Map<String, List<String>> rateCodeRoomTypesMap) {
+        Integer tenantId = getCurrentTenantId();
         // 自动建立渠道酒店映射（确保授权）
         ensureChannelHotelMapping(tenantId, hotelCode, channelCode);
 
@@ -139,15 +150,14 @@ public class ChannelPublishService {
         TenantChannel channel = tenantChannelRepository.findByTenantIdAndChannelCode(tenantId, channelCode);
 
         if (hotel != null && channel != null) {
-            List<ChannelHotelMapping> mappings = channelHotelMappingRepository.findByChannelIdAndHotelId(channel.getId(), hotel.getId());
+            List<ChannelHotelMapping> mappings = channelHotelMappingRepository.findByTenantIdAndChannelCodeAndHotelCode(tenantId, channelCode, hotelCode);
             if (mappings.isEmpty()) {
                 ChannelHotelMapping mapping = new ChannelHotelMapping();
-                mapping.setChannelId(channel.getId());
+                mapping.setTenantId(tenantId);
                 mapping.setChannelCode(channel.getChannelCode());
                 mapping.setChannelName(channel.getChannelName());
-                mapping.setHotelId(hotel.getId());
-                mapping.setHotelName(hotel.getChineseName());
                 mapping.setHotelCode(hotel.getHotelCode());
+                mapping.setHotelName(hotel.getChineseName());
                 mapping.setChannelHotelCode(channel.getChannelCode() + "_" + hotel.getHotelCode());
                 mapping.setStatus("active");
                 channelHotelMappingRepository.save(mapping);

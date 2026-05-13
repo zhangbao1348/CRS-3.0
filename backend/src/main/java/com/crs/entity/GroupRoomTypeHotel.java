@@ -1,7 +1,5 @@
 package com.crs.entity;
 
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,8 +9,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * 集团房型和酒店关联实体类
  * 对应数据库group_room_type_hotel表
  */
-@NoArgsConstructor
-@AllArgsConstructor
+
+
 @Entity
 @Table(name = "group_room_type_hotel")
 public class GroupRoomTypeHotel {
@@ -21,14 +19,8 @@ public class GroupRoomTypeHotel {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    @Column(name = "group_room_type_id", nullable = false)
-    private Integer groupRoomTypeId;
-    
     @Column(name = "group_room_type_code", length = 50)
     private String groupRoomTypeCode;
-    
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
     
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
@@ -53,12 +45,12 @@ public class GroupRoomTypeHotel {
     // 关联关系
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_room_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "group_room_type_code", referencedColumnName = "room_type_code", insertable = false, updatable = false)
     private GroupRoomType groupRoomType;
     
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
     
     @PreUpdate
@@ -75,28 +67,12 @@ public class GroupRoomTypeHotel {
         this.id = id;
     }
     
-    public Integer getGroupRoomTypeId() {
-        return groupRoomTypeId;
-    }
-    
-    public void setGroupRoomTypeId(Integer groupRoomTypeId) {
-        this.groupRoomTypeId = groupRoomTypeId;
-    }
-    
     public String getGroupRoomTypeCode() {
         return groupRoomTypeCode;
     }
     
     public void setGroupRoomTypeCode(String groupRoomTypeCode) {
         this.groupRoomTypeCode = groupRoomTypeCode;
-    }
-    
-    public Integer getHotelId() {
-        return hotelId;
-    }
-    
-    public void setHotelId(Integer hotelId) {
-        this.hotelId = hotelId;
     }
     
     public String getHotelCode() {
@@ -168,8 +144,8 @@ public class GroupRoomTypeHotel {
     public String toString() {
         return "GroupRoomTypeHotel{" +
                 "id=" + id +
-                ", groupRoomTypeId=" + groupRoomTypeId +
-                ", hotelId=" + hotelId +
+                ", groupRoomTypeCode='" + groupRoomTypeCode + '\'' +
+                ", hotelCode='" + hotelCode + '\'' +
                 ", allocated=" + allocated +
                 ", roomInfoEditable=" + roomInfoEditable +
                 ", createdAt=" + createdAt +

@@ -70,8 +70,30 @@ public class TenantInterceptor implements HandlerInterceptor {
                 logger.info("X-Tenant-Id请求头不存在，使用从 token 中提取的租户 ID: {}", existingTenantId);
                 request.setAttribute("tenantId", existingTenantId);
             } else {
-                // 最后兜底：使用默认租户 1
-                logger.info("X-Tenant-Id请求头不存在且token中无租户ID，使用默认租户ID: 1");
+                // 尝试从请求路径中提取 groupId (针对 /api/.../group/{groupId} 类型的路径)
+                String uri = request.getRequestURI();
+                if (uri.contains("/group/")) {
+                    try {
+                        String[] segments = uri.split("/");
+                        for (int i = 0; i < segments.length; i++) {
+                            if ("group".equals(segments[i]) && i + 1 < segments.length) {
+                                String groupIdStr = segments[i + 1];
+                                if (!"current".equals(groupIdStr)) {
+                                    Integer groupId = Integer.parseInt(groupIdStr);
+                                    logger.info("从路径中解析到的租户(集团)ID: {}", groupId);
+                                    TenantContext.setTenantId(groupId);
+                                    request.setAttribute("tenantId", groupId);
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("尝试从路径解析租户ID失败: {}", e.getMessage());
+                    }
+                }
+
+                // 恢复默认租户兜底逻辑：为了兼容性，在无法确定租户时使用默认 ID=1
+                logger.warn("未识别到租户上下文，降级使用默认租户 ID: 1");
                 TenantContext.setTenantId(1);
                 request.setAttribute("tenantId", 1);
             }

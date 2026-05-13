@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 
@@ -17,9 +17,9 @@ import jakarta.persistence.*;
  *     <li>**分级管控**：集团可以精准控制酒店对该房价码的编辑权限，如是否允许修改价格、预订限制或担保规则等。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "hotel_rate_code_allocations")
 public class HotelRateCodeAllocation {
@@ -64,4 +64,24 @@ public class HotelRateCodeAllocation {
     /** 权限开关：是否允许酒店关联该计划的促销活动 */
     @Column(name = "promotion_editable", nullable = false)
     private Boolean promotionEditable = false;
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getRateCode() { return rateCode; }
+    public void setRateCode(String rateCode) { this.rateCode = rateCode; }
+    public Boolean getAllocated() { return allocated; }
+    public void setAllocated(Boolean allocated) { this.allocated = allocated; }
+    public Boolean getBasicInfoEditable() { return basicInfoEditable; }
+    public void setBasicInfoEditable(Boolean basicInfoEditable) { this.basicInfoEditable = basicInfoEditable; }
+    public Boolean getPriceInfoEditable() { return priceInfoEditable; }
+    public void setPriceInfoEditable(Boolean priceInfoEditable) { this.priceInfoEditable = priceInfoEditable; }
+    public Boolean getBookingLimitEditable() { return bookingLimitEditable; }
+    public void setBookingLimitEditable(Boolean bookingLimitEditable) { this.bookingLimitEditable = bookingLimitEditable; }
+    public Boolean getGuaranteeRuleEditable() { return guaranteeRuleEditable; }
+    public void setGuaranteeRuleEditable(Boolean guaranteeRuleEditable) { this.guaranteeRuleEditable = guaranteeRuleEditable; }
+    public Boolean getPromotionEditable() { return promotionEditable; }
+    public void setPromotionEditable(Boolean promotionEditable) { this.promotionEditable = promotionEditable; }
 }

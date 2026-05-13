@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,9 +20,9 @@ import java.util.Date;
  * 
  * @since 2026-05-10
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "menus")
 public class Menu {
@@ -87,4 +87,33 @@ public class Menu {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getMenuCode() { return menuCode; }
+    public void setMenuCode(String menuCode) { this.menuCode = menuCode; }
+    public String getMenuName() { return menuName; }
+    public void setMenuName(String menuName) { this.menuName = menuName; }
+    public String getMenuType() { return menuType; }
+    public void setMenuType(String menuType) { this.menuType = menuType; }
+    public String getPath() { return path; }
+    public void setPath(String path) { this.path = path; }
+    public String getComponent() { return component; }
+    public void setComponent(String component) { this.component = component; }
+    public String getIcon() { return icon; }
+    public void setIcon(String icon) { this.icon = icon; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public String getPermission() { return permission; }
+    public void setPermission(String permission) { this.permission = permission; }
+    public String getSystemType() { return systemType; }
+    public void setSystemType(String systemType) { this.systemType = systemType; }
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
+    public Integer getParentId() { return parentId; }
+    public void setParentId(Integer parentId) { this.parentId = parentId; }
+    public String getParentCode() { return parentCode; }
+    public void setParentCode(String parentCode) { this.parentCode = parentCode; }
 }

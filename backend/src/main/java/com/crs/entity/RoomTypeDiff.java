@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +8,9 @@ import java.util.Date;
  * 房型差价实体类
  * 对应数据库room_type_diffs表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "room_type_diffs")
 public class RoomTypeDiff {
@@ -21,6 +18,9 @@ public class RoomTypeDiff {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+    
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     @Column(name = "system_id", nullable = false)
     private Integer systemId;
@@ -84,4 +84,31 @@ public class RoomTypeDiff {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Integer getSystemId() { return systemId; }
+    public void setSystemId(Integer systemId) { this.systemId = systemId; }
+    public String getSystemCode() { return systemCode; }
+    public void setSystemCode(String systemCode) { this.systemCode = systemCode; }
+    public Integer getRoomTypeId() { return roomTypeId; }
+    public void setRoomTypeId(Integer roomTypeId) { this.roomTypeId = roomTypeId; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Double getValue() { return value; }
+    public void setValue(Double value) { this.value = value; }
+    public Date getStartDate() { return startDate; }
+    public void setStartDate(Date startDate) { this.startDate = startDate; }
+    public Date getEndDate() { return endDate; }
+    public void setEndDate(Date endDate) { this.endDate = endDate; }
+    public String getWeekdays() { return weekdays; }
+    public void setWeekdays(String weekdays) { this.weekdays = weekdays; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
 }

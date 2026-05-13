@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 import jakarta.persistence.*;
 import java.util.Date;
 
@@ -19,7 +19,7 @@ import java.util.Date;
  * 
  * @since 2026-05-10
  */
-@Data @NoArgsConstructor @AllArgsConstructor
+  
 @Entity @Table(name = "inventory_quota_logs")
 public class InventoryQuotaLog {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Integer id;
@@ -33,4 +33,25 @@ public class InventoryQuotaLog {
     @Column(name = "operation_time", nullable = false) @Temporal(TemporalType.TIMESTAMP) private Date operationTime = new Date();
     @Column(name = "detail", columnDefinition = "TEXT") private String detail;
     @Column(name = "created_at", nullable = false, updatable = false) @Temporal(TemporalType.TIMESTAMP) private Date createdAt = new Date();
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getDimensionType() { return dimensionType; }
+    public void setDimensionType(String dimensionType) { this.dimensionType = dimensionType; }
+    public String getDimensionCode() { return dimensionCode; }
+    public void setDimensionCode(String dimensionCode) { this.dimensionCode = dimensionCode; }
+    public String getOperatorName() { return operatorName; }
+    public void setOperatorName(String operatorName) { this.operatorName = operatorName; }
+    public String getOperationType() { return operationType; }
+    public void setOperationType(String operationType) { this.operationType = operationType; }
+    public Date getOperationTime() { return operationTime; }
+    public void setOperationTime(Date operationTime) { this.operationTime = operationTime; }
+    public String getDetail() { return detail; }
+    public void setDetail(String detail) { this.detail = detail; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }

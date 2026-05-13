@@ -57,59 +57,5 @@ public interface HotelImageRepository extends JpaRepository<HotelImage, Integer>
      */
     void deleteByTenantIdAndHotelCode(Integer tenantId, String hotelCode);
 
-    // =====================================================================
-    // 已废弃方法：缺少 tenantId 约束（存在跨租户数据风险，禁止新代码使用）
-    // =====================================================================
-
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
-    List<HotelImage> findByHotelCode(String hotelCode);
-
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCodeAndImageType(Integer, String, String)} 
-     */
-    @Deprecated
-    List<HotelImage> findByHotelCodeAndImageType(String hotelCode, String imageType);
-
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCodeOrderBySortOrderAsc(Integer, String)} 
-     */
-    @Deprecated
     List<HotelImage> findByHotelCodeOrderBySortOrderAsc(String hotelCode);
-
-    /** 
-     * @deprecated 越权风险高。请改用 {@link #deleteByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
-    void deleteByHotelCode(String hotelCode);
-
-    // =====================================================================
-    // 已废弃方法：使用 hotelId（仅作兼容保留，禁止新代码使用）
-    // =====================================================================
-
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
-    List<HotelImage> findByHotelId(Integer hotelId);
-    
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCodeAndImageType(Integer, String, String)} 
-     */
-    @Deprecated
-    List<HotelImage> findByHotelIdAndImageType(Integer hotelId, String imageType);
-    
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCodeOrderBySortOrderAsc(Integer, String)} 
-     */
-    @Deprecated
-    List<HotelImage> findByHotelIdOrderBySortOrderAsc(Integer hotelId);
-    
-    /** 
-     * @deprecated 内部 ID 操作已过时。请改用 {@link #deleteByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
-    void deleteByHotelId(Integer hotelId);
 }

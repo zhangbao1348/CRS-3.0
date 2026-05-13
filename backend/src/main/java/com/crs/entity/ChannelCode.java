@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -19,9 +16,9 @@ import java.util.Date;
  *     <li>**库存关联**：在库存管理中，可针对特定渠道进行独立的库存分配。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "channel_codes")
 public class ChannelCode {
@@ -91,5 +88,34 @@ public class ChannelCode {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    /** 是否为默认渠道 (0: 否, 1: 是) */
+    @Column(name = "is_default")
+    private Integer isDefault = 0;
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Integer getParentId() { return parentId; }
+    public void setParentId(Integer parentId) { this.parentId = parentId; }
+    public String getParentCode() { return parentCode; }
+    public void setParentCode(String parentCode) { this.parentCode = parentCode; }
+    public Integer getLevel() { return level; }
+    public void setLevel(Integer level) { this.level = level; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+    public Integer getIsDefault() { return isDefault; }
+    public void setIsDefault(Integer isDefault) { this.isDefault = isDefault; }
 }
 

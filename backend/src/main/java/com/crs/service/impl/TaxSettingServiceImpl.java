@@ -22,44 +22,51 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     @Autowired
     private TaxSettingRepository taxSettingRepository;
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     @Override
     public List<TaxSetting> getAllTaxSettings(Integer tenantId) {
-        return taxSettingRepository.findByTenantId(tenantId);
+        return taxSettingRepository.findByTenantId(getCurrentTenantId());
     }
     
     @Override
     public Optional<TaxSetting> getById(Integer tenantId, Integer id) {
-        Optional<TaxSetting> taxSetting = taxSettingRepository.findById(id);
-        if (taxSetting.isPresent() && taxSetting.get().getTenantId().equals(tenantId)) {
-            return taxSetting;
-        }
-        return Optional.empty();
+        return taxSettingRepository.findById(id)
+                .filter(ts -> ts.getTenantId() != null && ts.getTenantId().equals(getCurrentTenantId()));
     }
     
     @Override
     public TaxSetting getByTaxCode(Integer tenantId, String taxCode) {
-        return taxSettingRepository.findByTenantIdAndTaxCode(tenantId, taxCode);
+        return taxSettingRepository.findByTenantIdAndTaxCode(getCurrentTenantId(), taxCode);
     }
     
     @Override
     public TaxSetting create(Integer tenantId, TaxSetting taxSetting) {
-        if (!isTaxCodeUnique(tenantId, taxSetting.getTaxCode(), null)) {
+        Integer currentTenantId = getCurrentTenantId();
+        if (!isTaxCodeUnique(currentTenantId, taxSetting.getTaxCode(), null)) {
             throw new IllegalArgumentException("税率编码已存在");
         }
-        taxSetting.setTenantId(tenantId);
+        taxSetting.setTenantId(currentTenantId);
         return taxSettingRepository.save(taxSetting);
     }
     
     @Override
     public TaxSetting update(Integer tenantId, Integer id, TaxSetting taxSetting) {
-        Optional<TaxSetting> existingOpt = getById(tenantId, id);
+        Integer currentTenantId = getCurrentTenantId();
+        Optional<TaxSetting> existingOpt = getById(currentTenantId, id);
         if (!existingOpt.isPresent()) {
-            throw new IllegalArgumentException("税率设置不存在");
+            throw new IllegalArgumentException("税率设置不存在或无权访问");
         }
         
         TaxSetting existing = existingOpt.get();
         
-        if (!isTaxCodeUnique(tenantId, taxSetting.getTaxCode(), id)) {
+        if (!isTaxCodeUnique(currentTenantId, taxSetting.getTaxCode(), id)) {
             throw new IllegalArgumentException("税率编码已存在");
         }
         
@@ -108,16 +115,16 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     
     @Override
     public void delete(Integer tenantId, Integer id) {
-        Optional<TaxSetting> taxSetting = getById(tenantId, id);
+        Optional<TaxSetting> taxSetting = getById(getCurrentTenantId(), id);
         if (!taxSetting.isPresent()) {
-            throw new IllegalArgumentException("税率设置不存在");
+            throw new IllegalArgumentException("税率设置不存在或无权访问");
         }
-        taxSettingRepository.deleteById(id);
+        taxSettingRepository.delete(taxSetting.get());
     }
     
     @Override
     public boolean isTaxCodeUnique(Integer tenantId, String taxCode, Integer excludeId) {
-        TaxSetting existing = taxSettingRepository.findByTenantIdAndTaxCode(tenantId, taxCode);
+        TaxSetting existing = taxSettingRepository.findByTenantIdAndTaxCode(getCurrentTenantId(), taxCode);
         return existing == null || (excludeId != null && existing.getId().equals(excludeId));
     }
     
@@ -125,8 +132,9 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     @Transactional
     public List<TaxSetting> batchCreateTaxSettings(Integer tenantId, List<TaxSetting> taxSettings) {
         List<TaxSetting> savedTaxSettings = new ArrayList<>();
+        Integer currentTenantId = getCurrentTenantId();
         for (TaxSetting taxSetting : taxSettings) {
-            taxSetting.setTenantId(tenantId);
+            taxSetting.setTenantId(currentTenantId);
             savedTaxSettings.add(taxSettingRepository.save(taxSetting));
         }
         return savedTaxSettings;
@@ -136,9 +144,10 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     @Transactional
     public List<TaxSetting> initDefaultTaxSettingsForTenant(Integer tenantId) {
         List<TaxSetting> defaultTaxSettings = new ArrayList<>();
+        Integer currentTenantId = getCurrentTenantId();
         
         TaxSetting vatCn = new TaxSetting();
-        vatCn.setTenantId(tenantId);
+        vatCn.setTenantId(currentTenantId);
         vatCn.setTaxCode("VAT-CN-001");
         vatCn.setLegalName("中国增值税(VAT)");
         vatCn.setBearer("guest");
@@ -155,7 +164,7 @@ public class TaxSettingServiceImpl implements TaxSettingService {
         defaultTaxSettings.add(taxSettingRepository.save(vatCn));
         
         TaxSetting cityTaxFr = new TaxSetting();
-        cityTaxFr.setTenantId(tenantId);
+        cityTaxFr.setTenantId(currentTenantId);
         cityTaxFr.setTaxCode("CITYTAX-FR-PAR-001");
         cityTaxFr.setLegalName("法国巴黎城市税");
         cityTaxFr.setBearer("guest");
@@ -172,7 +181,7 @@ public class TaxSettingServiceImpl implements TaxSettingService {
         defaultTaxSettings.add(taxSettingRepository.save(cityTaxFr));
         
         TaxSetting tourismJp = new TaxSetting();
-        tourismJp.setTenantId(tenantId);
+        tourismJp.setTenantId(currentTenantId);
         tourismJp.setTaxCode("TOURISM-JP-TKY-001");
         tourismJp.setLegalName("日本东京都宿泊税");
         tourismJp.setBearer("guest");
@@ -189,7 +198,7 @@ public class TaxSettingServiceImpl implements TaxSettingService {
         defaultTaxSettings.add(taxSettingRepository.save(tourismJp));
         
         TaxSetting vatDe = new TaxSetting();
-        vatDe.setTenantId(tenantId);
+        vatDe.setTenantId(currentTenantId);
         vatDe.setTaxCode("VAT-DE-001");
         vatDe.setLegalName("德国增值税(VAT)");
         vatDe.setBearer("hotel");
@@ -206,7 +215,7 @@ public class TaxSettingServiceImpl implements TaxSettingService {
         defaultTaxSettings.add(taxSettingRepository.save(vatDe));
         
         TaxSetting taxUsNy = new TaxSetting();
-        taxUsNy.setTenantId(tenantId);
+        taxUsNy.setTenantId(currentTenantId);
         taxUsNy.setTaxCode("TAX-US-NYC-001");
         taxUsNy.setLegalName("美国纽约市酒店税");
         taxUsNy.setBearer("guest");

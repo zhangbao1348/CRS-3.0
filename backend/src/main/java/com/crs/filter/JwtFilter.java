@@ -82,6 +82,9 @@ public class JwtFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             logger.error("Error in JWT filter: {}", e.getMessage());
             throw e;
+        } finally {
+            // 关键安全清理：防止线程复用导致的租户上下文泄露
+            TenantContext.clear();
         }
     }
 }

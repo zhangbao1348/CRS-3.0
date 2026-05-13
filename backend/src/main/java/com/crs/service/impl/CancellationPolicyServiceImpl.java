@@ -23,63 +23,61 @@ public class CancellationPolicyServiceImpl implements CancellationPolicyService 
     
     @Override
     public List<CancellationPolicy> getAllPolicies() {
-        return cancellationPolicyRepository.findAll();
-    }
-    
-    @Override
-    public List<CancellationPolicy> getByTenantId(Integer tenantId) {
-        return cancellationPolicyRepository.findByTenantId(tenantId);
+        return cancellationPolicyRepository.findByTenantId(getCurrentTenantId());
     }
     
     @Override
     public Optional<CancellationPolicy> getById(Integer id) {
-        return cancellationPolicyRepository.findById(id);
+        Integer currentTenantId = getCurrentTenantId();
+        return cancellationPolicyRepository.findById(id)
+                .filter(p -> p.getTenantId() != null && p.getTenantId().equals(currentTenantId));
     }
     
-    @Override
-    public List<CancellationPolicy> getByGroupId(Integer groupId) {
-        return cancellationPolicyRepository.findByGroupId(groupId);
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
-    
+
     @Override
-    public CancellationPolicy create(Integer tenantId, CancellationPolicy policy) {
+    public CancellationPolicy create(CancellationPolicy policy) {
+        Integer actualTenantId = getCurrentTenantId();
         // 检查代码是否已存在（同一租户下）
-        if (cancellationPolicyRepository.existsByTenantIdAndCode(tenantId, policy.getCode())) {
+        if (cancellationPolicyRepository.existsByTenantIdAndCode(actualTenantId, policy.getCode())) {
             throw new IllegalArgumentException("取消政策代码已存在");
         }
-        policy.setTenantId(tenantId);
+        policy.setTenantId(actualTenantId);
         return cancellationPolicyRepository.save(policy);
     }
     
     @Override
     public CancellationPolicy update(Integer id, CancellationPolicy policy) {
-        // 检查政策是否存在
-        Optional<CancellationPolicy> existingPolicyOpt = cancellationPolicyRepository.findById(id);
-        if (!existingPolicyOpt.isPresent()) {
-            throw new IllegalArgumentException("取消政策不存在");
-        }
-        
-        CancellationPolicy existingPolicy = existingPolicyOpt.get();
+        // 检查政策是否存在且属于当前租户
+        CancellationPolicy existingPolicy = getById(id)
+                .orElseThrow(() -> new IllegalArgumentException("取消政策不存在或无权访问"));
         
         // 检查代码是否已存在（同一租户下，排除当前ID）
-        if (!existingPolicy.getCode().equals(policy.getCode()) && 
+        if (policy.getCode() != null && !existingPolicy.getCode().equals(policy.getCode()) && 
             cancellationPolicyRepository.existsByTenantIdAndCode(existingPolicy.getTenantId(), policy.getCode())) {
             throw new IllegalArgumentException("取消政策代码已存在");
         }
         
-        // 保留租户ID
-        policy.setId(id);
-        policy.setTenantId(existingPolicy.getTenantId());
-        policy.setCreatedAt(existingPolicy.getCreatedAt());
+        // 执行更新
+        existingPolicy.setCode(policy.getCode());
+        existingPolicy.setName(policy.getName());
+        existingPolicy.setDescription(policy.getDescription());
+        existingPolicy.setStatus(policy.getStatus());
+        existingPolicy.setIsDefault(policy.getIsDefault());
         
-        return cancellationPolicyRepository.save(policy);
+        return cancellationPolicyRepository.save(existingPolicy);
     }
     
     @Override
     public void delete(Integer id) {
-        if (!cancellationPolicyRepository.existsById(id)) {
-            throw new IllegalArgumentException("取消政策不存在");
-        }
-        cancellationPolicyRepository.deleteById(id);
+        CancellationPolicy existing = getById(id)
+                .orElseThrow(() -> new IllegalArgumentException("取消政策不存在或无权访问"));
+        cancellationPolicyRepository.delete(existing);
     }
 }

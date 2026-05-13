@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -19,9 +16,9 @@ import java.util.Date;
  *     <li>**多维定位**：基于 [日期 + 酒店 + 房型 + 价格类型] 确定唯一的定价记录。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "base_prices")
 public class BasePrice {
@@ -31,26 +28,17 @@ public class BasePrice {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     /** 酒店外部编码冗余 */
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
     
-    /** 关联的价格类型 ID（对应价格分类，如 BAR） */
-    @Column(name = "rate_type_id", nullable = false)
-    private Integer rateTypeId;
-    
     /** 价格类型编码冗余 */
     @Column(name = "rate_type_code", length = 50)
     private String rateTypeCode;
 
-    /** 关联的房型 ID */
-    @Column(name = "room_type_id", nullable = false)
-    private Integer roomTypeId;
-    
     /** 房型编码冗余 */
     @Column(name = "room_type_code", length = 50)
     private String roomTypeCode;
@@ -85,19 +73,19 @@ public class BasePrice {
     
     // 关联关系 ---------------------------------------------------------
     
-    /** 所属酒店实体引用 */
+    /** 所属酒店实体引用 (基于 hotel_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
     
-    /** 关联的价格类型实体引用 */
+    /** 关联的价格类型实体引用 (基于 rate_type_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rate_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "rate_type_code", referencedColumnName = "code", insertable = false, updatable = false)
     private RateType rateType;
     
-    /** 关联的房型实体引用 */
+    /** 关联的房型实体引用 (基于 room_type_code) */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "room_type_code", referencedColumnName = "code", insertable = false, updatable = false)
     private RoomType roomType;
     
     /**
@@ -117,5 +105,28 @@ public class BasePrice {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getRateTypeCode() { return rateTypeCode; }
+    public void setRateTypeCode(String rateTypeCode) { this.rateTypeCode = rateTypeCode; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public Double getBasePrice() { return basePrice; }
+    public void setBasePrice(Double basePrice) { this.basePrice = basePrice; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
+    public Date getDate() { return date; }
+    public void setDate(Date date) { this.date = date; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
 

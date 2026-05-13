@@ -135,11 +135,16 @@ export const hotelApi = {
   deleteHotel: (id, options = {}) => api.delete(`/hotels/${id}`, options),
   getHotelsByCity: (city, options = {}) => api.get(`/hotels/city/${city}`, options),
   getHotelsByStatus: (status, options = {}) => api.get(`/hotels/status/${status}`, options),
-  checkHotelCode: (hotelId, options = {}) => api.get(`/hotels/${hotelId}/check-code`, options)
+  checkHotelCode: (hotelIdOrCode, options = {}) => {
+    if (typeof hotelIdOrCode === 'string') {
+      return api.get(`/hotels/code/${hotelIdOrCode}/check-code`, options)
+    }
+    return api.get(`/hotels/${hotelIdOrCode}/check-code`, options)
+  }
 }
 
 export const hotelRoomTypeApi = {
-  getHotelRoomTypes: (hotelId, options = {}) => api.get(`/hotel-room-types/hotel/${hotelId}`, options),
+  getHotelRoomTypes: (hotelCode, options = {}) => api.get(`/hotel-room-types/by-code/hotel/${hotelCode}`, options),
   getHotelRoomTypesByCode: (hotelCode, options = {}) => api.get(`/hotel-room-types/by-code/hotel/${hotelCode}`, options),
   getHotelRoomTypesByCodeAndStatus: (hotelCode, status, options = {}) => api.get(`/hotel-room-types/by-code/hotel/${hotelCode}/status/${status}`, options)
 }
@@ -159,6 +164,25 @@ export const channelCodeApi = {
   }
 }
 
+export const marketCodeApi = {
+  getAllMarketCodes: (options = {}) => api.get('/market-codes', options),
+  getThirdLevelMarketCodes: (options = {}) => api.get('/market-codes/third-level', options),
+  getMarketCodesByParentId: (parentId, options = {}) => api.get(`/market-codes/parent/${parentId}`, options),
+  getMarketCodeById: (id, options = {}) => api.get(`/market-codes/${id}`, options)
+}
+
+export const sourceCodeApi = {
+  getAllSourceCodes: (options = {}) => api.get('/source-codes', options),
+  getThirdLevelSourceCodes: (options = {}) => api.get('/source-codes/third-level', options),
+  getSourceCodesByParentId: (parentId, options = {}) => api.get(`/source-codes/parent/${parentId}`, options),
+  getSourceCodeById: (id, options = {}) => api.get(`/source-codes/${id}`, options)
+}
+
+export const packageApi = {
+  getAllPackages: (options = {}) => api.get('/packages', options),
+  getPackageById: (id, options = {}) => api.get(`/packages/${id}`, options)
+}
+
 export const groupFacilityApi = {
   getAllGroupFacilities: (options = {}) => api.get('/group-facilities', options),
   getGroupFacilityById: (id, options = {}) => api.get(`/group-facilities/${id}`, options),
@@ -166,15 +190,21 @@ export const groupFacilityApi = {
 }
 
 export const hotelFacilityApi = {
-  getHotelFacilities: (hotelId, options = {}) => api.get(`/hotel-facilities/hotel/${hotelId}`, options),
+  getHotelFacilities: (hotelCode, options = {}) => api.get(`/hotel-facilities/by-code/hotel/${hotelCode}`, options),
   getHotelFacilitiesByCode: (hotelCode, options = {}) => api.get(`/hotel-facilities/by-code/hotel/${hotelCode}`, options),
   createHotelFacility: (data, options = {}) => api.post('/hotel-facilities', data, options),
-  deleteHotelFacilities: (hotelId, options = {}) => api.delete(`/hotel-facilities/hotel/${hotelId}`, options),
+  deleteHotelFacilities: (hotelCode, options = {}) => api.delete(`/hotel-facilities/by-code/hotel/${hotelCode}`, options),
   deleteHotelFacilitiesByCode: (hotelCode, options = {}) => api.delete(`/hotel-facilities/by-code/hotel/${hotelCode}`, options)
 }
 
+export const roomTypeCategoryApi = {
+  getAllCategories: (options = {}) => api.get('/room-type-categories', options),
+  getCategoriesByGroupId: (groupId, options = {}) => api.get(`/room-type-categories/group/${groupId}`, options),
+  getCategoryById: (id, options = {}) => api.get(`/room-type-categories/${id}`, options)
+}
+
 export const hotelImageApi = {
-  getHotelImages: (hotelId) => api.get(`/hotel-images/hotel/${hotelId}`),
+  getHotelImages: (hotelCode) => api.get(`/hotel-images/by-code/hotel/${hotelCode}`),
   getHotelImagesByCode: (hotelCode) => api.get(`/hotel-images/by-code/hotel/${hotelCode}`),
   uploadHotelImage: (formData) => api.post('/hotel-images/upload', formData, {
     headers: {
@@ -205,8 +235,6 @@ export const groupRateCodeApi = {
    * @deprecated hotelIds 参数已废弃，请传入 hotelCodes
    */
   syncToHotels: (id, hotelCodes, options = {}) => api.post(`/group-rate-codes/${id}/sync-to-hotels`, { hotelCodes }, options),
-  /** @deprecated 请使用 syncToHotels 并传入 hotelCodes */
-  syncToHotelsByIds: (id, hotelIds, options = {}) => api.post(`/group-rate-codes/${id}/sync-to-hotels`, { hotelIds }, options),
   createGroupRateCode: (data, options = {}) => api.post('/group-rate-codes', data, options),
   updateGroupRateCode: (id, data, options = {}) => api.put(`/group-rate-codes/${id}`, data, options),
   deleteGroupRateCode: (id, options = {}) => api.delete(`/group-rate-codes/${id}`, options),
@@ -215,11 +243,11 @@ export const groupRateCodeApi = {
 }
 
 export const hotelRateCodeAllocationApi = {
-  getAllocationsByHotelId: (hotelId, options = {}) => api.get(`/hotel-rate-code-allocations/hotel/${hotelId}`, options),
+  getAllocations: (hotelCode, options = {}) => api.get(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options),
   getAllocationsByHotelCode: (hotelCode, options = {}) => api.get(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options),
   createAllocation: (data, options = {}) => api.post('/hotel-rate-code-allocations', data, options),
   updateAllocation: (id, data, options = {}) => api.put(`/hotel-rate-code-allocations/${id}`, data, options),
-  deleteAllocationsByHotelId: (hotelId, options = {}) => api.delete(`/hotel-rate-code-allocations/hotel/${hotelId}`, options),
+  deleteAllocations: (hotelCode, options = {}) => api.delete(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options),
   deleteAllocationsByHotelCode: (hotelCode, options = {}) => api.delete(`/hotel-rate-code-allocations/by-code/hotel/${hotelCode}`, options)
 }
 
@@ -232,7 +260,7 @@ export const groupRoomTypeApi = {
 }
 
 export const groupRoomTypeHotelApi = {
-  getHotelRoomTypeAllocations: (hotelId, options = {}) => api.get(`/group-room-type-hotels/hotel/${hotelId}`, options),
+  getHotelRoomTypeAllocations: (hotelCode, options = {}) => api.get(`/group-room-type-hotels/by-code/hotel/${hotelCode}`, options),
   getHotelRoomTypeAllocationsByCode: (hotelCode, options = {}) => api.get(`/group-room-type-hotels/by-code/hotel/${hotelCode}`, options),
   batchSaveRoomTypeAllocations: (data, options = {}) => api.post('/group-room-type-hotels', data, options)
 }
@@ -255,6 +283,12 @@ export const enumApi = {
   getTaxSettlementRule: () => api.get('/enums/tax-settlement-rule'),
   getCommonStatus: () => api.get('/enums/common-status'),
   getCurrency: () => api.get('/enums/currency')
+}
+
+export const rateTypeApi = {
+  getAllRateTypes: (options = {}) => api.get('/rate-types', options),
+  getActiveRateTypes: (options = {}) => api.get('/rate-types/active', options),
+  getRateTypeById: (id, options = {}) => api.get(`/rate-types/${id}`, options)
 }
 
 export const guaranteePolicyApi = {
@@ -299,13 +333,7 @@ export const ratePlanApi = {
    * 关联查询原则：优先使用 hotelCode，兼容 hotelId（已废弃）
    */
   getRatePlans: (hotelCode, options = {}) => {
-    // 如果传入 string 类型，视为 hotelCode（符合CODE关联规范）
     const params = hotelCode ? { hotelCode } : {}
-    return api.get('/rate-plans', { params, ...options })
-  },
-  /** @deprecated 请使用 getRatePlansByHotelCode */
-  getRatePlansByHotelId: (hotelId, options = {}) => {
-    const params = hotelId ? { hotelId } : {}
     return api.get('/rate-plans', { params, ...options })
   },
   getRatePlansByHotelCode: (hotelCode, options = {}) => api.get(`/rate-plans/by-code/hotel/${hotelCode}`, options),
@@ -416,8 +444,6 @@ export const reservationApi = {
     api.put(`/reservation/${id}/status`, data, options),
   manualIntervene: (id, data, options = {}) =>
     api.put(`/reservation/${id}/manual-intervene`, data, options),
-  getByHotel: (hotelId, params = {}, options = {}) =>
-    api.get(`/reservation/hotel/${hotelId}`, { params, ...options }),
   getByHotelCode: (hotelCode, params = {}, options = {}) =>
     api.get(`/reservation/by-code/hotel/${hotelCode}`, { params, ...options }),
   getToday: (params = {}, options = {}) =>

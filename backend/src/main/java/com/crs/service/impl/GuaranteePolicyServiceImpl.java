@@ -21,28 +21,38 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
     @Autowired
     private GuaranteePolicyRepository guaranteePolicyRepository;
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     @Override
     public List<GuaranteePolicy> getAllPolicies() {
-        return guaranteePolicyRepository.findAll();
+        return guaranteePolicyRepository.findByTenantId(getCurrentTenantId());
     }
     
     @Override
     public List<GuaranteePolicy> getByTenantId(Integer tenantId) {
-        return guaranteePolicyRepository.findByTenantId(tenantId);
+        return guaranteePolicyRepository.findByTenantId(getCurrentTenantId());
     }
     
     @Override
     public Optional<GuaranteePolicy> getById(Integer id) {
-        return guaranteePolicyRepository.findById(id);
+        return guaranteePolicyRepository.findById(id)
+                .filter(p -> p.getTenantId() != null && p.getTenantId().equals(getCurrentTenantId()));
     }
     
     @Override
     public List<GuaranteePolicy> getByGroupId(Integer groupId) {
-        return guaranteePolicyRepository.findByGroupId(groupId);
+        return guaranteePolicyRepository.findByGroupId(getCurrentTenantId());
     }
     
     @Override
-    public GuaranteePolicy create(Integer tenantId, GuaranteePolicy policy) {
+    public GuaranteePolicy create(GuaranteePolicy policy) {
+        Integer tenantId = getCurrentTenantId();
         // 检查代码是否已存在（同一租户下）
         if (guaranteePolicyRepository.existsByTenantIdAndCode(tenantId, policy.getCode())) {
             throw new IllegalArgumentException("担保政策代码已存在");
@@ -53,13 +63,9 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
     
     @Override
     public GuaranteePolicy update(Integer id, GuaranteePolicy policy) {
-        // 检查政策是否存在
-        Optional<GuaranteePolicy> existingPolicyOpt = guaranteePolicyRepository.findById(id);
-        if (!existingPolicyOpt.isPresent()) {
-            throw new IllegalArgumentException("担保政策不存在");
-        }
-        
-        GuaranteePolicy existingPolicy = existingPolicyOpt.get();
+        // 检查政策是否存在且属于当前租户
+        GuaranteePolicy existingPolicy = getById(id)
+                .orElseThrow(() -> new IllegalArgumentException("担保政策不存在或无权访问"));
         
         // 检查代码是否已存在（同一租户下，排除当前ID）
         if (!existingPolicy.getCode().equals(policy.getCode()) && 
@@ -67,19 +73,24 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
             throw new IllegalArgumentException("担保政策代码已存在");
         }
         
-        // 保留租户ID
-        policy.setId(id);
-        policy.setTenantId(existingPolicy.getTenantId());
-        policy.setCreatedAt(existingPolicy.getCreatedAt());
+        // 执行更新
+        existingPolicy.setCode(policy.getCode());
+        existingPolicy.setName(policy.getName());
+        existingPolicy.setDescription(policy.getDescription());
+        existingPolicy.setStatus(policy.getStatus());
+        existingPolicy.setIsDefault(policy.getIsDefault());
+        existingPolicy.setType(policy.getType());
+        existingPolicy.setCardType(policy.getCardType());
+        existingPolicy.setGuaranteeAmount(policy.getGuaranteeAmount());
+        existingPolicy.setLatestCheckInTime(policy.getLatestCheckInTime());
         
-        return guaranteePolicyRepository.save(policy);
+        return guaranteePolicyRepository.save(existingPolicy);
     }
     
     @Override
     public void delete(Integer id) {
-        if (!guaranteePolicyRepository.existsById(id)) {
-            throw new IllegalArgumentException("担保政策不存在");
-        }
-        guaranteePolicyRepository.deleteById(id);
+        GuaranteePolicy existing = getById(id)
+                .orElseThrow(() -> new IllegalArgumentException("担保政策不存在或无权访问"));
+        guaranteePolicyRepository.delete(existing);
     }
 }

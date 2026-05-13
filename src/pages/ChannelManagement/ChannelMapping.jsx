@@ -252,9 +252,9 @@ const ChannelMapping = () => {
         const newRecord = {
           ...values,
           id: Date.now(),
-          channelName: channels.find(c => c.id === values.channelId)?.name || '',
-          hotelName: hotels.find(h => h.id === values.hotelId)?.name || '',
-          hotelCode: hotels.find(h => h.id === values.hotelId)?.code || '',
+          channelName: channels.find(c => c.code === values.channelCode)?.name || '',
+          hotelName: hotels.find(h => h.code === values.hotelCode)?.name || '',
+          hotelCode: values.hotelCode,
           status: 'active',
           updatedAt: new Date().toLocaleString('zh-CN')
         }
@@ -264,14 +264,14 @@ const ChannelMapping = () => {
         } else if (activeTab === 'roomType') {
           setRoomTypeMappingsData(prev => [...prev, {
             ...newRecord,
-            roomTypeName: roomTypes.find(r => r.id === values.roomTypeId)?.name || '',
-            roomTypeCode: roomTypes.find(r => r.id === values.roomTypeId)?.code || ''
+            roomTypeName: roomTypes.find(r => r.code === values.roomTypeCode)?.name || '',
+            roomTypeCode: values.roomTypeCode
           }])
         } else if (activeTab === 'rateCode') {
           setRateCodeMappingsData(prev => [...prev, {
             ...newRecord,
-            rateCodeName: rateCodes.find(r => r.id === values.rateCodeId)?.name || '',
-            rateCode: rateCodes.find(r => r.id === values.rateCodeId)?.code || ''
+            rateCodeName: rateCodes.find(r => r.code === values.rateCode)?.name || '',
+            rateCode: values.rateCode
           }])
         }
         message.success('新增成功')
@@ -872,12 +872,12 @@ const ChannelMapping = () => {
             <Col span={12}>
               <Form.Item
                 label="渠道"
-                name="channelId"
+                name="channelCode"
                 rules={[{ required: true, message: '请选择渠道' }]}
               >
                 <Select placeholder="请选择渠道">
                   {channels.map(channel => (
-                    <Option key={channel.id} value={channel.id}>{channel.name}</Option>
+                    <Option key={channel.code} value={channel.code}>{channel.name}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -885,12 +885,12 @@ const ChannelMapping = () => {
             <Col span={12}>
               <Form.Item
                 label="酒店"
-                name="hotelId"
+                name="hotelCode"
                 rules={[{ required: true, message: '请选择酒店' }]}
               >
                 <Select placeholder="请选择酒店">
                   {hotels.map(hotel => (
-                    <Option key={hotel.id} value={hotel.id}>{hotel.name}</Option>
+                    <Option key={hotel.code} value={hotel.code}>{hotel.name}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -913,12 +913,12 @@ const ChannelMapping = () => {
                 <Col span={12}>
                   <Form.Item
                     label="酒店房型"
-                    name="roomTypeId"
+                    name="roomTypeCode"
                     rules={[{ required: true, message: '请选择酒店房型' }]}
                   >
                     <Select placeholder="请选择酒店房型">
                       {roomTypes.map(rt => (
-                        <Option key={rt.id} value={rt.id}>{rt.name}</Option>
+                        <Option key={rt.code} value={rt.code}>{rt.name}</Option>
                       ))}
                     </Select>
                   </Form.Item>
@@ -949,12 +949,12 @@ const ChannelMapping = () => {
                 <Col span={12}>
                   <Form.Item
                     label="房价码"
-                    name="rateCodeId"
+                    name="rateCode"
                     rules={[{ required: true, message: '请选择房价码' }]}
                   >
                     <Select placeholder="请选择房价码">
                       {rateCodes.map(rc => (
-                        <Option key={rc.id} value={rc.id}>{rc.name} ({rc.code})</Option>
+                        <Option key={rc.code} value={rc.code}>{rc.name} ({rc.code})</Option>
                       ))}
                     </Select>
                   </Form.Item>

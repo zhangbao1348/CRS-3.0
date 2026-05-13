@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -19,9 +16,9 @@ import java.util.Date;
  *     <li>**财务归类**：通过 `type` 区分餐饮、交通、娱乐等不同性质的增值项目。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "packages")
 public class Package {
@@ -119,5 +116,36 @@ public class Package {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+    public String getQuantityType() { return quantityType; }
+    public void setQuantityType(String quantityType) { this.quantityType = quantityType; }
+    public Integer getFixedQuantity() { return fixedQuantity; }
+    public void setFixedQuantity(Integer fixedQuantity) { this.fixedQuantity = fixedQuantity; }
+    public String getFrequency() { return frequency; }
+    public void setFrequency(String frequency) { this.frequency = frequency; }
+    public String getPriceType() { return priceType; }
+    public void setPriceType(String priceType) { this.priceType = priceType; }
+    public Double getFixedPrice() { return fixedPrice; }
+    public void setFixedPrice(Double fixedPrice) { this.fixedPrice = fixedPrice; }
+    public Boolean getTaxIncluded() { return taxIncluded; }
+    public void setTaxIncluded(Boolean taxIncluded) { this.taxIncluded = taxIncluded; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
 

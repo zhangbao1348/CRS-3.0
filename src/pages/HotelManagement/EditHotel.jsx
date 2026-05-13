@@ -15,6 +15,7 @@ const EditHotel = () => {
   const [supportMultiPrice, setSupportMultiPrice] = useState('no')
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
+  const [hotel, setHotel] = useState(null)
   
   // 集团设施数据状态
   const [groupFacilities, setGroupFacilities] = useState([])
@@ -150,6 +151,7 @@ const EditHotel = () => {
       })
       console.log('API响应:', response)
       const hotel = response.data
+      setHotel(hotel)
       console.log('酒店数据:', hotel)
       
       // 将星级转换为显示格式
@@ -317,7 +319,7 @@ const EditHotel = () => {
   // 加载酒店房价码分配
   const loadRateCodeAllocations = async (code) => {
     try {
-      console.log('开始加载酒店房价码分配，酒店ID:', id)
+      console.log('开始加载酒店房价码分配，酒店代码:', code)
       
       // 先加载集团房价码
       let activeRateCodes = []
@@ -348,9 +350,9 @@ const EditHotel = () => {
       const allocationMap = {}
       if (Array.isArray(allocations)) {
         allocations.forEach(alloc => {
-          console.log('分配数据:', alloc, 'groupRateCodeId:', alloc.groupRateCodeId)
-          if (alloc.groupRateCodeId) {
-            allocationMap[alloc.groupRateCodeId] = alloc
+          console.log('分配数据:', alloc, 'rateCode:', alloc.rateCode)
+          if (alloc.rateCode) {
+            allocationMap[alloc.rateCode] = alloc
           }
         })
       }
@@ -361,7 +363,7 @@ const EditHotel = () => {
       if (activeRateCodes && activeRateCodes.length > 0) {
         activeRateCodes.forEach(rateCode => {
           console.log('处理集团房价码:', rateCode.id, rateCode.rateCode)
-          const existingAllocation = allocationMap[rateCode.id]
+          const existingAllocation = allocationMap[rateCode.rateCode]
           console.log('找到分配:', existingAllocation)
           rateCodeData.push({
             key: rateCode.id.toString(),
@@ -427,7 +429,7 @@ const EditHotel = () => {
       const allocationMap = {}
       if (Array.isArray(allocations)) {
         allocations.forEach(alloc => {
-          allocationMap[alloc.groupRoomTypeId] = alloc
+          allocationMap[alloc.groupRoomTypeCode] = alloc
         })
       }
       
@@ -435,7 +437,7 @@ const EditHotel = () => {
       const roomTypeData = []
       if (activeRoomTypes && activeRoomTypes.length > 0) {
         activeRoomTypes.forEach(roomType => {
-          const existingAllocation = allocationMap[roomType.id]
+          const existingAllocation = allocationMap[roomType.roomTypeCode]
           roomTypeData.push({
             key: roomType.id.toString(),
             groupRoomTypeId: roomType.id,
@@ -640,7 +642,7 @@ const EditHotel = () => {
       for (const rateCode of rateCodeData) {
         const allocationData = {
           hotelCode: hotel.hotelCode,
-          rateCodeId: rateCode.rateCodeId || parseInt(rateCode.key),
+          rateCode: rateCode.rateCodeValue,
           allocated: rateCode.allocated,
           basicInfoEditable: rateCode.basicInfoEditable,
           priceInfoEditable: rateCode.priceInfoEditable,
@@ -666,7 +668,7 @@ const EditHotel = () => {
   const saveRoomTypeAllocations = async () => {
     try {
       const roomTypeAllocations = roomTypeData.map(roomType => ({
-        groupRoomTypeId: roomType.groupRoomTypeId || parseInt(roomType.key),
+        groupRoomTypeCode: roomType.roomTypeCode,
         hotelCode: hotel.hotelCode,
         allocated: roomType.allocated,
         roomInfoEditable: roomType.roomInfoEditable

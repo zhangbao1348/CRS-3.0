@@ -31,20 +31,23 @@ public class GuaranteePolicyController {
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
     
-    // 默认租户ID
-    private static final Integer DEFAULT_TENANT_ID = 1;
-    
     /**
      * 获取所有担保政策
-     * @param tenantId 租户ID（可选）
      * @return 担保政策列表
      */
     @GetMapping
-    public ResponseEntity<List<GuaranteePolicy>> getAllPolicies(
-            @RequestParam(required = false) Integer tenantId) {
-        Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-        List<GuaranteePolicy> policies = guaranteePolicyService.getByTenantId(actualTenantId);
+    public ResponseEntity<List<GuaranteePolicy>> getAllPolicies() {
+        List<GuaranteePolicy> policies = guaranteePolicyService.getAllPolicies();
         return ResponseEntity.ok(policies);
+    }
+
+    /**
+     * 兼容性接口：根据 groupId 获取所有担保政策（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<GuaranteePolicy>> getPoliciesByGroupId(@PathVariable Integer groupId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getAllPolicies();
     }
     
     /**
@@ -54,30 +57,23 @@ public class GuaranteePolicyController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<?> getPolicyById(@PathVariable Integer id) {
-        Optional<GuaranteePolicy> policy = guaranteePolicyService.getById(id);
-        if (policy.isPresent()) {
-            return ResponseEntity.ok(policy.get());
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("担保政策不存在");
-        }
+        return guaranteePolicyService.getById(id)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("担保政策不存在或无权访问"));
     }
     
     /**
      * 创建担保政策
      * @param policy 担保政策
-     * @param tenantId 租户ID（可选）
      * @return 创建的担保政策
      */
     @PostMapping
-    public ResponseEntity<?> createPolicy(
-            @RequestBody GuaranteePolicy policy,
-            @RequestParam(required = false) Integer tenantId) {
+    public ResponseEntity<?> createPolicy(@RequestBody GuaranteePolicy policy) {
         try {
             if (policy.getCode() != null && !CodeValidator.isValid(policy.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            Integer actualTenantId = tenantId != null ? tenantId : DEFAULT_TENANT_ID;
-            GuaranteePolicy created = guaranteePolicyService.create(actualTenantId, policy);
+            GuaranteePolicy created = guaranteePolicyService.create(policy);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -126,22 +122,6 @@ public class GuaranteePolicyController {
         }
     }
     
-    /**
-     * 检查担保政策代码是否唯一
-     * @param code 代码
-     * @param tenantId 租户ID
-     * @param id 排除的ID（可选）
-     * @return 是否唯一
-     */
-    // @GetMapping("/check-code")
-    // public ResponseEntity<Boolean> checkCodeUnique(
-    //         @RequestParam String code,
-    //         @RequestParam Integer tenantId,
-    //         @RequestParam(required = false) Integer id) {
-    //     boolean isUnique = guaranteePolicyService.isCodeUnique(code, tenantId, id);
-    //     return ResponseEntity.ok(isUnique);
-    // }
-    
     // ===== CODE-based endpoints =====
     
     /**
@@ -152,7 +132,10 @@ public class GuaranteePolicyController {
      */
     @PutMapping("/code/{code}")
     public ResponseEntity<?> updatePolicyByCode(@PathVariable String code, @RequestBody GuaranteePolicy policy) {
-        Integer tenantId = com.crs.util.TenantContext.getTenantId() != null ? com.crs.util.TenantContext.getTenantId() : DEFAULT_TENANT_ID;
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("租户上下文丢失");
+        }
         GuaranteePolicy existing = guaranteePolicyRepository.findByTenantIdAndCode(tenantId, code);
         if (existing == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("担保政策不存在");

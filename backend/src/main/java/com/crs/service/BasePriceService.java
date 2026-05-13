@@ -21,12 +21,20 @@ public class BasePriceService {
         this.basePriceRepository = basePriceRepository;
     }
     
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     /**
      * 获取所有基础价格列表
      * @return 基础价格列表
      */
     public List<BasePrice> getAllBasePrices() {
-        return basePriceRepository.findAll();
+        return basePriceRepository.findByTenantId(getCurrentTenantId());
     }
     
     /**
@@ -35,38 +43,39 @@ public class BasePriceService {
      * @return 基础价格信息
      */
     public Optional<BasePrice> getBasePriceById(Integer id) {
-        return basePriceRepository.findById(id);
+        return basePriceRepository.findById(id)
+                .filter(p -> p.getTenantId() != null && p.getTenantId().equals(getCurrentTenantId()));
     }
     
     /**
-     * 根据酒店ID获取基础价格列表
-     * @param hotelId 酒店ID
+     * 根据酒店编码获取基础价格列表
+     * @param hotelCode 酒店编码
      * @return 基础价格列表
      */
-    public List<BasePrice> getBasePricesByHotelId(Integer hotelId) {
-        return basePriceRepository.findByHotelId(hotelId);
+    public List<BasePrice> getBasePricesByHotelCode(String hotelCode) {
+        return basePriceRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
     }
     
     /**
-     * 根据酒店ID、价格类型ID和房型ID获取基础价格列表
-     * @param hotelId 酒店ID
-     * @param rateTypeId 价格类型ID
-     * @param roomTypeId 房型ID
+     * 根据酒店编码、价格类型编码和房型编码获取基础价格列表
+     * @param hotelCode 酒店编码
+     * @param rateTypeCode 价格类型编码
+     * @param roomTypeCode 房型编码
      * @return 基础价格列表
      */
-    public List<BasePrice> getBasePricesByHotelIdAndRateTypeIdAndRoomTypeId(Integer hotelId, Integer rateTypeId, Integer roomTypeId) {
-        return basePriceRepository.findByHotelIdAndRateTypeIdAndRoomTypeId(hotelId, rateTypeId, roomTypeId);
+    public List<BasePrice> getBasePricesByCode(String hotelCode, String rateTypeCode, String roomTypeCode) {
+        return basePriceRepository.findByTenantIdAndHotelCodeAndRateTypeCodeAndRoomTypeCode(getCurrentTenantId(), hotelCode, rateTypeCode, roomTypeCode);
     }
     
     /**
      * 根据日期范围获取基础价格
-     * @param hotelId 酒店ID
+     * @param hotelCode 酒店编码
      * @param startDate 开始日期
      * @param endDate 结束日期
      * @return 基础价格列表
      */
-    public List<BasePrice> getBasePricesByDateRange(Integer hotelId, Date startDate, Date endDate) {
-        return basePriceRepository.findByHotelIdAndDateBetween(hotelId, startDate, endDate);
+    public List<BasePrice> getBasePricesByDateRange(String hotelCode, Date startDate, Date endDate) {
+        return basePriceRepository.findByTenantIdAndHotelCodeAndDateBetween(getCurrentTenantId(), hotelCode, startDate, endDate);
     }
     
     /**
@@ -75,6 +84,7 @@ public class BasePriceService {
      * @return 创建的基础价格信息
      */
     public BasePrice createBasePrice(BasePrice basePrice) {
+        basePrice.setTenantId(getCurrentTenantId());
         // 计算价格
         basePrice.setPrice(calculatePrice(basePrice.getBasePrice()));
         return basePriceRepository.save(basePrice);
@@ -86,8 +96,10 @@ public class BasePriceService {
      * @return 创建的基础价格列表
      */
     public List<BasePrice> createBatchBasePrices(List<BasePrice> basePrices) {
+        Integer tenantId = getCurrentTenantId();
         // 计算每个价格
         basePrices.forEach(basePrice -> {
+            basePrice.setTenantId(tenantId);
             basePrice.setPrice(calculatePrice(basePrice.getBasePrice()));
         });
         return basePriceRepository.saveAll(basePrices);
@@ -100,15 +112,15 @@ public class BasePriceService {
      * @return 更新后的基础价格信息
      */
     public BasePrice updateBasePrice(Integer id, BasePrice basePrice) {
-        BasePrice existingBasePrice = basePriceRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Base price not found"));
+        BasePrice existingBasePrice = getBasePriceById(id)
+                .orElseThrow(() -> new RuntimeException("Base price not found or access denied"));
         
         // 计算价格
         basePrice.setPrice(calculatePrice(basePrice.getBasePrice()));
         
-        existingBasePrice.setHotelId(basePrice.getHotelId());
-        existingBasePrice.setRateTypeId(basePrice.getRateTypeId());
-        existingBasePrice.setRoomTypeId(basePrice.getRoomTypeId());
+        existingBasePrice.setHotelCode(basePrice.getHotelCode());
+        existingBasePrice.setRateTypeCode(basePrice.getRateTypeCode());
+        existingBasePrice.setRoomTypeCode(basePrice.getRoomTypeCode());
         existingBasePrice.setBasePrice(basePrice.getBasePrice());
         existingBasePrice.setPrice(basePrice.getPrice());
         existingBasePrice.setDate(basePrice.getDate());
@@ -122,10 +134,9 @@ public class BasePriceService {
      * @param id 基础价格ID
      */
     public void deleteBasePrice(Integer id) {
-        if (!basePriceRepository.existsById(id)) {
-            throw new RuntimeException("Base price not found");
-        }
-        basePriceRepository.deleteById(id);
+        BasePrice existing = getBasePriceById(id)
+                .orElseThrow(() -> new RuntimeException("Base price not found or access denied"));
+        basePriceRepository.delete(existing);
     }
     
     /**

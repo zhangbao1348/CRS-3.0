@@ -21,69 +21,11 @@ import java.util.Date;
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
 
-    // =====================================================================
-    // 已废弃方法：使用 hotelId/ratePlanId/channelId/roomTypeId
-    // （仅为内部兼容，禁止新代码使用）
-    // =====================================================================
+    /** 获取指定租户下的所有库存记录 */
+    List<Inventory> findByTenantId(Integer tenantId);
 
-    /**
-     * @deprecated 请使用 {@link #findByHotelCode(String)}
-     */
-    @Deprecated
-    List<Inventory> findByHotelId(Integer hotelId);
-    
-    /**
-     * @deprecated 请使用 {@link #findByHotelCodeAndStatus(String, Inventory.Status)}
-     */
-    @Deprecated
-    List<Inventory> findByHotelIdAndStatus(Integer hotelId, Inventory.Status status);
-    
-    /**
-     * @deprecated 请使用 {@link #findByHotelCodeAndRatePlanCodeAndRoomTypeCode(String, String, String)}
-     */
-    @Deprecated
-    List<Inventory> findByHotelIdAndRatePlanIdAndRoomTypeId(Integer hotelId, Integer ratePlanId, Integer roomTypeId);
-    
-    /**
-     * @deprecated 请使用 {@link #findByHotelCodeAndDateBetween(String, Date, Date)}
-     */
-    @Deprecated
-    List<Inventory> findByHotelIdAndDateBetween(Integer hotelId, Date startDate, Date endDate);
-
-    /**
-     * 根据 ID 组合定位特定日期的库存记录。
-     */
-    Inventory findByHotelIdAndRatePlanIdAndRoomTypeIdAndDate(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date date);
-    
-    /**
-     * 根据 ID 组合查询指定日期范围内的库存列表。
-     */
-    List<Inventory> findByHotelIdAndRatePlanIdAndRoomTypeIdAndDateBetween(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Date startDate, Date endDate);
-    
-    /**
-     * 全局查找特定状态的库存。
-     */
-    List<Inventory> findByStatus(Inventory.Status status);
-    
-    /**
-     * 根据渠道 ID 查询库存分配列表。
-     */
-    List<Inventory> findByChannelId(Integer channelId);
-    
-    /**
-     * 根据酒店 ID 和渠道 ID 查询库存列表。
-     */
-    List<Inventory> findByHotelIdAndChannelId(Integer hotelId, Integer channelId);
-    
-    /**
-     * 查询指定渠道在特定时间段内的库存记录。
-     */
-    List<Inventory> findByHotelIdAndChannelIdAndDateBetween(Integer hotelId, Integer channelId, Date startDate, Date endDate);
-    
-    /**
-     * 精确查询五维模型下的单条库存记录。
-     */
-    Inventory findByHotelIdAndRatePlanIdAndRoomTypeIdAndChannelIdAndDate(Integer hotelId, Integer ratePlanId, Integer roomTypeId, Integer channelId, Date date);
+    // 业务关联已统一切换为基于业务编码 (Code) 进行检索。
+    // 请优先使用下方的 ByCode 系列方法。
 
     // =========================================================================
     // 聚合与预警查询
@@ -92,74 +34,74 @@ public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
     /**
      * 查询库存预警记录。
      * 找出指定日期范围内可用房间数低于或等于阈值的活跃库存记录。
-     * 
-     * @param threshold 预警阈值（通常为 5 或 10）
-     * @param startDate 统计起始日期
-     * @param endDate 统计截止日期
-     * @return 预警列表
      */
     @org.springframework.data.jpa.repository.Query(
-            "SELECT i FROM Inventory i WHERE i.availableRooms <= :threshold AND i.date >= :startDate AND i.date <= :endDate AND i.status = 'active' ORDER BY i.date, i.hotelCode")
-    List<Inventory> findLowInventory(@org.springframework.data.repository.query.Param("threshold") int threshold,
+            "SELECT i FROM Inventory i WHERE i.tenantId = :tenantId AND i.availableRooms <= :threshold AND i.date >= :startDate AND i.date <= :endDate AND i.status = 'active' ORDER BY i.date, i.hotelCode")
+    List<Inventory> findLowInventory(@org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+                                     @org.springframework.data.repository.query.Param("threshold") int threshold,
                                      @org.springframework.data.repository.query.Param("startDate") Date startDate,
                                      @org.springframework.data.repository.query.Param("endDate") Date endDate);
 
     /**
-     * 查询指定酒店在某一天的所有记录。
+     * 根据租户和酒店编码安全获取库存。
      */
-    List<Inventory> findByHotelIdAndDate(Integer hotelId, Date date);
-
-    // =========================================================================
-    // 外部编码 (Code) 优先的查询方法（推荐使用）
-    // =========================================================================
+    List<Inventory> findByTenantIdAndHotelCode(Integer tenantId, String hotelCode);
 
     /**
-     * 根据酒店编码获取所有库存。
+     * 根据租户、酒店编码和日期范围获取库存。
      */
-    List<Inventory> findByHotelCode(String hotelCode);
+    List<Inventory> findByTenantIdAndHotelCodeAndDateBetween(Integer tenantId, String hotelCode, Date startDate, Date endDate);
 
     /**
-     * 根据酒店编码和日期范围获取库存。
+     * 跨日期查询租户酒店、计划和房型的库存组合。
      */
-    List<Inventory> findByHotelCodeAndDateBetween(String hotelCode, Date startDate, Date endDate);
+    List<Inventory> findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCode(Integer tenantId, String hotelCode, String ratePlanCode, String roomTypeCode);
 
     /**
-     * 跨日期查询酒店、计划和房型的库存组合。
+     * 精确查询租户特定编码组合下的单日库存。
      */
-    List<Inventory> findByHotelCodeAndRatePlanCodeAndRoomTypeCode(String hotelCode, String ratePlanCode, String roomTypeCode);
+    Inventory findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(Integer tenantId, String hotelCode, String ratePlanCode, String roomTypeCode, Date date);
 
     /**
-     * 精确查询特定编码组合下的单日库存。
+     * 精确查询租户特定编码组合下的时间段库存。
      */
-    Inventory findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDate(String hotelCode, String ratePlanCode, String roomTypeCode, Date date);
+    List<Inventory> findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDateBetween(Integer tenantId, String hotelCode, String ratePlanCode, String roomTypeCode, Date startDate, Date endDate);
 
     /**
-     * 精确查询特定编码组合下的时间段库存。
+     * 根据租户酒店和渠道编码查询库存。
      */
-    List<Inventory> findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndDateBetween(String hotelCode, String ratePlanCode, String roomTypeCode, Date startDate, Date endDate);
+    List<Inventory> findByTenantIdAndHotelCodeAndChannelCode(Integer tenantId, String hotelCode, String channelCode);
 
     /**
-     * 根据酒店和渠道编码查询库存。
+     * 根据租户酒店、渠道及日期范围查询。
      */
-    List<Inventory> findByHotelCodeAndChannelCode(String hotelCode, String channelCode);
+    List<Inventory> findByTenantIdAndHotelCodeAndChannelCodeAndDateBetween(Integer tenantId, String hotelCode, String channelCode, Date startDate, Date endDate);
 
     /**
-     * 根据酒店、渠道及日期范围查询。
+     * 租户五维编码模型下的精确库存定位。
      */
-    List<Inventory> findByHotelCodeAndChannelCodeAndDateBetween(String hotelCode, String channelCode, Date startDate, Date endDate);
+    Inventory findByTenantIdAndHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(Integer tenantId, String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date);
 
     /**
-     * 五维编码模型下的精确库存定位。
+     * 根据租户酒店编码和指定日期查询。
      */
-    Inventory findByHotelCodeAndRatePlanCodeAndRoomTypeCodeAndChannelCodeAndDate(String hotelCode, String ratePlanCode, String roomTypeCode, String channelCode, Date date);
+    List<Inventory> findByTenantIdAndHotelCodeAndDate(Integer tenantId, String hotelCode, Date date);
 
     /**
-     * 根据酒店编码和指定日期查询。
+     * 根据租户酒店编码和状态查询。
      */
-    List<Inventory> findByHotelCodeAndDate(String hotelCode, Date date);
+    List<Inventory> findByTenantIdAndHotelCodeAndStatus(Integer tenantId, String hotelCode, Inventory.Status status);
 
     /**
-     * 根据酒店编码和状态查询。
+     * 针对特定酒店查询库存预警记录。
      */
-    List<Inventory> findByHotelCodeAndStatus(String hotelCode, Inventory.Status status);
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT i FROM Inventory i WHERE i.tenantId = :tenantId AND i.hotelCode = :hotelCode " +
+            "AND i.availableRooms <= :threshold AND i.date >= :startDate AND i.date <= :endDate " +
+            "AND i.status = 'active' ORDER BY i.date ASC")
+    List<Inventory> findLowInventoryByHotel(@org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+                                            @org.springframework.data.repository.query.Param("hotelCode") String hotelCode,
+                                            @org.springframework.data.repository.query.Param("threshold") int threshold,
+                                            @org.springframework.data.repository.query.Param("startDate") Date startDate,
+                                            @org.springframework.data.repository.query.Param("endDate") Date endDate);
 }

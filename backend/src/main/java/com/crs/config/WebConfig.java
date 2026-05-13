@@ -39,7 +39,7 @@ public class WebConfig implements WebMvcConfigurer {
         // 2. 排除 /api/auth/** 路径，因为认证接口（登录等）在租户确认之前执行。
         registry.addInterceptor(tenantInterceptor)
                 .addPathPatterns("/api/**")
-                .excludePathPatterns("/api/auth/**");
+                .excludePathPatterns("/api/auth/**", "/api/tenants/**");
     }
 }
 

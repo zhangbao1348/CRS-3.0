@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -13,9 +10,9 @@ import java.util.Date;
  * 
  * <p>本类对应数据库中的 `reservation_payment` 表，记录了订单的支付、退款及预授权等财务流水信息。</p>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "reservation_payment")
 public class ReservationPayment {
@@ -24,6 +21,9 @@ public class ReservationPayment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
+
+    @Column(name = "tenant_id")
+    private Integer tenantId;
 
     /** 关联的预订 ID */
     @Column(name = "reservation_id", nullable = false)
@@ -72,5 +72,29 @@ public class ReservationPayment {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Temporal(TemporalType.TIMESTAMP)
     private Date createdAt = new Date();
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Integer getReservationId() { return reservationId; }
+    public void setReservationId(Integer reservationId) { this.reservationId = reservationId; }
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+    public String getPaymentType() { return paymentType; }
+    public void setPaymentType(String paymentType) { this.paymentType = paymentType; }
+    public BigDecimal getPaymentAmount() { return paymentAmount; }
+    public void setPaymentAmount(BigDecimal paymentAmount) { this.paymentAmount = paymentAmount; }
+    public String getTransactionId() { return transactionId; }
+    public void setTransactionId(String transactionId) { this.transactionId = transactionId; }
+    public String getCreditCardLast4() { return creditCardLast4; }
+    public void setCreditCardLast4(String creditCardLast4) { this.creditCardLast4 = creditCardLast4; }
+    public String getCreditCardExpiry() { return creditCardExpiry; }
+    public void setCreditCardExpiry(String creditCardExpiry) { this.creditCardExpiry = creditCardExpiry; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Date getPaidAt() { return paidAt; }
+    public void setPaidAt(Date paidAt) { this.paidAt = paidAt; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 }
 

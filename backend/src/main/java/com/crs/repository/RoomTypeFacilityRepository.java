@@ -26,15 +26,6 @@ import java.util.List;
 @Repository
 public interface RoomTypeFacilityRepository extends JpaRepository<RoomTypeFacility, Integer> {
 
-    List<RoomTypeFacility> findByRoomTypeId(Integer roomTypeId);
-
-    List<RoomTypeFacility> findByHotelIdAndRoomTypeId(Integer hotelId, Integer roomTypeId);
-
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM RoomTypeFacility f WHERE f.roomTypeId = :roomTypeId")
-    void deleteByRoomTypeId(@Param("roomTypeId") Integer roomTypeId);
-
     List<RoomTypeFacility> findByHotelCodeAndRoomTypeCode(String hotelCode, String roomTypeCode);
 
     @Modifying

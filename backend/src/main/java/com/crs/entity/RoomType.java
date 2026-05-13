@@ -1,9 +1,6 @@
 package com.crs.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,29 +17,24 @@ import java.util.Date;
  *     <li>**状态控制**：支持 active/inactive 状态，控制房型在预订端的可售性。</li>
  * </ul>
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "room_types")
 public class RoomType {
     
-    /** 房型内部主键 ID */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     
-    /** 所属酒店 ID */
-    @Column(name = "hotel_id", nullable = false)
-    private Integer hotelId;
+    /** 所属租户 ID */
+    @Column(name = "tenant_id")
+    private Integer tenantId;
     
     /** 酒店编码冗余字段，方便快速查询 */
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
-    
-    /** 关联的集团标准房型 ID（可选，若该房型由集团统一推送） */
-    @Column(name = "group_room_type_id")
-    private Integer groupRoomTypeId;
     
     /** 集团标准房型编码冗余 */
     @Column(name = "group_room_type_code", length = 50)
@@ -80,13 +72,13 @@ public class RoomType {
     /** 所属酒店实体的延迟加载引用 */
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "hotel_id", insertable = false, updatable = false)
+    @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
     
     /** 关联的集团标准房型实体的延迟加载引用 */
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "group_room_type_id", insertable = false, updatable = false)
+    @JoinColumn(name = "group_room_type_code", referencedColumnName = "room_type_code", insertable = false, updatable = false)
     private GroupRoomType groupRoomType;
     
     /**
@@ -106,5 +98,41 @@ public class RoomType {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+
+    public String getGroupRoomTypeCode() { return groupRoomTypeCode; }
+    public void setGroupRoomTypeCode(String groupRoomTypeCode) { this.groupRoomTypeCode = groupRoomTypeCode; }
+
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public Status getStatus() { return status; }
+    public void setStatus(Status status) { this.status = status; }
+
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
+
+    public Hotel getHotel() { return hotel; }
+    public void setHotel(Hotel hotel) { this.hotel = hotel; }
+
+    public GroupRoomType getGroupRoomType() { return groupRoomType; }
+    public void setGroupRoomType(GroupRoomType groupRoomType) { this.groupRoomType = groupRoomType; }
 }
 

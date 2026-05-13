@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -12,9 +12,9 @@ import java.util.Date;
  * 酒店价格实体类
  * 存储酒店每日价格数据，按租户+酒店+房价码+房型+日期维度
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "hotel_prices", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"tenant_id", "hotel_code", "rate_code", "room_type_code", "price_date"})
@@ -76,4 +76,27 @@ public class HotelPrice {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getHotelCode() { return hotelCode; }
+    public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
+    public String getRateCode() { return rateCode; }
+    public void setRateCode(String rateCode) { this.rateCode = rateCode; }
+    public String getRoomTypeCode() { return roomTypeCode; }
+    public void setRoomTypeCode(String roomTypeCode) { this.roomTypeCode = roomTypeCode; }
+    public Date getPriceDate() { return priceDate; }
+    public void setPriceDate(Date priceDate) { this.priceDate = priceDate; }
+    public BigDecimal getPriceWithTax() { return priceWithTax; }
+    public void setPriceWithTax(BigDecimal priceWithTax) { this.priceWithTax = priceWithTax; }
+    public BigDecimal getPriceWithoutTax() { return priceWithoutTax; }
+    public void setPriceWithoutTax(BigDecimal priceWithoutTax) { this.priceWithoutTax = priceWithoutTax; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

@@ -63,61 +63,12 @@ public interface HotelFacilityRepository extends JpaRepository<HotelFacility, In
     @Query("SELECT hf FROM HotelFacility hf WHERE hf.tenantId = :tenantId AND hf.hotelCode = :hotelCode AND hf.facilityCode IN (:facilityCodes)")
     List<HotelFacility> findByTenantIdAndHotelCodeAndFacilityCodes(@Param("tenantId") Integer tenantId, @Param("hotelCode") String hotelCode, @Param("facilityCodes") List<String> facilityCodes);
 
-    // =====================================================================
-    // 已废弃方法：缺少 tenantId 约束（存在跨租户数据风险，禁止新代码使用）
-    // =====================================================================
+    @org.springframework.transaction.annotation.Transactional
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM HotelFacility hf WHERE hf.tenantId = :tenantId AND hf.hotelCode = :hotelCode")
+    void deleteByTenantIdAndHotelCode(@Param("tenantId") Integer tenantId, @Param("hotelCode") String hotelCode);
 
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
     List<HotelFacility> findByHotelCode(String hotelCode);
 
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCodeAndFacilityType(Integer, String, String)} 
-     */
-    @Deprecated
-    List<HotelFacility> findByHotelCodeAndFacilityType(String hotelCode, String facilityType);
-
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCodeAndAvailable(Integer, String, Boolean)} 
-     */
-    @Deprecated
     List<HotelFacility> findByHotelCodeAndAvailable(String hotelCode, Boolean available);
-
-    /** 
-     * @deprecated 请改用 {@link #findByTenantIdAndHotelCodeAndFacilityCodes(Integer, String, List)} 
-     */
-    @Deprecated
-    @Query("SELECT hf FROM HotelFacility hf WHERE hf.hotelCode = :hotelCode AND hf.facilityCode IN (:facilityCodes)")
-    List<HotelFacility> findByHotelCodeAndFacilityCodes(@Param("hotelCode") String hotelCode, @Param("facilityCodes") List<String> facilityCodes);
-
-    // =====================================================================
-    // 已废弃方法：使用 hotelId（仅作兼容保留，禁止新代码使用）
-    // =====================================================================
-
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCode(Integer, String)} 
-     */
-    @Deprecated
-    List<HotelFacility> findByHotelId(Integer hotelId);
-    
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCodeAndFacilityType(Integer, String, String)} 
-     */
-    @Deprecated
-    List<HotelFacility> findByHotelIdAndFacilityType(Integer hotelId, String facilityType);
-    
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCodeAndAvailable(Integer, String, Boolean)} 
-     */
-    @Deprecated
-    List<HotelFacility> findByHotelIdAndAvailable(Integer hotelId, Boolean available);
-    
-    /** 
-     * @deprecated 内部 ID 关联已过时。请改用 {@link #findByTenantIdAndHotelCodeAndFacilityCodes(Integer, String, List)} 
-     */
-    @Deprecated
-    @Query("SELECT hf FROM HotelFacility hf WHERE hf.hotelId = :hotelId AND hf.facilityCode IN (:facilityCodes)")
-    List<HotelFacility> findByHotelIdAndFacilityCodes(@Param("hotelId") Integer hotelId, @Param("facilityCodes") List<String> facilityCodes);
 }

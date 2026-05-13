@@ -29,7 +29,10 @@ public class ChannelPublishController {
 
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
 
     /**
@@ -40,21 +43,29 @@ public class ChannelPublishController {
             @RequestParam(required = false) Integer hotelId,
             @RequestParam(required = false) String hotelCode) {
         try {
-            Integer resolvedHotelId = hotelId;
-            if (resolvedHotelId == null) {
-                if (hotelCode == null || hotelCode.trim().isEmpty()) {
+            Integer currentTenantId = getCurrentTenantId();
+            String resolvedHotelCode = hotelCode;
+            if (resolvedHotelCode == null || resolvedHotelCode.trim().isEmpty()) {
+                if (hotelId != null) {
+                    Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
+                            .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+                    if (hotelOpt.isPresent()) {
+                        resolvedHotelCode = hotelOpt.get().getHotelCode();
+                    } else {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                    }
+                } else {
                     return ResponseEntity.badRequest().body(null);
                 }
-                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(hotelCode, getCurrentTenantId());
+            } else {
+                Optional<Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(resolvedHotelCode, currentTenantId);
                 if (hotelOpt.isEmpty()) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
                 }
-                resolvedHotelId = hotelOpt.get().getId();
             }
-            List<Map<String, Object>> result = channelPublishService.getRateCodesWithRoomTypes(resolvedHotelId);
+            List<Map<String, Object>> result = channelPublishService.getRateCodesWithRoomTypes(resolvedHotelCode);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -64,14 +75,12 @@ public class ChannelPublishController {
      */
     @GetMapping("/records")
     public ResponseEntity<List<ChannelPublishRecord>> getPublishedRecords(
-            @RequestParam(defaultValue = "1") Integer tenantId,
             @RequestParam String hotelCode,
             @RequestParam String channelCode) {
         try {
-            List<ChannelPublishRecord> records = channelPublishService.getPublishedRecords(tenantId, hotelCode, channelCode);
+            List<ChannelPublishRecord> records = channelPublishService.getPublishedRecords(hotelCode, channelCode);
             return ResponseEntity.ok(records);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -82,16 +91,15 @@ public class ChannelPublishController {
     @PostMapping("/batch")
     public ResponseEntity<Map<String, Object>> batchPublish(@RequestBody Map<String, Object> request) {
         try {
-            Integer tenantId = (Integer) request.getOrDefault("tenantId", 1);
             String hotelCode = (String) request.get("hotelCode");
             String channelCode = (String) request.get("channelCode");
             // rateCodeRoomTypesMap: { "BAR": ["ST1","ST3"], "BAR_B1": ["ST2"] }
+            @SuppressWarnings("unchecked")
             Map<String, List<String>> rateCodeRoomTypesMap = (Map<String, List<String>>) request.get("rateCodeRoomTypesMap");
 
-            int count = channelPublishService.batchPublish(tenantId, hotelCode, channelCode, rateCodeRoomTypesMap);
+            int count = channelPublishService.batchPublish(hotelCode, channelCode, rateCodeRoomTypesMap);
             return ResponseEntity.ok(Map.of("success", true, "count", count));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("success", false, "error", e.getMessage()));
         }

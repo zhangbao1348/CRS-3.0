@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Image, Radio, Table, Switch, message } from 'antd'
+import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Image, Radio, Table, Switch, message, Tag } from 'antd'
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
@@ -499,7 +499,7 @@ const AddHotel = () => {
       for (const item of allocatedRateCodes) {
         const allocation = {
           hotelCode: hotelCode,
-          groupRateCodeId: parseInt(item.key),
+          rateCode: item.rateCodeValue,
           basicInfoEditable: item.basicInfoEditable || false,
           priceInfoEditable: item.priceInfoEditable || false,
           bookingLimitEditable: item.bookingLimitEditable || false,
@@ -528,7 +528,7 @@ const AddHotel = () => {
         .filter(item => item.allocated)
         .map(item => ({
           hotelCode: hotelCode,
-          groupRoomTypeId: parseInt(item.key),
+          groupRoomTypeCode: item.roomTypeCode,
           roomInfoEditable: item.roomInfoEditable || false
         }))
       

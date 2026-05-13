@@ -1,7 +1,5 @@
 package com.crs.entity;
 
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -20,8 +18,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * 
  * @since 2026-05-10
  */
-@NoArgsConstructor
-@AllArgsConstructor
+
+
 @Entity
 @Table(name = "room_type_categories")
 public class RoomTypeCategory {

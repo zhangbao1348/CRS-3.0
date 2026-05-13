@@ -30,10 +30,18 @@ public class MarketCodeCategoryServiceImpl implements MarketCodeCategoryService 
     @Autowired
     private MarketCodeCategoryRepository marketCodeCategoryRepository;
 
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     @Override
-    public List<Map<String, Object>> getAllMarketCodeCategories(Integer tenantId) {
+    public List<Map<String, Object>> getAllMarketCodeCategories() {
         try {
-            List<MarketCodeCategory> categories = marketCodeCategoryRepository.findByTenantId(tenantId);
+            List<MarketCodeCategory> categories = marketCodeCategoryRepository.findByTenantId(getCurrentTenantId());
             List<Map<String, Object>> result = new ArrayList<>();
             for (MarketCodeCategory category : categories) {
                 Map<String, Object> node = new HashMap<>();
@@ -46,70 +54,46 @@ public class MarketCodeCategoryServiceImpl implements MarketCodeCategoryService 
             }
             return result;
         } catch (Exception e) {
-            e.printStackTrace();
-            return getDefaultMarketCodeCategories();
+            return new ArrayList<>();
         }
-    }
-
-    private List<Map<String, Object>> getDefaultMarketCodeCategories() {
-        List<Map<String, Object>> result = new ArrayList<>();
-        
-        String[] codes = {"DIRECT", "OTA", "CORPORATE", "TRAVEL_AGENCY", "MEMBER", "PROMO"};
-        String[] names = {"直接预订", "OTA渠道", "企业客户", "旅行社", "会员预订", "促销活动"};
-        
-        for (int i = 0; i < codes.length; i++) {
-            Map<String, Object> node = new HashMap<>();
-            node.put("key", String.valueOf(i + 1));
-            node.put("title", names[i]);
-            node.put("code", codes[i]);
-            node.put("id", i + 1);
-            result.add(node);
-        }
-        
-        return result;
     }
 
     @Override
-    public MarketCodeCategory getMarketCodeCategoryById(Integer tenantId, Integer id) {
-        MarketCodeCategory category = marketCodeCategoryRepository.findById(id).orElse(null);
-        if (category != null && category.getTenantId() != null && category.getTenantId().equals(tenantId)) {
-            return category;
-        }
-        return null;
+    public MarketCodeCategory getMarketCodeCategoryById(Integer id) {
+        Integer currentTenantId = getCurrentTenantId();
+        return marketCodeCategoryRepository.findById(id)
+                .filter(c -> c.getTenantId() != null && c.getTenantId().equals(currentTenantId))
+                .orElse(null);
     }
 
     @Override
-    public MarketCodeCategory createMarketCodeCategory(Integer tenantId, MarketCodeCategory marketCodeCategory) {
-        marketCodeCategory.setTenantId(tenantId);
+    public MarketCodeCategory createMarketCodeCategory(MarketCodeCategory marketCodeCategory) {
+        marketCodeCategory.setTenantId(getCurrentTenantId());
         return marketCodeCategoryRepository.save(marketCodeCategory);
     }
 
     @Override
-    public MarketCodeCategory updateMarketCodeCategory(Integer tenantId, MarketCodeCategory marketCodeCategory) {
-        MarketCodeCategory existing = getMarketCodeCategoryById(tenantId, marketCodeCategory.getId());
+    public MarketCodeCategory updateMarketCodeCategory(MarketCodeCategory marketCodeCategory) {
+        Integer currentTenantId = getCurrentTenantId();
+        MarketCodeCategory existing = getMarketCodeCategoryById(marketCodeCategory.getId());
         if (existing != null) {
-            marketCodeCategory.setTenantId(tenantId);
+            marketCodeCategory.setTenantId(currentTenantId);
             return marketCodeCategoryRepository.save(marketCodeCategory);
         }
         return null;
     }
 
     @Override
-    public void deleteMarketCodeCategory(Integer tenantId, Integer id) {
-        MarketCodeCategory existing = getMarketCodeCategoryById(tenantId, id);
+    public void deleteMarketCodeCategory(Integer id) {
+        MarketCodeCategory existing = getMarketCodeCategoryById(id);
         if (existing != null) {
             marketCodeCategoryRepository.deleteById(id);
         }
     }
 
     @Override
-    public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
-        try {
-            MarketCodeCategory existing = marketCodeCategoryRepository.findByTenantIdAndCode(tenantId, code);
-            return existing == null || (excludeId != null && existing.getId().equals(excludeId));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return true;
-        }
+    public boolean isCodeUnique(String code, Integer excludeId) {
+        MarketCodeCategory existing = marketCodeCategoryRepository.findByTenantIdAndCode(getCurrentTenantId(), code);
+        return existing == null || (excludeId != null && existing.getId().equals(excludeId));
     }
 }

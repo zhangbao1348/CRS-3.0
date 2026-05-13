@@ -41,13 +41,19 @@ public class GroupRoomTypeHotelController {
     @Autowired
     private HotelRepository hotelRepository;
     
+    @Autowired
+    private com.crs.repository.GroupRoomTypeRepository groupRoomTypeRepository;
+    
     public GroupRoomTypeHotelController(GroupRoomTypeHotelService groupRoomTypeHotelService) {
         this.groupRoomTypeHotelService = groupRoomTypeHotelService;
     }
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
-        return tenantId != null ? tenantId : 1;
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
     }
     
     private boolean validateHotelTenant(String hotelCode) {
@@ -59,9 +65,7 @@ public class GroupRoomTypeHotelController {
      */
     private static class AllocationDTO {
         private Integer id;
-        private Integer groupRoomTypeId;
         private String groupRoomTypeCode;
-        private Integer hotelId;
         private String hotelCode;
         private Boolean allocated;
         private Boolean roomInfoEditable;
@@ -70,21 +74,17 @@ public class GroupRoomTypeHotelController {
         
         public AllocationDTO(GroupRoomTypeHotel allocation) {
             this.id = allocation.getId();
-            this.groupRoomTypeId = allocation.getGroupRoomTypeId();
             this.groupRoomTypeCode = allocation.getGroupRoomTypeCode();
-            this.hotelId = allocation.getHotelId();
             this.hotelCode = allocation.getHotelCode();
             this.allocated = allocation.getAllocated();
             this.roomInfoEditable = allocation.getRoomInfoEditable();
-            this.createdAt = allocation.getCreatedAt().toString();
-            this.updatedAt = allocation.getUpdatedAt().toString();
+            this.createdAt = allocation.getCreatedAt() != null ? allocation.getCreatedAt().toString() : "";
+            this.updatedAt = allocation.getUpdatedAt() != null ? allocation.getUpdatedAt().toString() : "";
         }
         
         // Getters
         public Integer getId() { return id; }
-        public Integer getGroupRoomTypeId() { return groupRoomTypeId; }
         public String getGroupRoomTypeCode() { return groupRoomTypeCode; }
-        public Integer getHotelId() { return hotelId; }
         public String getHotelCode() { return hotelCode; }
         public Boolean getAllocated() { return allocated; }
         public Boolean getRoomInfoEditable() { return roomInfoEditable; }
@@ -93,15 +93,14 @@ public class GroupRoomTypeHotelController {
     }
     
     /**
-     * 获取集团房型的酒店分配列表
-     * @param groupRoomTypeId 集团房型ID
-     * @return 分配列表
+     * 获取集团房型的酒店分配列表 (基于 ID，为了兼容前端，但内部已转向 CODE)
      */
     @GetMapping("/group/{groupRoomTypeId}")
     public ResponseEntity<?> getGroupRoomTypeHotels(@PathVariable Integer groupRoomTypeId) {
         try {
-            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getGroupRoomTypeHotels(groupRoomTypeId);
-            // 转换为DTO列表，避免序列化循环引用
+            var grt = groupRoomTypeRepository.findById(groupRoomTypeId)
+                    .orElseThrow(() -> new RuntimeException("Group room type not found"));
+            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getGroupRoomTypeHotelsByCode(grt.getRoomTypeCode());
             List<AllocationDTO> allocationDTOs = allocations.stream()
                     .map(AllocationDTO::new)
                     .collect(Collectors.toList());
@@ -112,16 +111,15 @@ public class GroupRoomTypeHotelController {
     }
     
     /**
-     * 获取酒店的集团房型分配列表
-     * @param hotelId 酒店ID
-     * @return 分配列表
+     * 获取酒店的集团房型分配列表 (基于 ID，为了兼容前端)
      */
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<Map<String, Object>> getHotelRoomTypeAllocations(@PathVariable Integer hotelId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getHotelRoomTypeAllocations(hotelId);
-            // 转换为DTO列表，避免序列化循环引用
+            var hotel = hotelRepository.findById(hotelId)
+                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
+            List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getHotelRoomTypeAllocationsByCode(hotel.getHotelCode());
             List<AllocationDTO> allocationDTOs = allocations.stream()
                     .map(AllocationDTO::new)
                     .collect(Collectors.toList());
@@ -135,11 +133,6 @@ public class GroupRoomTypeHotelController {
         }
     }
     
-    /**
-     * 批量保存酒店房型分配
-     * @param allocations 分配列表
-     * @return 成功响应
-     */
     @PostMapping
     public ResponseEntity<?> batchSaveRoomTypeAllocations(@RequestBody List<GroupRoomTypeHotel> allocations) {
         try {
@@ -150,13 +143,6 @@ public class GroupRoomTypeHotelController {
         }
     }
     
-    /**
-     * 更新酒店房型分配状态
-     * @param groupRoomTypeId 集团房型ID
-     * @param hotelId 酒店ID
-     * @param allocationData 分配数据
-     * @return 关联信息
-     */
     @PutMapping("/group/{groupRoomTypeId}/hotel/{hotelId}")
     public ResponseEntity<?> updateRoomTypeAllocation(
             @PathVariable Integer groupRoomTypeId,
@@ -166,22 +152,20 @@ public class GroupRoomTypeHotelController {
             Boolean allocated = allocationData.getOrDefault("allocated", false);
             Boolean roomInfoEditable = allocationData.getOrDefault("roomInfoEditable", false);
             
-            GroupRoomTypeHotel allocation = groupRoomTypeHotelService.updateRoomTypeAllocation(
-                    groupRoomTypeId, hotelId, allocated, roomInfoEditable);
+            var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
+                    .orElseThrow(() -> new RuntimeException("Group room type not found"));
+            var hotel = hotelRepository.findById(hotelId)
+                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
+                    
+            GroupRoomTypeHotel allocation = groupRoomTypeHotelService.updateRoomTypeAllocationByCode(
+                    groupRoomType.getRoomTypeCode(), hotel.getHotelCode(), allocated, roomInfoEditable);
             
-            // 返回DTO对象
             return ResponseEntity.ok(new AllocationDTO(allocation));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
     
-    /**
-     * 批量更新酒店房型分配
-     * @param groupRoomTypeId 集团房型ID
-     * @param allocations 分配列表
-     * @return 成功响应
-     */
     @PutMapping("/group/{groupRoomTypeId}/batch")
     public ResponseEntity<?> batchUpdateRoomTypeAllocations(
             @PathVariable Integer groupRoomTypeId,
@@ -204,7 +188,6 @@ public class GroupRoomTypeHotelController {
                 return ResponseEntity.status(403).body(response);
             }
             
-            // 关联查询原则：必须使用 tenantId + hotelCode 双维度隔离，防止跨租户数据泄露
             List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelRepository.findByTenantIdAndHotelCode(getCurrentTenantId(), hotelCode);
             List<AllocationDTO> allocationDTOs = allocations.stream()
                     .map(AllocationDTO::new)

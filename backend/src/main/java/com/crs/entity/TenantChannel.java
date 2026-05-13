@@ -1,8 +1,8 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+
+
+
 
 import jakarta.persistence.*;
 import java.util.Date;
@@ -11,9 +11,9 @@ import java.util.Date;
  * 租户可对接渠道实体类
  * 对应数据库tenant_channels表
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+
+
+
 @Entity
 @Table(name = "tenant_channels")
 public class TenantChannel {
@@ -80,4 +80,41 @@ public class TenantChannel {
     public void preUpdate() {
         this.updatedAt = new Date();
     }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public Integer getTenantId() { return tenantId; }
+    public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public String getChannelCode() { return channelCode; }
+    public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
+    public String getChannelName() { return channelName; }
+    public void setChannelName(String channelName) { this.channelName = channelName; }
+    public Boolean getConnected() { return connected; }
+    public void setConnected(Boolean connected) { this.connected = connected; }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public String getSwitchChannel() { return switchChannel; }
+    public void setSwitchChannel(String switchChannel) { this.switchChannel = switchChannel; }
+    public String getAccessKey() { return accessKey; }
+    public void setAccessKey(String accessKey) { this.accessKey = accessKey; }
+    public String getAccessSecret() { return accessSecret; }
+    public void setAccessSecret(String accessSecret) { this.accessSecret = accessSecret; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getPriceRounding() { return priceRounding; }
+    public void setPriceRounding(String priceRounding) { this.priceRounding = priceRounding; }
+    public String getPrepaidCommissionType() { return prepaidCommissionType; }
+    public void setPrepaidCommissionType(String prepaidCommissionType) { this.prepaidCommissionType = prepaidCommissionType; }
+    public java.math.BigDecimal getPrepaidCommissionValue() { return prepaidCommissionValue; }
+    public void setPrepaidCommissionValue(java.math.BigDecimal prepaidCommissionValue) { this.prepaidCommissionValue = prepaidCommissionValue; }
+    public String getPostpaidCommissionType() { return postpaidCommissionType; }
+    public void setPostpaidCommissionType(String postpaidCommissionType) { this.postpaidCommissionType = postpaidCommissionType; }
+    public java.math.BigDecimal getPostpaidCommissionValue() { return postpaidCommissionValue; }
+    public void setPostpaidCommissionValue(java.math.BigDecimal postpaidCommissionValue) { this.postpaidCommissionValue = postpaidCommissionValue; }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }

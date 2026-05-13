@@ -1,8 +1,5 @@
 package com.crs.entity;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 import jakarta.persistence.*;
 import java.util.Date;
 
@@ -19,7 +16,7 @@ import java.util.Date;
  * 
  * @since 2026-05-10
  */
-@Data @NoArgsConstructor @AllArgsConstructor
+  
 @Entity @Table(name = "pms_sync_logs")
 public class PmsSyncLog {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)

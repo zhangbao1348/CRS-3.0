@@ -44,13 +44,19 @@ public class ReservationController {
         this.tenantChannelRepo = tenantChannelRepo;
     }
 
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
+
     @GetMapping
     public ResponseEntity<Map<String, Object>> listReservations(
-            @RequestParam(required = false) Integer tenantId,
-            @RequestParam(required = false) Integer hotelId,
+            @RequestParam(required = false) String hotelCode,
             @RequestParam(required = false) String orderNo,
             @RequestParam(required = false) String reservationStatus,
-            @RequestParam(required = false) Integer channelId,
             @RequestParam(required = false) String channelCode,
             @RequestParam(required = false) String guestName,
             @RequestParam(required = false) String startDate,
@@ -58,25 +64,9 @@ public class ReservationController {
             @RequestParam(required = false) String checkInStart,
             @RequestParam(required = false) String checkInEnd,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            HttpServletRequest request) {
+            @RequestParam(defaultValue = "20") int pageSize) {
 
-        if (tenantId == null) {
-            String tid = request.getHeader("X-Tenant-Id");
-            if (tid != null && !tid.isBlank()) {
-                tenantId = Integer.parseInt(tid);
-            }
-        }
-
-        if (channelId == null && channelCode != null && !channelCode.isBlank()) {
-            List<TenantChannel> channels = tenantChannelRepo.findByTenantIdAndStatusOrderBySortOrderAsc(tenantId, "active");
-            for (TenantChannel tc : channels) {
-                if (channelCode.equals(tc.getChannelCode())) {
-                    channelId = tc.getId();
-                    break;
-                }
-            }
-        }
+        Integer tenantId = getCurrentTenantId();
 
         Date sDate = parseDate(startDate);
         Date eDate = parseDate(endDate);
@@ -84,7 +74,7 @@ public class ReservationController {
         Date ciEnd = parseDate(checkInEnd);
 
         Page<Reservation> result = reservationService.listReservations(
-                tenantId, hotelId, orderNo, reservationStatus, channelId,
+                tenantId, hotelCode, orderNo, reservationStatus, channelCode,
                 guestName, sDate, eDate, ciStart, ciEnd, page, pageSize);
 
         List<Map<String, Object>> items = result.getContent().stream()
@@ -369,24 +359,17 @@ public class ReservationController {
 
     @GetMapping("/export")
     public ResponseEntity<String> exportReservations(
-            @RequestParam(required = false) Integer tenantId,
-            @RequestParam(required = false) Integer hotelId,
+            @RequestParam(required = false) String hotelCode,
             @RequestParam(required = false) String orderNo,
             @RequestParam(required = false) String reservationStatus,
-            @RequestParam(required = false) Integer channelId,
+            @RequestParam(required = false) String channelCode,
             @RequestParam(required = false) String guestName,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String checkInStart,
-            @RequestParam(required = false) String checkInEnd,
-            HttpServletRequest request) {
+            @RequestParam(required = false) String checkInEnd) {
 
-        if (tenantId == null) {
-            String tid = request.getHeader("X-Tenant-Id");
-            if (tid != null && !tid.isBlank()) {
-                tenantId = Integer.parseInt(tid);
-            }
-        }
+        Integer tenantId = getCurrentTenantId();
 
         Date sDate = parseDate(startDate);
         Date eDate = parseDate(endDate);
@@ -394,7 +377,7 @@ public class ReservationController {
         Date ciEnd = parseDate(checkInEnd);
 
         List<Reservation> reservations = reservationService.listReservationsForExport(
-                tenantId, hotelId, orderNo, reservationStatus, channelId,
+                tenantId, hotelCode, orderNo, reservationStatus, channelCode,
                 guestName, sDate, eDate, ciStart, ciEnd);
 
         String csvData = reservationService.exportReservationsToCsv(reservations);
@@ -405,24 +388,25 @@ public class ReservationController {
                 .body("\uFEFF" + csvData);
     }
 
-    @GetMapping("/hotel/{hotelId}")
-    public ResponseEntity<List<Reservation>> getReservationsByHotelId(@PathVariable Integer hotelId) {
-        List<Reservation> reservations = reservationService.getReservationsByHotelId(hotelId);
+    @GetMapping("/hotel/{hotelCode}")
+    public ResponseEntity<List<Reservation>> getReservationsByHotelCode(@PathVariable String hotelCode) {
+        List<Reservation> reservations = reservationService.getReservationsByHotelCode(hotelCode);
         return ResponseEntity.ok(reservations);
     }
 
-    @GetMapping("/hotel/{hotelId}/reservation-status/{reservationStatus}")
-    public ResponseEntity<List<Reservation>> getReservationsByHotelIdAndReservationStatus(
-            @PathVariable Integer hotelId,
+    @GetMapping("/hotel/{hotelCode}/reservation-status/{reservationStatus}")
+    public ResponseEntity<List<Reservation>> getReservationsByHotelCodeAndReservationStatus(
+            @PathVariable String hotelCode,
             @PathVariable String reservationStatus) {
-        List<Reservation> reservations = reservationService.getReservationsByHotelIdAndReservationStatus(
-                hotelId, reservationStatus);
+        List<Reservation> reservations = reservationService.getReservationsByHotelCodeAndReservationStatus(
+                hotelCode, reservationStatus);
         return ResponseEntity.ok(reservations);
     }
 
     @GetMapping("/today")
-    public ResponseEntity<List<Reservation>> getTodayReservations(@RequestParam Integer hotelId) {
-        List<Reservation> reservations = reservationService.getTodayReservations(hotelId);
+    public ResponseEntity<List<Reservation>> getTodayReservations(@RequestParam String hotelCode) {
+        Integer tenantId = getCurrentTenantId();
+        List<Reservation> reservations = reservationService.getTodayReservations(tenantId, hotelCode);
         return ResponseEntity.ok(reservations);
     }
 
@@ -475,17 +459,13 @@ public class ReservationController {
     @SuppressWarnings("unchecked")
     private Reservation parseReservationFromBody(Map<String, Object> body) {
         Reservation r = new Reservation();
-        r.setTenantId(getInteger(body, "tenantId"));
-        r.setHotelId(getInteger(body, "hotelId"));
+        r.setTenantId(com.crs.util.TenantContext.getTenantId());
         r.setHotelCode(getString(body, "hotelCode"));
         r.setHotelName(getString(body, "hotelName"));
-        r.setRoomTypeId(getInteger(body, "roomTypeId"));
         r.setRoomTypeCode(getString(body, "roomTypeCode"));
         r.setRoomTypeName(getString(body, "roomTypeName"));
-        r.setRatePlanId(getInteger(body, "ratePlanId"));
         r.setRatePlanCode(getString(body, "ratePlanCode"));
         r.setRatePlanName(getString(body, "ratePlanName"));
-        r.setChannelId(getInteger(body, "channelId"));
         r.setChannelCode(getString(body, "channelCode"));
         r.setChannelName(getString(body, "channelName"));
         r.setChannelOrderNumber(getString(body, "channelOrderNumber"));

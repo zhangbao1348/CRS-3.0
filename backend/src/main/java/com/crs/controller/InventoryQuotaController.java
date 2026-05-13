@@ -36,7 +36,13 @@ public class InventoryQuotaController {
     @Autowired private InventoryQuotaRepository repository;
     @Autowired private InventoryQuotaLogRepository logRepository;
 
-    private Integer tid() { Integer t = TenantContext.getTenantId(); return t != null ? t : 1; }
+    private Integer tid() { 
+        Integer t = TenantContext.getTenantId(); 
+        if (t == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return t; 
+    }
     private String dec(String s) { try { return URLDecoder.decode(s, StandardCharsets.UTF_8); } catch (Exception e) { return s; } }
 
     @GetMapping

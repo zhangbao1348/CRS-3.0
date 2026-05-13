@@ -31,8 +31,8 @@ public class RoomTypeFacilityController {
     private RoomTypeFacilityRepository repository;
 
     @GetMapping
-    public ResponseEntity<?> getByRoomTypeId(@RequestParam Integer roomTypeId) {
-        List<RoomTypeFacility> facilities = repository.findByRoomTypeId(roomTypeId);
+    public ResponseEntity<?> getByRoomTypeCode(@RequestParam String hotelCode, @RequestParam String roomTypeCode) {
+        List<RoomTypeFacility> facilities = repository.findByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
         return ResponseEntity.ok(Map.of("success", true, "data", facilities));
     }
 
@@ -40,22 +40,18 @@ public class RoomTypeFacilityController {
     @Transactional
     public ResponseEntity<?> saveBatch(@RequestBody Map<String, Object> request) {
         try {
-            Integer roomTypeId = (Integer) request.get("roomTypeId");
-            Integer hotelId = (Integer) request.get("hotelId");
             String hotelCode = (String) request.get("hotelCode");
             String roomTypeCode = (String) request.get("roomTypeCode");
             @SuppressWarnings("unchecked")
             List<Map<String, String>> facilities = (List<Map<String, String>>) request.get("facilities");
 
-            // 先删除该房型的所有设施
-            repository.deleteByRoomTypeId(roomTypeId);
+            // 先删除该房型的所有设施（关联查询原则：使用 CODE）
+            repository.deleteByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
 
             // 批量新增
             if (facilities != null) {
                 for (Map<String, String> f : facilities) {
                     RoomTypeFacility entity = new RoomTypeFacility();
-                    entity.setRoomTypeId(roomTypeId);
-                    entity.setHotelId(hotelId);
                     entity.setHotelCode(hotelCode);
                     entity.setRoomTypeCode(roomTypeCode);
                     entity.setFacilityType(f.get("facilityType"));

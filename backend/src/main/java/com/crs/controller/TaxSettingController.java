@@ -41,7 +41,7 @@ public class TaxSettingController {
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
         if (tenantId == null) {
-            tenantId = 1;
+            throw new RuntimeException("Tenant context missing");
         }
         return tenantId;
     }

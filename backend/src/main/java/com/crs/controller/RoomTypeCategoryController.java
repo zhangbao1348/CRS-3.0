@@ -34,9 +34,8 @@ public class RoomTypeCategoryController {
     
     private final RoomTypeCategoryService roomTypeCategoryService;
     private final GroupRoomTypeRepository groupRoomTypeRepository;
-    
-    private static final Integer DEFAULT_TENANT_ID = 1;
-    
+
+    @Autowired
     public RoomTypeCategoryController(RoomTypeCategoryService roomTypeCategoryService, GroupRoomTypeRepository groupRoomTypeRepository) {
         this.roomTypeCategoryService = roomTypeCategoryService;
         this.groupRoomTypeRepository = groupRoomTypeRepository;
@@ -45,7 +44,7 @@ public class RoomTypeCategoryController {
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getRoomTypeCategories() {
         try {
-            List<RoomTypeCategory> categories = roomTypeCategoryService.getAllRoomTypeCategories(DEFAULT_TENANT_ID);
+            List<RoomTypeCategory> categories = roomTypeCategoryService.getAllRoomTypeCategories();
             List<Map<String, Object>> result = categories.stream().map(category -> {
                 Map<String, Object> item = new HashMap<>();
                 item.put("key", category.getId().toString());
@@ -64,16 +63,16 @@ public class RoomTypeCategoryController {
     public ResponseEntity<Map<String, Boolean>> checkCodeUnique(
             @RequestParam String code,
             @RequestParam(required = false) Integer id) {
-        boolean isUnique = roomTypeCategoryService.isCodeUnique(DEFAULT_TENANT_ID, code, id);
+        boolean isUnique = roomTypeCategoryService.isCodeUnique(code, id);
         return ResponseEntity.ok(Map.of("unique", isUnique));
     }
     
     @GetMapping("/{id}")
     public ResponseEntity<?> getRoomTypeCategoryById(@PathVariable Integer id) {
         try {
-            RoomTypeCategory category = roomTypeCategoryService.getRoomTypeCategoryById(DEFAULT_TENANT_ID, id);
+            RoomTypeCategory category = roomTypeCategoryService.getRoomTypeCategoryById(id);
             if (category == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "房型大类不存在"));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
             }
             return ResponseEntity.ok(category);
         } catch (RuntimeException e) {
@@ -84,9 +83,9 @@ public class RoomTypeCategoryController {
     @GetMapping("/code/{code}")
     public ResponseEntity<?> getRoomTypeCategoryByCode(@PathVariable String code) {
         try {
-            RoomTypeCategory category = roomTypeCategoryService.getRoomTypeCategoryByCode(DEFAULT_TENANT_ID, code);
+            RoomTypeCategory category = roomTypeCategoryService.getRoomTypeCategoryByCode(code);
             if (category == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "房型大类不存在"));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
             }
             return ResponseEntity.ok(category);
         } catch (RuntimeException e) {
@@ -96,14 +95,14 @@ public class RoomTypeCategoryController {
     
     @GetMapping("/active")
     public ResponseEntity<List<RoomTypeCategory>> getActiveRoomTypeCategories() {
-        List<RoomTypeCategory> categories = roomTypeCategoryService.getActiveRoomTypeCategories(DEFAULT_TENANT_ID);
+        List<RoomTypeCategory> categories = roomTypeCategoryService.getActiveRoomTypeCategories();
         return ResponseEntity.ok(categories);
     }
     
-    @GetMapping("/group/{groupId}")
-    public ResponseEntity<List<Map<String, Object>>> getRoomTypeCategoriesByGroupId(@PathVariable Integer groupId) {
+    @GetMapping("/group/current")
+    public ResponseEntity<List<Map<String, Object>>> getRoomTypeCategoriesByCurrentTenant() {
         try {
-            List<RoomTypeCategory> categories = roomTypeCategoryService.getRoomTypeCategoriesByGroupIdAndStatus(groupId, "active");
+            List<RoomTypeCategory> categories = roomTypeCategoryService.getRoomTypeCategoriesByGroupIdAndStatus("active");
             List<Map<String, Object>> result = categories.stream().map(category -> {
                 Map<String, Object> item = new HashMap<>();
                 item.put("id", category.getId());
@@ -116,24 +115,14 @@ public class RoomTypeCategoryController {
             return ResponseEntity.internalServerError().build();
         }
     }
-    
-    @GetMapping("/group/{groupId}/status/{status}")
-    public ResponseEntity<List<Map<String, Object>>> getRoomTypeCategoriesByGroupIdAndStatus(
-            @PathVariable Integer groupId, 
-            @PathVariable String status) {
-        try {
-            List<RoomTypeCategory> categories = roomTypeCategoryService.getRoomTypeCategoriesByGroupIdAndStatus(groupId, status);
-            List<Map<String, Object>> result = categories.stream().map(category -> {
-                Map<String, Object> item = new HashMap<>();
-                item.put("id", category.getId());
-                item.put("categoryName", category.getCategoryName());
-                item.put("categoryCode", category.getCategoryCode());
-                return item;
-            }).collect(Collectors.toList());
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().build();
-        }
+
+    /**
+     * 兼容性接口：根据 groupId 获取房型大类（实际使用当前登录租户 ID）
+     */
+    @GetMapping("/group/{groupId}")
+    public ResponseEntity<List<Map<String, Object>>> getRoomTypeCategoriesByGroupId(@PathVariable Integer groupId) {
+        // 忽略路径中的 groupId，直接使用当前租户上下文
+        return getRoomTypeCategoriesByCurrentTenant();
     }
     
     @PostMapping
@@ -142,10 +131,10 @@ public class RoomTypeCategoryController {
             if (roomTypeCategory.getCategoryCode() != null && !CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            if (!roomTypeCategoryService.isCodeUnique(DEFAULT_TENANT_ID, roomTypeCategory.getCategoryCode(), null)) {
-                return ResponseEntity.badRequest().build();
+            if (!roomTypeCategoryService.isCodeUnique(roomTypeCategory.getCategoryCode(), null)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "房型大类代码已存在"));
             }
-            RoomTypeCategory createdCategory = roomTypeCategoryService.createRoomTypeCategory(DEFAULT_TENANT_ID, roomTypeCategory);
+            RoomTypeCategory createdCategory = roomTypeCategoryService.createRoomTypeCategory(roomTypeCategory);
             Map<String, Object> result = new HashMap<>();
             result.put("key", createdCategory.getId().toString());
             result.put("title", createdCategory.getCategoryName());
@@ -154,7 +143,7 @@ public class RoomTypeCategoryController {
             result.put("name", createdCategory.getCategoryName());
             return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
     
@@ -164,11 +153,11 @@ public class RoomTypeCategoryController {
             if (roomTypeCategory.getCategoryCode() != null && !CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
-            if (!roomTypeCategoryService.isCodeUnique(DEFAULT_TENANT_ID, roomTypeCategory.getCategoryCode(), id)) {
-                return ResponseEntity.badRequest().build();
+            if (!roomTypeCategoryService.isCodeUnique(roomTypeCategory.getCategoryCode(), id)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "房型大类代码已存在"));
             }
             roomTypeCategory.setId(id);
-            RoomTypeCategory updatedCategory = roomTypeCategoryService.updateRoomTypeCategory(DEFAULT_TENANT_ID, roomTypeCategory);
+            RoomTypeCategory updatedCategory = roomTypeCategoryService.updateRoomTypeCategory(roomTypeCategory);
             if (updatedCategory != null) {
                 Map<String, Object> result = new HashMap<>();
                 result.put("key", updatedCategory.getId().toString());
@@ -178,10 +167,10 @@ public class RoomTypeCategoryController {
                 result.put("name", updatedCategory.getCategoryName());
                 return ResponseEntity.ok(result);
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
             }
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
     
@@ -193,7 +182,7 @@ public class RoomTypeCategoryController {
             if (refCount > 0) {
                 return ResponseEntity.badRequest().body(Map.of("error", "该房型大类已被 " + refCount + " 个集团房型引用，无法删除"));
             }
-            roomTypeCategoryService.deleteRoomTypeCategory(DEFAULT_TENANT_ID, id);
+            roomTypeCategoryService.deleteRoomTypeCategory(id);
             return ResponseEntity.ok(Map.of("message", "房型大类删除成功"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -203,11 +192,11 @@ public class RoomTypeCategoryController {
     @PutMapping("/{id}/enable")
     public ResponseEntity<?> enableRoomTypeCategory(@PathVariable Integer id) {
         try {
-            RoomTypeCategory enabledCategory = roomTypeCategoryService.enableRoomTypeCategory(DEFAULT_TENANT_ID, id);
+            RoomTypeCategory enabledCategory = roomTypeCategoryService.enableRoomTypeCategory(id);
             if (enabledCategory != null) {
                 return ResponseEntity.ok(enabledCategory);
             } else {
-                return ResponseEntity.badRequest().body(Map.of("error", "房型大类不存在"));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
             }
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -217,11 +206,11 @@ public class RoomTypeCategoryController {
     @PutMapping("/{id}/disable")
     public ResponseEntity<?> disableRoomTypeCategory(@PathVariable Integer id) {
         try {
-            RoomTypeCategory disabledCategory = roomTypeCategoryService.disableRoomTypeCategory(DEFAULT_TENANT_ID, id);
+            RoomTypeCategory disabledCategory = roomTypeCategoryService.disableRoomTypeCategory(id);
             if (disabledCategory != null) {
                 return ResponseEntity.ok(disabledCategory);
             } else {
-                return ResponseEntity.badRequest().body(Map.of("error", "房型大类不存在"));
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
             }
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

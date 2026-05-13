@@ -15,29 +15,6 @@ import java.util.Optional;
 public interface PersonDiffSystemRepository extends JpaRepository<PersonDiffSystem, Integer> {
     
     /**
-     * 根据酒店ID查询人数差价体系列表
-     * @param hotelId 酒店ID
-     * @return 人数差价体系列表
-     */
-    List<PersonDiffSystem> findByHotelId(Integer hotelId);
-    
-    /**
-     * 根据酒店ID和状态查询人数差价体系列表
-     * @param hotelId 酒店ID
-     * @param status 状态
-     * @return 人数差价体系列表
-     */
-    List<PersonDiffSystem> findByHotelIdAndStatus(Integer hotelId, PersonDiffSystem.Status status);
-    
-    /**
-     * 根据酒店ID和名称查询人数差价体系
-     * @param hotelId 酒店ID
-     * @param name 体系名称
-     * @return 人数差价体系信息
-     */
-    Optional<PersonDiffSystem> findByHotelIdAndName(Integer hotelId, String name);
-    
-    /**
      * 根据状态查询人数差价体系
      * @param status 状态
      * @return 人数差价体系列表
