@@ -1,3 +1,7 @@
+# BMAD 驱动的 CRS 项目
+
+本项目正式集成 [BMAD 方法论](file:///Users/willawang/Desktop/%E6%88%91%E7%9A%84%E9%A1%B9%E7%9B%AE/CRS%E6%BC%94%E7%A4%BA/BMAD.md)，所有开发任务由不同的专业代理角色协同完成。
+
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
@@ -13,7 +17,7 @@ Rules:
 
 **第一阶段：环境感知与记忆同步 (Context Alignment)**
 - **执行 Graphify 全量扫描**：扫描当前工程目录，更新知识图谱，特别识别模块间的依赖关系。
-- **检索长期记忆**：搜索 Postgres 数据库中关于需求和技术选型的历史决策记录。
+- **检索长期记忆**：搜索 `.kiro/memory/` 目录中的历史决策记录及经验片段。
 
 **第二阶段：方案设计与对齐 (Blueprint & Review)**
 - **生成实现方案 (RFC)**：在修改代码前，先用中文列出修改逻辑、新增接口定义以及对现有图谱的影响。
@@ -27,7 +31,7 @@ Rules:
 
 **第四阶段：验证与持久化 (Validation & Persistence)**
 - **执行静态检查**：代码写入后，立即运行项目定义的 Lint 或 Type Check 命令。
-- **存储关键决策**：将核心逻辑、报错及解决方案作为“经验片段”存入 Postgres 长期记忆。
+- **存储关键决策**：将核心逻辑、报错及解决方案作为“经验片段”存入 `.kiro/memory/lessons/`。
 - **生成变更报告**：简要总结改动，提示对项目图谱产生的任何重大拓扑变化。
 
 **第五阶段：文档同步**

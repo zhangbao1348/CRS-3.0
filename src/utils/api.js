@@ -454,8 +454,10 @@ export const reservationApi = {
 
 export const dashboardApi = {
   /** 获取集团首页数据 */
-  getGroupDashboard: (options = {}) =>
-    api.get('/dashboard/group', options),
+  getGroupDashboard: (hotelCode, options = {}) => {
+    const params = hotelCode ? { hotelCode } : {}
+    return api.get('/dashboard/group', { params, ...options })
+  },
   /** 获取门店首页数据 */
   getHotelDashboard: (hotelCode, options = {}) =>
     api.get('/dashboard/hotel', { params: { hotelCode }, ...options })

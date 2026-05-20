@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, List, Spin, Empty, Badge, Typography, Tooltip, Space, Radio, Progress, Avatar } from 'antd'
+import { Card, Row, Col, Statistic, Table, Tag, List, Spin, Empty, Badge, Typography, Tooltip, Space, Radio, Progress, Avatar, Select } from 'antd'
 import {
   BankOutlined,
   ThunderboltOutlined,
@@ -20,12 +20,15 @@ import { useNavigate } from 'react-router-dom'
 import { useHotelContext } from '../../contexts/HotelContext'
 
 const { Title, Text } = Typography
+const { Option } = Select
 
 const GroupDashboard = () => {
   const [loading, setLoading] = useState(true)
+  const [pacingLoading, setPacingLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [trendDays, setTrendDays] = useState('7')
+  const [selectedPacingHotel, setSelectedPacingHotel] = useState(null)
   const navigate = useNavigate()
   const { changeHotel } = useHotelContext()
 
@@ -33,11 +36,13 @@ const GroupDashboard = () => {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
-    setLoading(true)
+  const fetchData = async (hotelCode = null) => {
+    if (hotelCode) setPacingLoading(true)
+    else setLoading(true)
+    
     setError(null)
     try {
-      const res = await dashboardApi.getGroupDashboard()
+      const res = await dashboardApi.getGroupDashboard(hotelCode)
       
       // 注入集团排行榜模拟数据
       const hotelRanking = [
@@ -46,17 +51,6 @@ const GroupDashboard = () => {
         { key: '3', name: '深圳南山旗舰店', revenue: 860000, occ: 78, rank: 3 },
         { key: '4', name: '广州天河店', revenue: 720000, occ: 75, rank: 4 },
         { key: '5', name: '成都春熙路店', revenue: 650000, occ: 88, rank: 5 }
-      ]
-
-      // 注入全域流速模拟
-      const groupPacingData = [
-        { date: '05-13', avgOcc: 78, velocity: '快', color: '#faad14' },
-        { date: '05-14', avgOcc: 72, velocity: '正常', color: '#52c41a' },
-        { date: '05-15', avgOcc: 65, velocity: '正常', color: '#52c41a' },
-        { date: '05-16', avgOcc: 85, velocity: '极快', color: '#ff4d4f' },
-        { date: '05-17', avgOcc: 92, velocity: '售罄风险', color: '#ff4d4f' },
-        { date: '05-18', avgOcc: 80, velocity: '快', color: '#faad14' },
-        { date: '05-19', avgOcc: 60, velocity: '正常', color: '#52c41a' }
       ]
 
       // 注入 30 天全域趋势数据
@@ -77,18 +71,29 @@ const GroupDashboard = () => {
         { id: 3, hotel: '深圳南山店', type: '价格倒挂', detail: '美团价格显著低于直销', level: 'warning', time: '45分钟前' }
       ]
 
-      setData({ ...res, hotelRanking, groupPacingData, fullTrendData, groupExceptions })
+      if (hotelCode) {
+        // 仅更新流速数据
+        setData(prev => ({ ...prev, groupPacing: res.groupPacing }))
+      } else {
+        setData({ ...res, hotelRanking, fullTrendData, groupExceptions })
+      }
     } catch (err) {
       setError('加载集团数据失败')
     } finally {
       setLoading(false)
+      setPacingLoading(false)
     }
+  }
+
+  const handlePacingHotelChange = (val) => {
+    setSelectedPacingHotel(val)
+    fetchData(val)
   }
 
   if (loading) return <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><Spin size="large" /></div>
   if (error) return <Empty description={error} />
 
-  const { stats, hotelRanking, groupPacingData, fullTrendData, groupExceptions, hotelOverview = [] } = data
+  const { stats, hotelRanking, groupPacing = [], fullTrendData, groupExceptions, hotelOverview = [] } = data
 
   const displayTrendData = trendDays === '7' ? fullTrendData.slice(-7) : fullTrendData
 
@@ -190,29 +195,45 @@ const GroupDashboard = () => {
           </Card>
         </Col>
 
-        {/* 4. 集团全域流速监测 */}
+        {/* 4. 集团流速监控 (支持酒店下钻) */}
         <Col span={24}>
           <Card 
-            title={<span><ThunderboltOutlined style={{ color: '#faad14' }} /> 集团全域流速监测 (未来 7 天平均)</span>}
+            title={<span><ThunderboltOutlined style={{ color: '#faad14' }} /> 集团全域流速监测 (未来 7 天)</span>}
+            extra={
+              <Select 
+                placeholder="选择酒店" 
+                style={{ width: 200 }} 
+                allowClear 
+                onChange={handlePacingHotelChange}
+                value={selectedPacingHotel}
+              >
+                <Option value={null}>集团全域平均</Option>
+                {hotelOverview.map(h => (
+                  <Option key={h.hotelCode} value={h.hotelCode}>{h.hotelName}</Option>
+                ))}
+              </Select>
+            }
             style={cardStyle}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 16 }}>
-              {groupPacingData.map(p => (
-                <div key={p.date} style={{ 
-                  padding: '16px', 
-                  borderRadius: 12, 
-                  background: p.color + '0a', 
-                  border: `1px solid ${p.color}33`,
-                  textAlign: 'center'
-                }} className="hover-scale">
-                  <Text type="secondary" style={{ fontSize: 12 }}>{p.date}</Text>
-                  <div style={{ margin: '8px 0' }}>
-                    <Text strong style={{ fontSize: 20, display: 'block' }}>{p.avgOcc}%</Text>
-                    <Tag color={p.color} style={{ margin: 0 }}>{p.velocity}</Tag>
+            <Spin spinning={pacingLoading}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 16 }}>
+                {groupPacing.length > 0 ? groupPacing.map(p => (
+                  <div key={p.date} style={{ 
+                    padding: '16px', 
+                    borderRadius: 12, 
+                    background: (p.color || '#1890ff') + '0a', 
+                    border: `1px solid ${(p.color || '#1890ff')}33`,
+                    textAlign: 'center'
+                  }} className="hover-scale">
+                    <Text type="secondary" style={{ fontSize: 12 }}>{p.date}</Text>
+                    <div style={{ margin: '8px 0' }}>
+                      <Text strong style={{ fontSize: 20, display: 'block' }}>{p.avgOcc}%</Text>
+                      <Tag color={p.color} style={{ margin: 0 }}>{p.velocity}</Tag>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无流速数据" />}
+              </div>
+            </Spin>
           </Card>
         </Col>
 
