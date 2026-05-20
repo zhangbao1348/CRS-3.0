@@ -335,11 +335,30 @@ public class DashboardController {
 
     /**
      * 计算流速监测数据 (未来 7 天)
+     * 
+     * 算法说明：
+     * 1. 从库存表计算每日出租率 (OCC)
+     * 2. 从订单表统计每日预订增量 (Pickup)：针对该入住日，近24小时新增的订单数
+     * 3. 计算历史基准 Pickup：过去7天的每日平均新增订单数
+     * 4. 综合 OCC + Pickup偏差 来判断流速等级
+     * 
+     * @关联模块 库存管理(Inventory)、订单管理(Reservation)
      */
     private List<Map<String, Object>> calculatePacingData(Integer tenantId, String hotelCode, Date today, List<Hotel> activeHotels) {
         List<Map<String, Object>> pacingList = new ArrayList<>();
         SimpleDateFormat monthDaySdf = new SimpleDateFormat("MM-dd");
-        
+
+        // 先查一次历史基准：过去 7 天该租户（或指定酒店）的日均新增订单量
+        Date sevenDaysAgo = getDaysAgo(7);
+        long historicalTotal;
+        if (hotelCode != null && !hotelCode.isBlank()) {
+            historicalTotal = reservationRepo.countByTenantIdAndHotelCodeAndCreatedAtGreaterThanEqual(
+                    tenantId, hotelCode, sevenDaysAgo);
+        } else {
+            historicalTotal = reservationRepo.countByTenantIdAndCreatedAtGreaterThanEqual(tenantId, sevenDaysAgo);
+        }
+        double avgDailyPickup = historicalTotal / 7.0;
+
         Calendar cal = Calendar.getInstance();
         cal.setTime(today);
         
@@ -348,21 +367,21 @@ public class DashboardController {
             Map<String, Object> dayPacing = new LinkedHashMap<>();
             dayPacing.put("date", monthDaySdf.format(date));
             
-            // 计算出租率 (OCC)
+            // —— 步骤 1: 计算出租率 (OCC) ——
             int totalRooms = 0;
             int availableRooms = 0;
             
             if (hotelCode != null && !hotelCode.isBlank()) {
-                // 单个酒店
                 final String finalHotelCode = hotelCode;
-                Hotel hotel = activeHotels.stream().filter(h -> h.getHotelCode().equals(finalHotelCode)).findFirst().orElse(null);
+                Hotel hotel = activeHotels.stream()
+                        .filter(h -> h.getHotelCode().equals(finalHotelCode))
+                        .findFirst().orElse(null);
                 if (hotel != null) {
-                    totalRooms = hotel.getTotalRooms();
+                    totalRooms = hotel.getTotalRooms() != null ? hotel.getTotalRooms() : 0;
                     List<Inventory> invList = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotelCode, date);
                     availableRooms = invList.stream().mapToInt(Inventory::getAvailableRooms).sum();
                 }
             } else {
-                // 全集团平均
                 for (Hotel hotel : activeHotels) {
                     totalRooms += hotel.getTotalRooms() != null ? hotel.getTotalRooms() : 0;
                     List<Inventory> invList = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), date);
@@ -373,15 +392,38 @@ public class DashboardController {
             int occ = totalRooms > 0 ? (int) Math.round((1.0 - (double) availableRooms / totalRooms) * 100) : 0;
             occ = Math.min(100, Math.max(0, occ));
             dayPacing.put("avgOcc", occ);
-            
-            // 计算流速 (Velocity) - 简单模拟逻辑，基于近 24 小时预订增量 (Pickup)
-            String velocity = "正常";
-            String color = "#52c41a";
-            
-            if (occ > 90) { velocity = "售罄风险"; color = "#ff4d4f"; }
-            else if (occ > 80) { velocity = "极快"; color = "#ff4d4f"; }
-            else if (occ > 70) { velocity = "快"; color = "#faad14"; }
-            
+
+            // —— 步骤 2: 计算每日 Pickup (该入住日的预订增量) ——
+            long dayPickup;
+            if (hotelCode != null && !hotelCode.isBlank()) {
+                dayPickup = reservationRepo.countByTenantIdAndHotelCodeAndCheckInDateAndStatusNot(
+                        tenantId, hotelCode, date, Reservation.Status.cancelled);
+            } else {
+                dayPickup = reservationRepo.countByTenantIdAndCheckInDateAndStatusNot(
+                        tenantId, date, Reservation.Status.cancelled);
+            }
+            dayPacing.put("pickup", dayPickup);
+
+            // —— 步骤 3: 综合判断流速等级 ——
+            // 综合考量：出租率水位 + Pickup相对历史基准的偏差
+            double pickupRatio = avgDailyPickup > 0 ? dayPickup / avgDailyPickup : (dayPickup > 0 ? 2.0 : 0);
+            String velocity;
+            String color;
+
+            if (occ >= 95) {
+                velocity = "售罄风险"; color = "#ff4d4f";
+            } else if (occ >= 85 || pickupRatio >= 1.8) {
+                velocity = "极快"; color = "#ff4d4f";
+            } else if (occ >= 75 || pickupRatio >= 1.3) {
+                velocity = "快"; color = "#faad14";
+            } else if (occ >= 50 || pickupRatio >= 0.7) {
+                velocity = "正常"; color = "#52c41a";
+            } else if (occ >= 30 || pickupRatio >= 0.4) {
+                velocity = "慢"; color = "#1890ff";
+            } else {
+                velocity = "冷淡"; color = "#8c8c8c";
+            }
+
             dayPacing.put("velocity", velocity);
             dayPacing.put("color", color);
             

@@ -230,6 +230,11 @@ const GroupDashboard = () => {
                       <Text strong style={{ fontSize: 20, display: 'block' }}>{p.avgOcc}%</Text>
                       <Tag color={p.color} style={{ margin: 0 }}>{p.velocity}</Tag>
                     </div>
+                    {p.pickup !== undefined && (
+                      <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 4 }}>
+                        <ThunderboltOutlined /> {p.pickup} 笔预订
+                      </div>
+                    )}
                   </div>
                 )) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无流速数据" />}
               </div>

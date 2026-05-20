@@ -3,9 +3,11 @@ package com.crs.controller;
 import com.crs.entity.HotelRateCodeAllocation;
 import com.crs.entity.Hotel;
 import com.crs.entity.GroupRateCode;
+import com.crs.entity.RatePlan;
 import com.crs.repository.HotelRateCodeAllocationRepository;
 import com.crs.repository.HotelRepository;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.repository.RatePlanRepository;
 import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +41,9 @@ public class HotelRateCodeAllocationController {
 
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    @Autowired
+    private RatePlanRepository ratePlanRepository;
 
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
@@ -104,6 +109,9 @@ public class HotelRateCodeAllocationController {
 
     /**
      * 创建酒店房价码分配
+     * 支持两种房价码定位方式：
+     *   1. rateCodeId（整数 ID）
+     *   2. rateCode（字符串代码，如 "BAR"）— 前端酒店编辑页使用此方式
      * @param allocationData 分配数据
      * @return 创建结果
      */
@@ -114,6 +122,7 @@ public class HotelRateCodeAllocationController {
             Integer hotelId = allocationData.get("hotelId") instanceof Number ? ((Number) allocationData.get("hotelId")).intValue() : null;
             String hotelCodeParam = allocationData.get("hotelCode") instanceof String ? (String) allocationData.get("hotelCode") : null;
             Integer rateCodeId = allocationData.get("rateCodeId") instanceof Number ? ((Number) allocationData.get("rateCodeId")).intValue() : null;
+            String rateCodeStr = allocationData.get("rateCode") instanceof String ? (String) allocationData.get("rateCode") : null;
 
             Hotel hotel = null;
             if (hotelCodeParam != null && !hotelCodeParam.isEmpty()) {
@@ -129,11 +138,15 @@ public class HotelRateCodeAllocationController {
                 return ResponseEntity.status(403).build();
             }
 
+            // 优先通过 rateCodeId 查找，其次通过 rateCode 字符串查找
             GroupRateCode rateCode = null;
             if (rateCodeId != null) {
                 rateCode = groupRateCodeRepository.findById(rateCodeId)
                         .filter(rc -> rc.getGroupId() != null && rc.getGroupId().equals(currentTenantId))
                         .orElse(null);
+            }
+            if (rateCode == null && rateCodeStr != null && !rateCodeStr.isEmpty()) {
+                rateCode = groupRateCodeRepository.findByRateCodeAndGroupId(rateCodeStr, currentTenantId);
             }
             if (rateCode == null) {
                 return ResponseEntity.badRequest().build();
@@ -143,7 +156,8 @@ public class HotelRateCodeAllocationController {
             allocation.setTenantId(currentTenantId);
             allocation.setHotelCode(hotel.getHotelCode());
             allocation.setRateCode(rateCode.getRateCode());
-            allocation.setAllocated((Boolean) allocationData.getOrDefault("allocated", false));
+            Boolean allocated = (Boolean) allocationData.getOrDefault("allocated", false);
+            allocation.setAllocated(allocated);
             allocation.setBasicInfoEditable((Boolean) allocationData.getOrDefault("basicInfoEditable", false));
             allocation.setPriceInfoEditable((Boolean) allocationData.getOrDefault("priceInfoEditable", false));
             allocation.setBookingLimitEditable((Boolean) allocationData.getOrDefault("bookingLimitEditable", false));
@@ -151,10 +165,71 @@ public class HotelRateCodeAllocationController {
             allocation.setPromotionEditable((Boolean) allocationData.getOrDefault("promotionEditable", false));
 
             HotelRateCodeAllocation saved = allocationRepository.save(allocation);
+
+            // === 房价码下发逻辑：allocated=true 时自动创建酒店价格计划 ===
+            if (Boolean.TRUE.equals(allocated)) {
+                distributeRatePlanToHotel(currentTenantId, hotel.getHotelCode(), rateCode);
+            }
+
             return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(null);
         }
+    }
+
+    /**
+     * 将集团房价码下发为酒店价格计划
+     * 如果酒店已存在相同 rateCode 的价格计划，则更新（同步）；否则新建。
+     * 
+     * @关联模块 集团管理(GroupRateCode)、价格计划管理(RatePlan)
+     * @关联PRD .kiro/specs/prd/08-集团管理.md — 房价码下发到酒店
+     */
+    private void distributeRatePlanToHotel(Integer tenantId, String hotelCode, GroupRateCode groupRateCode) {
+        // 检查是否已存在
+        java.util.Optional<RatePlan> existingOpt = ratePlanRepository.findByTenantIdAndHotelCodeAndRateCode(
+                tenantId, hotelCode, groupRateCode.getRateCode());
+
+        RatePlan ratePlan = existingOpt.orElseGet(RatePlan::new);
+
+        // 设置基础归属
+        ratePlan.setTenantId(tenantId);
+        ratePlan.setHotelCode(hotelCode);
+        ratePlan.setSourceGroupRateCode(groupRateCode.getRateCode());
+
+        // 从集团房价码复制业务字段
+        ratePlan.setRateCode(groupRateCode.getRateCode());
+        ratePlan.setRateName(groupRateCode.getRateName());
+        ratePlan.setDescription(groupRateCode.getDescription());
+        ratePlan.setRateCategory(groupRateCode.getRateCategory());
+        ratePlan.setMarketCode(groupRateCode.getMarketCode());
+        ratePlan.setSourceCode(groupRateCode.getSourceCode());
+        ratePlan.setRateType(groupRateCode.getRateType());
+        ratePlan.setParentRateCode(groupRateCode.getParentRateCode());
+        ratePlan.setDerivativeLevel(groupRateCode.getDerivativeLevel());
+        ratePlan.setDiscount(groupRateCode.getDiscount());
+        ratePlan.setRounding(groupRateCode.getRounding());
+        ratePlan.setGuaranteeRule(groupRateCode.getGuaranteeRule());
+        ratePlan.setCancellationRule(groupRateCode.getCancellationRule());
+        ratePlan.setCouponRule(groupRateCode.getCouponRule());
+        ratePlan.setPromotionRule(groupRateCode.getPromotionRule());
+        ratePlan.setAllowPoints(groupRateCode.getAllowPoints());
+        ratePlan.setPointsType(groupRateCode.getPointsType());
+        ratePlan.setPointsValue(groupRateCode.getPointsValue());
+        ratePlan.setApplicableRoomTypes(groupRateCode.getApplicableRoomTypes());
+        ratePlan.setPackages(groupRateCode.getPackages());
+        ratePlan.setPersonalMembership(groupRateCode.getPersonalMembership());
+        ratePlan.setCompanyMembership(groupRateCode.getCompanyMembership());
+        ratePlan.setAdvanceBookingMin(groupRateCode.getAdvanceBookingMin());
+        ratePlan.setAdvanceBookingMax(groupRateCode.getAdvanceBookingMax());
+        ratePlan.setMinimumStayMin(groupRateCode.getMinimumStayMin());
+        ratePlan.setMinimumStayMax(groupRateCode.getMinimumStayMax());
+        ratePlan.setBookingStartTime(groupRateCode.getBookingStartTime());
+        ratePlan.setBookingEndTime(groupRateCode.getBookingEndTime());
+        ratePlan.setCheckinStartTime(groupRateCode.getCheckinStartTime());
+        ratePlan.setCheckinEndTime(groupRateCode.getCheckinEndTime());
+        ratePlan.setStatus(groupRateCode.getStatus() != null ? groupRateCode.getStatus() : "active");
+
+        ratePlanRepository.save(ratePlan);
     }
 
     /**

@@ -639,6 +639,7 @@ const EditHotel = () => {
         metadata: { skipAutoLogout: true }
       })
       
+      const failedItems = []
       for (const rateCode of rateCodeData) {
         const allocationData = {
           hotelCode: hotel.hotelCode,
@@ -650,9 +651,19 @@ const EditHotel = () => {
           guaranteeRuleEditable: rateCode.guaranteeRuleEditable,
           promotionEditable: rateCode.promotionEditable
         }
-        await hotelRateCodeAllocationApi.createAllocation(allocationData, {
-          metadata: { skipAutoLogout: true }
-        })
+        try {
+          await hotelRateCodeAllocationApi.createAllocation(allocationData, {
+            metadata: { skipAutoLogout: true }
+          })
+        } catch (itemError) {
+          console.error(`保存房价码 ${rateCode.rateCodeValue} 分配失败:`, itemError)
+          failedItems.push(rateCode.rateCodeValue)
+        }
+      }
+      
+      if (failedItems.length > 0) {
+        message.warning(`以下房价码分配保存失败: ${failedItems.join(', ')}`)
+        return false
       }
       
       console.log('酒店房价码分配保存成功')
