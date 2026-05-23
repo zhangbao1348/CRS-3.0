@@ -16,8 +16,8 @@ const formatPackagePrice = (pkg) => {
     return `¥${pkg.fixedPrice}`
   }
 
-  if (pkg.priceType === 'hotel') {
-    return '酒店设置'
+  if (pkg.priceType === 'daily') {
+    return '设置价格'
   }
 
   if (pkg.priceType === 'group') {
@@ -34,7 +34,8 @@ const mapPackageToRow = (pkg) => ({
   type: pkg.type,
   status: pkg.status === 'active' ? '启用' : '停用',
   description: pkg.description,
-  price: formatPackagePrice(pkg)
+  price: formatPackagePrice(pkg),
+  priceType: pkg.priceType
 })
 
 const PackageSetting = () => {
@@ -127,9 +128,11 @@ const PackageSetting = () => {
   const handleEditPackage = (record) => {
     navigate(`/rate-management/edit-package?id=${record.id}`)
   }
-  
 
-  
+  const handleSetDailyPrice = (record) => {
+    navigate(`/rate-management/edit-package?id=${record.id}&tab=daily-price`)
+  }
+
   // 列配置
   const columns = [
     {
@@ -155,6 +158,18 @@ const PackageSetting = () => {
       dataIndex: 'price',
       key: 'price',
       width: 120
+      ,
+      render: (_, record) => {
+        if (record.priceType === 'daily') {
+          return (
+            <Button type="link" size="small" onClick={() => handleSetDailyPrice(record)}>
+              设置价格
+            </Button>
+          )
+        }
+
+        return record.price
+      }
     },
     {
       title: '描述',

@@ -1,8 +1,19 @@
 package com.crs.entity;
 
 
-import jakarta.persistence.*;
 import java.util.Date;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 
 /**
  * 增值包价实体类 (Package)
@@ -12,7 +23,7 @@ import java.util.Date;
  * <p>业务配置：</p>
  * <ul>
  *     <li>发放规则：通过 `quantityType`（固定份数/按订单/按房间/按人数/按成人数/按儿童数）和 `frequency` 组合定义。</li>
- *     <li>定价逻辑：通过 `fixedPrice + priceType` 表达固定价格或酒店设置。</li>
+ *     <li>定价逻辑：通过 `fixedPrice + priceType` 表达固定价格、按日期设置价格或酒店设置。</li>
  *     <li>财务归类：通过 `type` 区分早餐、综合、延时退房等不同性质的增值项目。</li>
  * </ul>
  */
@@ -76,7 +87,7 @@ public class Package {
     
     /** 
      * 定价模式。
-     * 可选值：group（固定价格，由集团统一维护）、hotel（酒店设置）。
+     * 可选值：group（固定价格）、daily（按日期设置价格）、hotel（酒店设置）。
      */
     @Column(name = "price_type", nullable = false, length = 20)
     private String priceType;

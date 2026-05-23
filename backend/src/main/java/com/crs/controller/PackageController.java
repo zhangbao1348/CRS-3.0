@@ -1,5 +1,7 @@
 package com.crs.controller;
 
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,8 +18,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.crs.dto.PackageDailyPriceBatchRequest;
 import com.crs.entity.Package;
+import com.crs.entity.PackageDailyPrice;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.service.PackageDailyPriceService;
 import com.crs.service.PackageService;
 import com.crs.util.CodeValidator;
 
@@ -34,6 +39,9 @@ public class PackageController {
     
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    @Autowired
+    private PackageDailyPriceService packageDailyPriceService;
     
     // 默认租户ID
     /**
@@ -82,6 +90,65 @@ public class PackageController {
             return ResponseEntity.ok(pkg.get());
         } else {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "包价不存在或无权访问"));
+        }
+    }
+
+    /**
+     * 查询酒店包价某月每日价格。
+     *
+     * @param code 包价代码
+     * @param hotelCode 酒店编码
+     * @param month 月份，格式 yyyy-MM
+     * @return 每日价格列表
+     */
+    @GetMapping("/code/{code}/daily-prices")
+    public ResponseEntity<?> getDailyPrices(
+            @PathVariable String code,
+            @org.springframework.web.bind.annotation.RequestParam String hotelCode,
+            @org.springframework.web.bind.annotation.RequestParam String month) {
+        try {
+            YearMonth targetMonth = YearMonth.parse(month);
+            List<PackageDailyPrice> prices = packageDailyPriceService.getDailyPrices(hotelCode, code, targetMonth);
+            return ResponseEntity.ok(Map.of(
+                    "hotelCode", hotelCode,
+                    "packageCode", code,
+                    "month", month,
+                    "prices", prices.stream().map(this::toDailyPriceResponse).toList()
+            ));
+        } catch (DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "月份格式无效，应为 yyyy-MM"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 批量保存酒店包价每日价格。
+     *
+     * @param code 包价代码
+     * @param request 保存请求
+     * @return 最新每日价格列表
+     */
+    @PostMapping("/code/{code}/daily-prices")
+    public ResponseEntity<?> saveDailyPrices(
+            @PathVariable String code,
+            @RequestBody PackageDailyPriceBatchRequest request) {
+        try {
+            List<PackageDailyPrice> prices = packageDailyPriceService.saveDailyPrices(
+                    request.getHotelCode(),
+                    code,
+                    request.getPrices());
+            return ResponseEntity.ok(Map.of(
+                    "hotelCode", request.getHotelCode(),
+                    "packageCode", code,
+                    "prices", prices.stream().map(this::toDailyPriceResponse).toList()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
     
@@ -159,9 +226,12 @@ public class PackageController {
      */
     @PostMapping("/search")
     public ResponseEntity<List<Package>> searchPackages(@RequestBody Map<String, String> params) {
+        String keyword = normalize(params.get("keyword"));
         String name = normalize(params.get("name"));
         String code = normalize(params.get("code"));
         String type = normalize(params.get("type"));
+        String frequency = normalize(params.get("frequency"));
+        String quantityType = normalize(params.get("quantityType"));
         String status = normalize(params.get("status"));
 
         Package.Status packageStatus = null;
@@ -173,7 +243,14 @@ public class PackageController {
             }
         }
 
-        List<Package> packages = packageService.searchPackages(name, code, type, packageStatus);
+        List<Package> packages = packageService.searchPackages(
+                keyword,
+                name,
+                code,
+                type,
+                frequency,
+                quantityType,
+                packageStatus);
         return ResponseEntity.ok(packages);
     }
 
@@ -183,6 +260,13 @@ public class PackageController {
         }
         String trimmedValue = value.trim();
         return trimmedValue.isEmpty() ? null : trimmedValue;
+    }
+
+    private Map<String, Object> toDailyPriceResponse(PackageDailyPrice price) {
+        return Map.of(
+                "priceDate", price.getPriceDate(),
+                "salePrice", price.getSalePrice()
+        );
     }
     
     /**

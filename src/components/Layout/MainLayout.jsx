@@ -33,15 +33,32 @@ import { useHotelContext } from '../../contexts/HotelContext.jsx'
 import { AuthContext } from '../../contexts/AuthContext.jsx'
 import { useTenantContext } from '../../contexts/TenantContext.jsx'
 import { crsMenuData, crmMenuData, miniProgramMenuData } from '../../utils/menuData.jsx'
-import { setInitializingState } from '../../utils/api.js'
 
 const { Option } = Select
 
 const { Header, Sider, Content } = Layout
 
+const MENU_PATH_ALIAS_RULES = [
+  { path: '/group-management/add-hotel', target: '/group-management/hotel-management' },
+  { path: '/hotel-management/edit-hotel', target: '/group-management/hotel-management' },
+  { path: '/group-management/add-group-room-type', target: '/group-management/group-room-type' },
+  { path: '/group-management/add-rate-code', target: '/group-management/group-rate-code' },
+  { path: '/group-management/add-edit-tax', target: '/group-management/tax-setting' },
+  { path: '/group-management/add-package', target: '/group-management/package-setting' },
+  { path: '/group-management/edit-package', target: '/group-management/package-setting' },
+  { path: '/group-management/add-edit-guarantee', target: '/group-management/group-guarantee' },
+  { path: '/group-management/add-edit-cancellation', target: '/group-management/group-cancellation' },
+  { path: '/group-management/archive-management/add', target: '/group-management/archive-management' },
+  { pattern: /^\/group-management\/archive-management\/edit\/[^/]+$/, target: '/group-management/archive-management' },
+  { path: '/rate-management/add-package', target: '/rate-management/package-setting' },
+  { path: '/rate-management/edit-package', target: '/rate-management/package-setting' },
+  { path: '/rate-management/add-rate-plan', target: '/rate-management/rate-plan' },
+  { pattern: /^\/rate-management\/edit-rate-plan\/[^/]+$/, target: '/rate-management/rate-plan' }
+]
+
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = React.useState(false)
-  const [systemType, setSystemType] = React.useState('crs')
+  const [systemType] = React.useState('crs')
   const location = useLocation()
   const navigate = useNavigate()
   const { hotels, selectedHotel, loading: hotelLoading, changeHotel } = useHotelContext()
@@ -74,20 +91,6 @@ const MainLayout = ({ children }) => {
       onClick: handleLogout
     }
   ]
-
-  const handleSystemChange = (value) => {
-    setSystemType(value)
-    if (value === 'crm') {
-      message.info('切换到CRM系统')
-      navigate('/crm/dashboard')
-    } else if (value === 'mini') {
-      message.info('切换到小程序系统')
-      navigate('/mini-program/dashboard')
-    } else {
-      message.info('切换到CRS系统')
-      navigate('/dashboard')
-    }
-  }
 
   // 动态导入图标组件
   const getIconComponent = (iconName) => {
@@ -209,6 +212,18 @@ const MainLayout = ({ children }) => {
     return crsMenuData
   }
 
+  const resolveMenuPath = (path) => {
+    const matchedRule = MENU_PATH_ALIAS_RULES.find((rule) => {
+      if (rule.path) {
+        return rule.path === path
+      }
+
+      return rule.pattern?.test(path)
+    })
+
+    return matchedRule?.target || path
+  }
+
   // 递归构建菜单items
   const generateMenuItems = (menuItems) => {
     return menuItems.map((item, index) => {
@@ -239,27 +254,36 @@ const MainLayout = ({ children }) => {
     })
   }
 
-  // 获取当前选中的菜单key
-  const getSelectedKeys = () => {
-    const path = location.pathname
-    let selectedKey = ''
-    
-    const findKey = (items) => {
+  const getMenuState = (menuData, currentPath) => {
+    const targetPath = resolveMenuPath(currentPath)
+
+    const findMenuState = (items, parentKeys = []) => {
       for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.path === path) {
-          selectedKey = `${item.key}-${i}`
-          return true
+        const item = items[i]
+        const itemKey = `${item.key}-${i}`
+
+        if (item.path === targetPath) {
+          return {
+            selectedKeys: [itemKey],
+            openKeys: parentKeys
+          }
         }
-        if (item.children && findKey(item.children)) {
-          return true
+
+        if (item.children) {
+          const childState = findMenuState(item.children, [...parentKeys, itemKey])
+          if (childState) {
+            return childState
+          }
         }
       }
-      return false
+
+      return null
     }
-    
-    findKey(getMenuData())
-    return selectedKey ? [selectedKey] : []
+
+    return findMenuState(menuData) || {
+      selectedKeys: [],
+      openKeys: []
+    }
   }
   
   // 获取路径对应的友好名称
@@ -274,6 +298,10 @@ const MainLayout = ({ children }) => {
       '/group-management/add-edit-tax': '集团管理 > 税和服务费设置 > 添加/编辑税',
       '/group-management/add-package': '集团管理 > 包价设置 > 添加包价',
       '/group-management/edit-package': '集团管理 > 包价设置 > 编辑包价',
+      '/rate-management/add-package': '价格计划管理 > 包价设置 > 新增包价',
+      '/rate-management/edit-package': '价格计划管理 > 包价设置 > 编辑包价',
+      '/rate-management/add-rate-plan': '价格计划管理 > 价格计划 > 新增价格计划',
+      '/rate-management/edit-rate-plan/:id': '价格计划管理 > 价格计划 > 编辑价格计划',
       '/group-management/add-edit-guarantee': '集团管理 > 集团担保政策管理 > 添加/编辑担保政策',
       '/group-management/add-edit-cancellation': '集团管理 > 集团取消政策管理 > 添加/编辑取消政策',
       '/group-management/archive-management/add': '集团管理 > 档案管理 > 添加档案',
@@ -385,7 +413,14 @@ const MainLayout = ({ children }) => {
     return mappedParts.join(' > ')
   }
 
-  const menuItems = generateMenuItems(getMenuData())
+  const menuData = getMenuData()
+  const menuItems = generateMenuItems(menuData)
+  const menuState = getMenuState(menuData, location.pathname)
+  const [openMenuKeys, setOpenMenuKeys] = React.useState(menuState.openKeys)
+
+  useEffect(() => {
+    setOpenMenuKeys(menuState.openKeys)
+  }, [location.pathname])
 
   return (
     <Layout>
@@ -438,7 +473,9 @@ const MainLayout = ({ children }) => {
         </div>
         <Menu
           mode="inline"
-          selectedKeys={getSelectedKeys()}
+          selectedKeys={menuState.selectedKeys}
+          openKeys={openMenuKeys}
+          onOpenChange={setOpenMenuKeys}
           style={{ 
             height: '100%', 
             borderRight: 0

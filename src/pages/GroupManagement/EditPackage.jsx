@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Form, Tabs, Input, Select, Radio, Checkbox, Button, message, Row, Col, InputNumber } from 'antd'
+import { Form, Input, Select, Checkbox, Button, message, Row, Col, InputNumber, Card } from 'antd'
 import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
 
-const { TabPane } = Tabs
 const { Option } = Select
-const { Group: RadioGroup } = Radio
 
 const frequencyOptions = [
   { value: 'daily', label: '每天1次' },
@@ -46,12 +44,8 @@ const getQuantityLabel = (quantityType) => {
   return quantityLabelMap[quantityType] || '份数'
 }
 
-const getEditPriceType = (packageData) => {
-  if (packageData.fixedPrice !== null && packageData.fixedPrice !== undefined) {
-    return 'fixed'
-  }
-
-  return 'hotel'
+const getEditPriceType = () => {
+  return 'fixed'
 }
 
 const getErrorMessage = (error, fallbackMessage) => {
@@ -70,7 +64,6 @@ const EditPackage = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [quantityType, setQuantityType] = useState('')
-  const [priceType, setPriceType] = useState('fixed')
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -127,7 +120,6 @@ const EditPackage = () => {
       
       // 设置计数方式状态
       setQuantityType(formData.quantityType)
-      setPriceType(normalizedPriceType)
     } catch (error) {
       console.error('加载包价数据失败:', error)
       message.error('加载包价数据失败，请稍后重试')
@@ -152,8 +144,8 @@ const EditPackage = () => {
         quantityType: values.quantityType,
         fixedQuantity: values.fixedQuantity,
         frequency: values.frequency,
-        priceType: values.priceType === 'fixed' ? 'group' : 'hotel',
-        fixedPrice: values.priceType === 'fixed' ? values.fixedPrice : null,
+        priceType: 'group',
+        fixedPrice: values.fixedPrice,
         taxIncluded: values.taxIncluded || false,
         status: 'active'
       }
@@ -178,21 +170,57 @@ const EditPackage = () => {
   }
   
   return (
-    <div className="fade-in">
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center' }}>
-        <Button
-          icon={<LeftOutlined />}
-          onClick={handleBack}
-          style={{ marginRight: 16 }}
+    <div className="fade-in" style={{ paddingBottom: 32 }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <div
+          style={{
+            marginBottom: 24,
+            padding: 28,
+            borderRadius: 24,
+            background: 'linear-gradient(135deg, #112b56 0%, #1a447f 58%, #2e66b8 100%)',
+            boxShadow: '0 20px 48px rgba(17, 43, 86, 0.18)',
+            color: '#ffffff'
+          }}
         >
-          返回
-        </Button>
-        <h1 className="page-title">
-          编辑集团包价
-        </h1>
-      </div>
-      
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.14)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  marginBottom: 14
+                }}
+              >
+                GROUP PACKAGE
+              </div>
+              <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.25 }}>
+                编辑集团包价
+              </div>
+              <div style={{ marginTop: 10, maxWidth: 620, color: 'rgba(255,255,255,0.82)', lineHeight: 1.8 }}>
+                调整集团统一包价模板的名称、发放规则、份数与价格配置，保证集团侧标准数据持续一致。
+              </div>
+            </div>
+            <Button
+              icon={<LeftOutlined />}
+              onClick={handleBack}
+              style={{
+                borderRadius: 12,
+                borderColor: 'rgba(255,255,255,0.24)',
+                color: '#ffffff',
+                background: 'rgba(255,255,255,0.08)'
+              }}
+            >
+              返回列表
+            </Button>
+          </div>
+        </div>
+
         <Form
           form={form}
           layout="vertical"
@@ -201,146 +229,209 @@ const EditPackage = () => {
             taxIncluded: false
           }}
         >
-          <Tabs defaultActiveKey="1">
-            <TabPane tab="基础信息" key="1">
-              <Row gutter={[16, 16]}>
-                <Col span={12}>
-                  <Form.Item
-                    name="code"
-                    label="包价代码"
-                    rules={[
-                      { required: true, message: '请输入包价代码' },
-                      { pattern: /^[A-Za-z0-9_]+$/, message: '包价代码只能包含英文字母、数字和下划线' }
-                    ]}
+          <Card
+            variant="borderless"
+            style={{
+              borderRadius: 20,
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08)',
+              marginBottom: 24
+            }}
+            styles={{ body: { padding: 28 } }}
+          >
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#102a43' }}>基础信息</div>
+              <div style={{ marginTop: 8, color: '#6b7a90', lineHeight: 1.8 }}>
+                在保持集团统一口径的前提下，调整包价名称、类型、发放频率与份数规则。
+              </div>
+            </div>
+
+            <Row gutter={[20, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="code"
+                  label="包价代码"
+                  rules={[
+                    { required: true, message: '请输入包价代码' },
+                    { pattern: /^[A-Za-z0-9_]+$/, message: '包价代码只能包含英文字母、数字和下划线' }
+                  ]}
+                >
+                  <Input placeholder="请输入包价代码" disabled size="large" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="name"
+                  label="包价名称"
+                  rules={[{ required: true, message: '请输入包价名称' }]}
+                >
+                  <Input placeholder="请输入包价名称" size="large" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="type"
+                  label="包价类型"
+                  rules={[{ required: true, message: '请选择包价类型' }]}
+                >
+                  <Select placeholder="请选择包价类型" size="large">
+                    {packageTypes.map((item) => (
+                      <Option key={item.value} value={item.value}>{item.label}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="frequency"
+                  label="发放频率"
+                  rules={[{ required: true, message: '请选择发放频率' }]}
+                >
+                  <Select placeholder="请选择发放频率" size="large">
+                    {frequencyOptions.map((item) => (
+                      <Option key={item.value} value={item.value}>{item.label}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="quantityType"
+                  label="计数方式"
+                  rules={[{ required: true, message: '请选择计数方式' }]}
+                >
+                  <Select
+                    placeholder="请选择计数方式"
+                    size="large"
+                    onChange={(value) => {
+                      setQuantityType(value)
+                      form.setFieldValue('fixedQuantity', undefined)
+                    }}
                   >
-                    <Input placeholder="请输入包价代码" disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
+                    {quantityTypeOptions.map((item) => (
+                      <Option key={item.value} value={item.value}>{item.label}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                {quantityType && (
                   <Form.Item
-                    name="name"
-                    label="包价名称"
-                    rules={[{ required: true, message: '请输入包价名称' }]}
+                    name="fixedQuantity"
+                    label={getQuantityLabel(quantityType)}
+                    rules={[{ required: true, message: `请输入${getQuantityLabel(quantityType)}` }]}
                   >
-                    <Input placeholder="请输入包价名称" />
+                    <InputNumber
+                      style={{ width: '100%' }}
+                      min={1}
+                      precision={0}
+                      size="large"
+                      placeholder={`请输入${getQuantityLabel(quantityType)}`}
+                    />
                   </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="type"
-                    label="包价类型"
-                    rules={[{ required: true, message: '请选择包价类型' }]}
-                  >
-                    <Select placeholder="请选择包价类型">
-                      {packageTypes.map(item => (
-                        <Option key={item.value} value={item.value}>{item.label}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="frequency"
-                    label="发放频率"
-                    rules={[{ required: true, message: '请选择发放频率' }]}
-                  >
-                    <Select placeholder="请选择发放频率">
-                      {frequencyOptions.map(item => (
-                        <Option key={item.value} value={item.value}>{item.label}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="quantityType"
-                    label="计数方式"
-                    rules={[{ required: true, message: '请选择计数方式' }]}
-                  >
-                    <Select 
-                      placeholder="请选择计数方式"
-                      onChange={(value) => {
-                        setQuantityType(value)
-                        form.setFieldValue('fixedQuantity', undefined)
-                      }}
-                    >
-                      {quantityTypeOptions.map(item => (
-                        <Option key={item.value} value={item.value}>{item.label}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  {quantityType && (
-                    <Form.Item
-                      name="fixedQuantity"
-                      label={getQuantityLabel(quantityType)}
-                      rules={[{ required: true, message: `请输入${getQuantityLabel(quantityType)}` }]}
-                    >
-                      <InputNumber style={{ width: '100%' }} min={1} precision={0} placeholder={`请输入${getQuantityLabel(quantityType)}`} />
-                    </Form.Item>
-                  )}
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    name="priceType"
-                    label="计价方式"
-                    rules={[{ required: true, message: '请选择计价方式' }]}
-                  >
-                    <RadioGroup onChange={(e) => setPriceType(e.target.value)}>
-                      <Radio value="fixed">固定价格</Radio>
-                      <Radio value="hotel">酒店设置</Radio>
-                    </RadioGroup>
-                  </Form.Item>
-                </Col>
-                {priceType === 'fixed' && (
-                  <Col span={12}>
-                    <Form.Item
-                      name="fixedPrice"
-                      label="价格"
-                      dependencies={['priceType']}
-                      rules={[
-                        ({ getFieldValue }) => ({
-                          required: getFieldValue('priceType') === 'fixed',
-                          message: '请输入价格'
-                        })
-                      ]}
-                    >
-                      <InputNumber
-                        style={{ width: '100%' }}
-                        placeholder="请输入价格"
-                        min={0}
-                        step={0.01}
-                        prefix="¥"
-                      />
-                    </Form.Item>
-                  </Col>
                 )}
-                <Col span={12}>
-                  <Form.Item
-                    name="taxIncluded"
-                    valuePropName="checked"
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            variant="borderless"
+            style={{
+              borderRadius: 20,
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08)',
+              marginBottom: 24
+            }}
+            styles={{ body: { padding: 28 } }}
+          >
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#102a43' }}>价格与说明</div>
+              <div style={{ marginTop: 8, color: '#6b7a90', lineHeight: 1.8 }}>
+                编辑集团固定价格模板及说明信息；价格可为空，未填写时将按集团设置状态展示。
+              </div>
+            </div>
+
+            <Row gutter={[20, 8]}>
+              <Col xs={24} md={12}>
+                <Form.Item label="计价方式" required>
+                  <div
+                    style={{
+                      minHeight: 48,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '0 16px',
+                      borderRadius: 14,
+                      border: '1px solid #d9e3f0',
+                      background: 'linear-gradient(180deg, #f9fbff 0%, #f4f8ff 100%)'
+                    }}
                   >
-                    <Checkbox>设置价格是否含税</Checkbox>
-                  </Form.Item>
-                </Col>
-              </Row>
-              
-              <Form.Item
-                name="description"
-                label="描述"
-              >
-                <Input.TextArea rows={4} placeholder="请输入包价描述" />
-              </Form.Item>
-            </TabPane>
-          </Tabs>
-          
-          <div style={{ marginTop: 32, padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: '#1677ff',
+                        boxShadow: '0 0 0 4px rgba(22,119,255,0.12)'
+                      }}
+                    />
+                    <span style={{ fontWeight: 600, color: '#123a72' }}>固定价格</span>
+                  </div>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="fixedPrice"
+                  label="价格"
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    placeholder="请输入价格"
+                    min={0}
+                    step={0.01}
+                    size="large"
+                    prefix="¥"
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24}>
+                <Form.Item
+                  name="taxIncluded"
+                  valuePropName="checked"
+                >
+                  <Checkbox>设置价格是否含税</Checkbox>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item
+              name="description"
+              label="描述"
+            >
+              <Input.TextArea rows={5} placeholder="请输入包价描述" showCount maxLength={300} />
+            </Form.Item>
+          </Card>
+
+          <div
+            style={{
+              padding: 20,
+              borderRadius: 20,
+              background: '#ffffff',
+              boxShadow: '0 12px 32px rgba(15, 23, 42, 0.08)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16,
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ color: '#6b7a90', lineHeight: 1.8 }}>
+              保存后将更新当前集团包价模板，并影响集团侧统一维护的标准包价信息。
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
               <Button
                 icon={<LeftOutlined />}
                 onClick={handleBack}
-                style={{ marginRight: 12 }}
+                size="large"
+                style={{ borderRadius: 12 }}
               >
                 返回
               </Button>
@@ -350,6 +441,7 @@ const EditPackage = () => {
                 loading={loading}
                 htmlType="submit"
                 size="large"
+                style={{ borderRadius: 12, minWidth: 120 }}
               >
                 保存
               </Button>

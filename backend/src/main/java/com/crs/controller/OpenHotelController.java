@@ -1,24 +1,68 @@
 package com.crs.controller;
 
-import com.crs.entity.*;
-import com.crs.repository.*;
+import java.math.BigDecimal;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.crs.entity.BookingControl;
+import com.crs.entity.CancellationPolicy;
+import com.crs.entity.ChannelHotelMapping;
+import com.crs.entity.ChannelPublishRecord;
+import com.crs.entity.GuaranteePolicy;
+import com.crs.entity.Hotel;
+import com.crs.entity.HotelFacility;
+import com.crs.entity.HotelImage;
+import com.crs.entity.HotelPrice;
+import com.crs.entity.HotelRoomType;
+import com.crs.entity.Inventory;
+import com.crs.entity.RatePlan;
+import com.crs.entity.RoomTypeFacility;
+import com.crs.entity.TenantChannel;
+import com.crs.repository.BookingControlRepository;
+import com.crs.repository.CancellationPolicyRepository;
+import com.crs.repository.ChannelHotelMappingRepository;
+import com.crs.repository.ChannelPublishRecordRepository;
+import com.crs.repository.GuaranteePolicyRepository;
+import com.crs.repository.HotelFacilityRepository;
+import com.crs.repository.HotelImageRepository;
+import com.crs.repository.HotelPriceRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.repository.InventoryRepository;
+import com.crs.repository.PackageRepository;
+import com.crs.repository.RatePlanRepository;
+import com.crs.repository.RoomStatusRepository;
+import com.crs.repository.RoomTypeFacilityRepository;
 import com.crs.service.inventory.AvailabilityContext;
 import com.crs.service.inventory.AvailabilityResult;
 import com.crs.service.inventory.InventoryDeductionService;
 import com.crs.util.DisplayMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 开放API - 酒店查询接口
@@ -43,6 +87,7 @@ public class OpenHotelController {
     @Autowired private InventoryDeductionService inventoryDeductionService;
     @Autowired private CancellationPolicyRepository cancellationPolicyRepo;
     @Autowired private GuaranteePolicyRepository guaranteePolicyRepo;
+    @Autowired private PackageRepository packageRepo;
     @Autowired private ChannelHotelMappingRepository channelHotelMappingRepo;
     @Autowired private ChannelPublishRecordRepository channelPublishRecordRepo;
 
@@ -368,7 +413,7 @@ public class OpenHotelController {
                     rpMap.put("averagePrice", totalPrice.divide(BigDecimal.valueOf(nights * roomCount), 2, java.math.RoundingMode.HALF_UP));
                     rpMap.put("currency", "CNY");
                     rpMap.put("dailyPrices", dailyPrices);
-                    rpMap.put("packages", parsePackages(rp.getPackages()));
+                    rpMap.put("packages", parsePackages(hotel.getTenantId(), rp.getPackages()));
                     rpMap.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), rp.getCancellationRule()));
                     rpMap.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), rp.getGuaranteeRule()));
                     ratePlanResults.add(rpMap);
@@ -542,7 +587,7 @@ public class OpenHotelController {
             data.put("dailyPrices", dailyPrices);
             data.put("totalPrice", totalPrice);
             data.put("currency", "CNY");
-            data.put("packages", parsePackages(ratePlan.getPackages()));
+            data.put("packages", parsePackages(hotel.getTenantId(), ratePlan.getPackages()));
             data.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), ratePlan.getCancellationRule()));
             data.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), ratePlan.getGuaranteeRule()));
             return ResponseEntity.ok(ok(data));
@@ -577,19 +622,44 @@ public class OpenHotelController {
         return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
     }
 
-    private List<Map<String, Object>> parsePackages(String packagesJson) {
+    private List<Map<String, Object>> parsePackages(Integer tenantId, String packagesJson) {
         if (packagesJson == null || packagesJson.isBlank() || packagesJson.equals("null")) return Collections.emptyList();
         try {
             List<Map<String, Object>> raw = objectMapper.readValue(packagesJson, new TypeReference<>() {});
-            return raw.stream().map(p -> {
+            List<String> packageCodes = raw.stream()
+                    .map(p -> Objects.toString(p.get("code"), null))
+                    .filter(Objects::nonNull)
+                    .filter(code -> !code.isBlank())
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (packageCodes.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            Map<String, com.crs.entity.Package> activePackageMap = packageRepo
+                    .findByTenantIdAndCodeInAndStatus(tenantId, packageCodes, com.crs.entity.Package.Status.active)
+                    .stream()
+                    .collect(Collectors.toMap(com.crs.entity.Package::getCode, p -> p, (a, b) -> a, LinkedHashMap::new));
+
+            return raw.stream()
+                    .filter(p -> {
+                        String code = Objects.toString(p.get("code"), null);
+                        return code != null && activePackageMap.containsKey(code);
+                    })
+                    .map(p -> {
+                String code = Objects.toString(p.get("code"), null);
+                com.crs.entity.Package activePackage = activePackageMap.get(code);
                 Map<String, Object> pm = new LinkedHashMap<>();
-                pm.put("packageCode", p.get("code"));
-                pm.put("packageName", p.get("name"));
-                String type = (String) p.getOrDefault("type", "other");
+                pm.put("packageCode", activePackage.getCode());
+                pm.put("packageName", activePackage.getName());
+                String type = activePackage.getType() != null ? activePackage.getType() : (String) p.getOrDefault("type", "other");
                 pm.put("type", type);
                 pm.put("typeName", DisplayMapper.packageTypeName(type));
-                pm.put("frequency", p.getOrDefault("frequency", "daily"));
-                pm.put("quantity", p.getOrDefault("fixedQuantity", p.getOrDefault("quantity", 1)));
+                pm.put("frequency", activePackage.getFrequency() != null ? activePackage.getFrequency() : p.getOrDefault("frequency", "daily"));
+                pm.put("quantity", activePackage.getFixedQuantity() != null
+                        ? activePackage.getFixedQuantity()
+                        : p.getOrDefault("fixedQuantity", p.getOrDefault("quantity", 1)));
                 return pm;
             }).collect(Collectors.toList());
         } catch (Exception e) { return Collections.emptyList(); }

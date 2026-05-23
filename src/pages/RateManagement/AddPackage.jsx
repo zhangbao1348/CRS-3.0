@@ -62,6 +62,7 @@ const AddPackage = () => {
     { value: '早餐', label: '早餐' },
     { value: '午餐', label: '午餐' },
     { value: '晚餐', label: '晚餐' },
+    { value: '综合', label: '综合' },
     { value: '下午茶', label: '下午茶' },
     { value: '门票', label: '门票' },
     { value: '其他', label: '其他' },
@@ -85,18 +86,21 @@ const AddPackage = () => {
         quantityType: values.quantityType,
         fixedQuantity: values.fixedQuantity,
         frequency: values.frequency,
-        priceType: values.priceType === 'fixed' ? 'group' : 'hotel',
+        priceType: values.priceType === 'daily' ? 'daily' : 'group',
         fixedPrice: values.priceType === 'fixed' ? values.fixedPrice : null,
         taxIncluded: values.taxIncluded || false,
         status: 'active'
       }
       
       // 创建包价
-      await api.post('/packages', packageData)
+      const createdPackage = await api.post('/packages', packageData)
       message.success('包价创建成功')
-      
-      // 跳转到包价列表页面
-      navigate('/rate-management/package-setting')
+
+      if (values.priceType === 'daily' && createdPackage?.id) {
+        navigate(`/rate-management/edit-package?id=${createdPackage.id}&tab=daily-price`)
+      } else {
+        navigate('/rate-management/package-setting')
+      }
     } catch (error) {
       console.error('保存包价失败:', error)
       message.error(getErrorMessage(error, '保存失败，请稍后重试'))
@@ -221,9 +225,17 @@ const AddPackage = () => {
                     label="计价方式"
                     rules={[{ required: true, message: '请选择计价方式' }]}
                   >
-                    <RadioGroup onChange={(e) => setPriceType(e.target.value)}>
+                    <RadioGroup
+                      onChange={(e) => {
+                        const nextPriceType = e.target.value
+                        setPriceType(nextPriceType)
+                        if (nextPriceType !== 'fixed') {
+                          form.setFieldValue('fixedPrice', null)
+                        }
+                      }}
+                    >
                       <Radio value="fixed">固定价格</Radio>
-                      <Radio value="hotel">酒店设置</Radio>
+                      <Radio value="daily">按日期设置价格</Radio>
                     </RadioGroup>
                   </Form.Item>
                 </Col>

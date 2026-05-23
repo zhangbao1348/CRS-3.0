@@ -180,7 +180,15 @@ export const sourceCodeApi = {
 
 export const packageApi = {
   getAllPackages: (options = {}) => api.get('/packages', options),
-  getPackageById: (id, options = {}) => api.get(`/packages/${id}`, options)
+  getPackageById: (id, options = {}) => api.get(`/packages/${id}`, options),
+  searchPackages: (data, options = {}) => api.post('/packages/search', data, options),
+  getDailyPrices: (packageCode, hotelCode, month, options = {}) =>
+    api.get(`/packages/code/${packageCode}/daily-prices`, {
+      params: { hotelCode, month },
+      ...options
+    }),
+  saveDailyPrices: (packageCode, data, options = {}) =>
+    api.post(`/packages/code/${packageCode}/daily-prices`, data, options)
 }
 
 export const groupFacilityApi = {

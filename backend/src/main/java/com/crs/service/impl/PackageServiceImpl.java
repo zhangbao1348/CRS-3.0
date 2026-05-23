@@ -1,14 +1,15 @@
 package com.crs.service.impl;
 
-import com.crs.entity.Package;
-import com.crs.repository.PackageRepository;
-import com.crs.service.PackageService;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
+import com.crs.entity.Package;
+import com.crs.repository.PackageRepository;
+import com.crs.service.PackageService;
 
 /**
  * 包价服务实现类
@@ -101,8 +102,23 @@ public class PackageServiceImpl implements PackageService {
     }
 
     @Override
-    public List<Package> searchPackages(String name, String code, String type, Package.Status status) {
-        return packageRepository.searchPackages(getCurrentTenantId(), name, code, type, status);
+    public List<Package> searchPackages(
+            String keyword,
+            String name,
+            String code,
+            String type,
+            String frequency,
+            String quantityType,
+            Package.Status status) {
+        return packageRepository.searchPackages(
+                getCurrentTenantId(),
+                keyword,
+                name,
+                code,
+                type,
+                frequency,
+                quantityType,
+                status);
     }
     
     @Override

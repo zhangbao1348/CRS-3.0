@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Checkbox } from 'antd'
+import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Checkbox, Card } from 'antd'
 import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
+import { useHotelContext } from '../../contexts/HotelContext'
+import PackageDailyPriceEditor from './PackageDailyPriceEditor'
 
 const { TabPane } = Tabs
 const { Option } = Select
@@ -47,11 +49,11 @@ const getQuantityLabel = (quantityType) => {
 }
 
 const getEditPriceType = (packageData) => {
-  if (packageData.fixedPrice !== null && packageData.fixedPrice !== undefined) {
-    return 'fixed'
+  if (packageData.priceType === 'daily') {
+    return 'daily'
   }
 
-  return 'hotel'
+  return 'fixed'
 }
 
 const getErrorMessage = (error, fallbackMessage) => {
@@ -71,17 +73,24 @@ const EditPackage = () => {
   const [loading, setLoading] = useState(false)
   const [quantityType, setQuantityType] = useState('')
   const [priceType, setPriceType] = useState('fixed')
+  const [savedPriceType, setSavedPriceType] = useState('fixed')
+  const [activeTab, setActiveTab] = useState('1')
+  const [packageCode, setPackageCode] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
+  const { selectedHotel: hotelCode } = useHotelContext()
   
   // 获取包价ID
   const packageId = new URLSearchParams(location.search).get('id')
+  const targetTab = new URLSearchParams(location.search).get('tab')
+  const packageName = Form.useWatch('name', form)
   
   // 包价类型选项
   const packageTypes = [
     { value: '早餐', label: '早餐' },
     { value: '午餐', label: '午餐' },
     { value: '晚餐', label: '晚餐' },
+    { value: '综合', label: '综合' },
     { value: '下午茶', label: '下午茶' },
     { value: '门票', label: '门票' },
     { value: '其他', label: '其他' },
@@ -129,6 +138,9 @@ const EditPackage = () => {
       
       // 设置计价方式状态
       setPriceType(normalizedPriceType)
+      setSavedPriceType(normalizedPriceType)
+      setPackageCode(packageData.code)
+      setActiveTab(targetTab === 'daily-price' && normalizedPriceType === 'daily' ? 'daily-price' : '1')
     } catch (error) {
       console.error('加载包价数据失败:', error)
       message.error('加载包价数据失败，请稍后重试')
@@ -153,7 +165,7 @@ const EditPackage = () => {
         quantityType: values.quantityType,
         fixedQuantity: values.fixedQuantity,
         frequency: values.frequency,
-        priceType: values.priceType === 'fixed' ? 'group' : 'hotel',
+        priceType: values.priceType === 'daily' ? 'daily' : 'group',
         fixedPrice: values.priceType === 'fixed' ? values.fixedPrice : null,
         taxIncluded: values.taxIncluded || false,
         status: 'active'
@@ -162,9 +174,15 @@ const EditPackage = () => {
       // 更新包价
       await api.put(`/packages/${packageId}`, packageData)
       message.success('包价更新成功')
-      
-      // 跳转到包价列表页面
-      navigate('/rate-management/package-setting')
+
+      setSavedPriceType(values.priceType)
+      setPackageCode(values.code)
+
+      if (values.priceType === 'daily') {
+        setActiveTab('daily-price')
+      } else {
+        navigate('/rate-management/package-setting')
+      }
     } catch (error) {
       console.error('保存包价失败:', error)
       message.error(getErrorMessage(error, '保存失败，请稍后重试'))
@@ -179,30 +197,30 @@ const EditPackage = () => {
   }
   
   return (
-    <div className="fade-in">
-      <div style={{ marginBottom: 24, display: 'flex', alignItems: 'center' }}>
-        <Button
-          icon={<LeftOutlined />}
-          onClick={handleBack}
-          style={{ marginRight: 16 }}
-        >
-          返回
-        </Button>
+    <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh', overflow: 'auto' }}>
+      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">
           编辑包价
         </h1>
+        <Button
+          icon={<LeftOutlined />}
+          onClick={handleBack}
+        >
+          返回列表
+        </Button>
       </div>
       
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <Card style={{ marginBottom: 24 }}>
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          style={{ maxWidth: 800, overflow: 'visible' }}
           initialValues={{
             taxIncluded: false
           }}
         >
-          <Tabs defaultActiveKey="1">
+          <Tabs activeKey={activeTab} onChange={setActiveTab}>
             <TabPane tab="基础信息" key="1">
               <Row gutter={[16, 16]}>
                 <Col span={12}>
@@ -288,9 +306,17 @@ const EditPackage = () => {
                     label="计价方式"
                     rules={[{ required: true, message: '请选择计价方式' }]}
                   >
-                    <RadioGroup onChange={(e) => setPriceType(e.target.value)}>
+                    <RadioGroup
+                      onChange={(e) => {
+                        const nextPriceType = e.target.value
+                        setPriceType(nextPriceType)
+                        if (nextPriceType !== 'fixed') {
+                          form.setFieldValue('fixedPrice', null)
+                        }
+                      }}
+                    >
                       <Radio value="fixed">固定价格</Radio>
-                      <Radio value="hotel">酒店设置</Radio>
+                      <Radio value="daily">按日期设置价格</Radio>
                     </RadioGroup>
                   </Form.Item>
                 </Col>
@@ -334,30 +360,43 @@ const EditPackage = () => {
                 <Input.TextArea rows={4} placeholder="请输入包价描述" />
               </Form.Item>
             </TabPane>
+            {(priceType === 'daily' || savedPriceType === 'daily') && (
+              <TabPane tab="每日价格设置" key="daily-price">
+                {savedPriceType === 'daily' && priceType === 'daily' ? (
+                  <PackageDailyPriceEditor
+                    hotelCode={hotelCode}
+                    packageCode={packageCode}
+                    packageName={packageName}
+                  />
+                ) : (
+                  <div style={{ color: '#8c8c8c', padding: '16px 0' }}>
+                    请先保存“按日期设置价格”的基础信息后，再维护每日价格。
+                  </div>
+                )}
+              </TabPane>
+            )}
           </Tabs>
           
-          <div style={{ marginTop: 32, padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                icon={<LeftOutlined />}
-                onClick={handleBack}
-                style={{ marginRight: 12 }}
-              >
-                返回
-              </Button>
-              <Button
-                type="primary"
-                icon={<SaveOutlined />}
-                loading={loading}
-                htmlType="submit"
-                size="large"
-              >
-                保存
-              </Button>
-            </div>
+          <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              icon={<LeftOutlined />}
+              onClick={handleBack}
+              style={{ marginRight: 12 }}
+            >
+              返回列表
+            </Button>
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={loading}
+              htmlType="submit"
+              size="large"
+            >
+              保存
+            </Button>
           </div>
         </Form>
-      </div>
+      </Card>
     </div>
   )
 }

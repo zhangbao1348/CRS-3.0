@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button, DatePicker, Card, Row, Col, Select, Spin, Empty, message } from 'antd'
 import { SearchOutlined, ReloadOutlined, DollarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -17,6 +17,9 @@ const PriceQuery = () => {
   const [dates, setDates] = useState([])
   const [prices, setPrices] = useState({}) // { roomTypeCode: { 'yyyy-MM-dd': value } }
   const [loading, setLoading] = useState(false)
+  const [hasQueried, setHasQueried] = useState(false)
+  const [hasPriceResults, setHasPriceResults] = useState(false)
+  const tableScrollRef = useRef(null)
 
   // 加载价格计划
   useEffect(() => {
@@ -59,6 +62,7 @@ const PriceQuery = () => {
         params: { hotelCode, rateCode: selectedRateCode, startDate, endDate }
       })
       const list = res?.data || []
+      const activePrices = list.filter((item) => item.status !== 'inactive' && item.priceWithTax != null)
       const map = {}
       roomTypes.forEach(rt => { map[rt.roomTypeCode] = {} })
       list.forEach(p => {
@@ -71,6 +75,28 @@ const PriceQuery = () => {
         }
       })
       setPrices(map)
+      setHasQueried(true)
+      setHasPriceResults(list.length > 0)
+
+      const firstPriceDate = activePrices
+        .map((item) => dayjs(item.priceDate).format('YYYY-MM-DD'))
+        .sort()[0]
+
+      if (firstPriceDate && tableScrollRef.current) {
+        const firstPriceIndex = cols.indexOf(firstPriceDate)
+        if (firstPriceIndex > 0) {
+          const scrollLeft = Math.max(firstPriceIndex * 70 - 140, 0)
+          requestAnimationFrame(() => {
+            if (tableScrollRef.current) {
+              tableScrollRef.current.scrollLeft = scrollLeft
+            }
+          })
+        } else {
+          tableScrollRef.current.scrollLeft = 0
+        }
+      } else if (tableScrollRef.current) {
+        tableScrollRef.current.scrollLeft = 0
+      }
     } catch (err) {
       console.error('查询价格失败:', err)
       message.error('查询价格失败')
@@ -88,13 +114,18 @@ const PriceQuery = () => {
     if (ratePlans.length > 0) setSelectedRateCode(ratePlans[0].rateCode)
     setPrices({})
     setDates([])
+    setHasQueried(false)
+    setHasPriceResults(false)
+    if (tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = 0
+    }
   }
 
   if (!hotelCode) {
     return (
       <div className="page-container">
         <h1 className="page-title"><DollarOutlined /> 价格查询</h1>
-        <Card bordered={false}><Empty description="请先选择酒店" /></Card>
+        <Card variant="borderless"><Empty description="请先选择酒店" /></Card>
       </div>
     )
   }
@@ -105,7 +136,7 @@ const PriceQuery = () => {
   return (
     <div className="page-container">
       <h1 className="page-title"><DollarOutlined /> 价格查询</h1>
-      <Card bordered={false}>
+      <Card variant="borderless">
         <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
           <Col>
             <span style={{ marginRight: 8 }}>价格计划:</span>
@@ -139,8 +170,8 @@ const PriceQuery = () => {
         </Row>
 
         <Spin spinning={loading}>
-          {dates.length > 0 && roomTypes.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
+          {dates.length > 0 && roomTypes.length > 0 && hasPriceResults ? (
+            <div ref={tableScrollRef} style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: dates.length * 70 + 200 }}>
                 <thead>
                   <tr>
@@ -186,7 +217,19 @@ const PriceQuery = () => {
               </table>
             </div>
           ) : (
-            !loading && <Empty description={dates.length === 0 ? '请点击查询加载价格数据' : '暂无房型数据'} />
+            !loading && (
+              <Empty
+                description={
+                  dates.length === 0
+                    ? '请点击查询加载价格数据'
+                    : roomTypes.length === 0
+                      ? '暂无房型数据'
+                      : hasQueried
+                        ? '所选条件暂无价格数据'
+                        : '请点击查询加载价格数据'
+                }
+              />
+            )
           )}
         </Spin>
       </Card>

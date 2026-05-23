@@ -1,8 +1,9 @@
 package com.crs.service;
 
-import com.crs.entity.Package;
 import java.util.List;
 import java.util.Optional;
+
+import com.crs.entity.Package;
 
 /**
  * 包价服务接口
@@ -74,13 +75,23 @@ public interface PackageService {
 
     /**
      * 组合条件搜索包价
-     * @param name 包价名称，支持模糊匹配
-     * @param code 包价代码，支持模糊匹配
+     * @param keyword 关键词，同时匹配包价名称和包价代码
+     * @param name 包价名称，支持模糊匹配，兼容旧参数
+     * @param code 包价代码，支持模糊匹配，兼容旧参数
      * @param type 包价类型，精确匹配
+     * @param frequency 发放频率，精确匹配
+     * @param quantityType 计数方式，精确匹配
      * @param status 包价状态，精确匹配
      * @return 包价列表
      */
-    List<Package> searchPackages(String name, String code, String type, Package.Status status);
+    List<Package> searchPackages(
+            String keyword,
+            String name,
+            String code,
+            String type,
+            String frequency,
+            String quantityType,
+            Package.Status status);
     
     /**
      * 检查租户内包价代码是否存在

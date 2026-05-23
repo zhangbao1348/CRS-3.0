@@ -1,13 +1,14 @@
 package com.crs.repository;
 
-import com.crs.entity.Package;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
+import com.crs.entity.Package;
 
 /**
  * 增值包价数据访问接口 (PackageRepository)
@@ -33,6 +34,16 @@ public interface PackageRepository extends JpaRepository<Package, Integer> {
      * @return 包价实体的 Optional 对象
      */
     Optional<Package> findByTenantIdAndCode(Integer tenantId, String code);
+
+    /**
+     * 按租户、编码集合和状态批量查询包价。
+     *
+     * @param tenantId 租户 ID
+     * @param codes 包价编码集合
+     * @param status 包价状态
+     * @return 包价列表
+     */
+    List<Package> findByTenantIdAndCodeInAndStatus(Integer tenantId, List<String> codes, Package.Status status);
     
     /**
      * 根据名称模糊搜索租户下的包价。
@@ -65,9 +76,12 @@ public interface PackageRepository extends JpaRepository<Package, Integer> {
      * 组合条件搜索租户内包价。
      *
      * @param tenantId 租户 ID
+     * @param keyword 关键词，同时匹配包价名称和包价代码
      * @param name 包价名称，支持模糊匹配
      * @param code 包价代码，支持模糊匹配
      * @param type 包价类型，精确匹配
+     * @param frequency 发放频率，精确匹配
+     * @param quantityType 计数方式，精确匹配
      * @param status 包价状态，精确匹配
      * @return 包价列表
      */
@@ -75,17 +89,23 @@ public interface PackageRepository extends JpaRepository<Package, Integer> {
         SELECT p
         FROM Package p
         WHERE p.tenantId = :tenantId
+          AND (:keyword IS NULL OR p.name LIKE CONCAT('%', :keyword, '%') OR p.code LIKE CONCAT('%', :keyword, '%'))
           AND (:name IS NULL OR p.name LIKE CONCAT('%', :name, '%'))
           AND (:code IS NULL OR p.code LIKE CONCAT('%', :code, '%'))
           AND (:type IS NULL OR p.type = :type)
+          AND (:frequency IS NULL OR p.frequency = :frequency)
+          AND (:quantityType IS NULL OR p.quantityType = :quantityType)
           AND (:status IS NULL OR p.status = :status)
-        ORDER BY p.id DESC
+        ORDER BY p.updatedAt DESC, p.id DESC
         """)
     List<Package> searchPackages(
             @Param("tenantId") Integer tenantId,
+            @Param("keyword") String keyword,
             @Param("name") String name,
             @Param("code") String code,
             @Param("type") String type,
+            @Param("frequency") String frequency,
+            @Param("quantityType") String quantityType,
             @Param("status") Package.Status status);
     
     /**
