@@ -123,7 +123,14 @@ const ChannelSetting = () => {
         postpaidCommissionValue: values.postpaidCommissionValue || null
       }
 
-      await tenantChannelApi.updateChannelByCode(channelCode, updateData, 1)
+      if (channelData?.connected === false) {
+        updateData.connected = true
+      }
+
+      const updatedChannel = await tenantChannelApi.updateChannelByCode(channelCode, updateData, 1)
+      if (updatedChannel) {
+        setChannelData(updatedChannel)
+      }
       message.success('保存成功')
     } catch (error) {
       console.error('保存失败:', error)

@@ -1,24 +1,58 @@
 package com.crs.controller;
 
-import com.crs.entity.*;
-import com.crs.repository.*;
+import java.math.BigDecimal;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.crs.entity.CancellationPolicy;
+import com.crs.entity.ChannelHotelMapping;
+import com.crs.entity.GuaranteePolicy;
+import com.crs.entity.Hotel;
+import com.crs.entity.HotelPrice;
+import com.crs.entity.HotelRoomType;
+import com.crs.entity.RatePlan;
+import com.crs.entity.Reservation;
+import com.crs.entity.ReservationDailyPrice;
+import com.crs.entity.ReservationGuest;
+import com.crs.entity.ReservationPromotion;
+import com.crs.entity.TenantChannel;
+import com.crs.repository.CancellationPolicyRepository;
+import com.crs.repository.ChannelHotelMappingRepository;
+import com.crs.repository.ChannelPublishRecordRepository;
+import com.crs.repository.GuaranteePolicyRepository;
+import com.crs.repository.HotelPriceRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.repository.RatePlanRepository;
+import com.crs.repository.ReservationRepository;
 import com.crs.service.ReservationService;
 import com.crs.service.inventory.AvailabilityContext;
 import com.crs.service.inventory.AvailabilityResult;
 import com.crs.service.inventory.InventoryDeductionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * OpenReservationController 控制器 (REST Controller)
@@ -136,6 +170,11 @@ public class OpenReservationController {
                 return ResponseEntity.badRequest().body(err(400, "入住/离店日期无效"));
             }
 
+            String checkInValidationMessage = validateOpenApiCheckInDate(checkIn);
+            if (checkInValidationMessage != null) {
+                return ResponseEntity.badRequest().body(err(400, checkInValidationMessage));
+            }
+
             int roomCount = body.get("roomCount") != null ? ((Number) body.get("roomCount")).intValue() : 1;
             int adultCount = body.get("adultCount") != null ? ((Number) body.get("adultCount")).intValue() : 1;
             int childCount = body.get("childCount") != null ? ((Number) body.get("childCount")).intValue() : 0;
@@ -146,7 +185,6 @@ public class OpenReservationController {
             }
 
             String memberLevel = getString(body, "memberLevel");
-            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             Calendar cal = Calendar.getInstance();
             cal.setTime(checkOut);
             cal.add(Calendar.DATE, -1);
@@ -624,6 +662,24 @@ public class OpenReservationController {
 
     private String now() {
         return ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+    }
+
+    private LocalDate getEarliestAllowedCheckInDate() {
+        ZonedDateTime now = ZonedDateTime.now();
+        LocalDate today = now.toLocalDate();
+        return now.getHour() < 6 ? today.minusDays(1) : today;
+    }
+
+    private String validateOpenApiCheckInDate(Date checkInDate) {
+        if (checkInDate == null) {
+            return null;
+        }
+        LocalDate targetDate = checkInDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate earliestDate = getEarliestAllowedCheckInDate();
+        if (targetDate.isBefore(earliestDate)) {
+            return String.format("入住日期不能早于允许预订日期 %s", earliestDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        }
+        return null;
     }
 
     private Map<String, Object> ok(Object data) {

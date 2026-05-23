@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * ChannelPublishService 服务接口 (Service Interface)
@@ -153,24 +152,28 @@ public class ChannelPublishService {
             List<ChannelHotelMapping> mappings = channelHotelMappingRepository.findByTenantIdAndChannelCodeAndHotelCode(tenantId, channelCode, hotelCode);
             if (mappings.isEmpty()) {
                 ChannelHotelMapping mapping = new ChannelHotelMapping();
-                mapping.setTenantId(tenantId);
-                mapping.setChannelCode(channel.getChannelCode());
-                mapping.setChannelName(channel.getChannelName());
-                mapping.setHotelCode(hotel.getHotelCode());
-                mapping.setHotelName(hotel.getChineseName());
-                mapping.setChannelHotelCode(channel.getChannelCode() + "_" + hotel.getHotelCode());
-                mapping.setStatus("active");
+                fillChannelHotelMapping(mapping, tenantId, channel, hotel);
                 channelHotelMappingRepository.save(mapping);
             } else {
-                // 如果已存在但可能被停用，重新激活
+                // 如果已存在则回填主数据并重新激活，避免缺失必填关联字段
                 for (ChannelHotelMapping mapping : mappings) {
-                    if (!"active".equals(mapping.getStatus())) {
-                        mapping.setStatus("active");
-                        channelHotelMappingRepository.save(mapping);
-                    }
+                    fillChannelHotelMapping(mapping, tenantId, channel, hotel);
+                    channelHotelMappingRepository.save(mapping);
                 }
             }
         }
+    }
+
+    private void fillChannelHotelMapping(ChannelHotelMapping mapping, Integer tenantId, TenantChannel channel, Hotel hotel) {
+        mapping.setTenantId(tenantId);
+        mapping.setChannelId(channel.getId());
+        mapping.setChannelCode(channel.getChannelCode());
+        mapping.setChannelName(channel.getChannelName());
+        mapping.setHotelId(hotel.getId());
+        mapping.setHotelCode(hotel.getHotelCode());
+        mapping.setHotelName(hotel.getChineseName());
+        mapping.setChannelHotelCode(channel.getChannelCode() + "_" + hotel.getHotelCode());
+        mapping.setStatus("active");
     }
 
     private List<String> parseApplicableRoomTypes(String json) {

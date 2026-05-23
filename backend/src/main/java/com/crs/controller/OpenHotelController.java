@@ -1,6 +1,8 @@
 package com.crs.controller;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -139,6 +141,11 @@ public class OpenHotelController {
             TenantChannel channel = getChannel(req);
             if (pageSize > 50) pageSize = 50;
 
+            String checkInValidationMessage = validateOpenApiCheckInDate(checkInDate);
+            if (checkInValidationMessage != null) {
+                return ResponseEntity.badRequest().body(err(400, checkInValidationMessage));
+            }
+
             // 获取该渠道有权访问的酒店CODE列表
             List<ChannelHotelMapping> mappings = channelHotelMappingRepo.findByTenantIdAndChannelCode(channel.getTenantId(), channel.getChannelCode())
                     .stream().filter(m -> "active".equals(m.getStatus())).collect(Collectors.toList());
@@ -156,7 +163,7 @@ public class OpenHotelController {
 
             List<Map<String, Object>> list = new ArrayList<>();
             for (Hotel hotel : hotelPage.getContent()) {
-                list.add(buildHotelSummary(hotel, checkInDate, checkOutDate));
+                list.add(buildHotelSummary(hotel, checkInDate, checkOutDate, channel.getPriceRounding()));
             }
 
             Map<String, Object> data = new LinkedHashMap<>();
@@ -170,7 +177,7 @@ public class OpenHotelController {
         }
     }
 
-    private Map<String, Object> buildHotelSummary(Hotel hotel, Date checkIn, Date checkOut) {
+    private Map<String, Object> buildHotelSummary(Hotel hotel, Date checkIn, Date checkOut, String priceRounding) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("hotelCode", hotel.getHotelCode());
         m.put("chineseName", hotel.getChineseName());
@@ -192,11 +199,11 @@ public class OpenHotelController {
             List<HotelPrice> prices = priceRepo.findByTenantIdAndHotelCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotel.getHotelCode(), checkIn, checkOut);
             startingPrice = prices.stream()
-                    .filter(p -> p.getPriceWithTax() != null)
+                    .filter(this::isEffectiveHotelPrice)
                     .map(HotelPrice::getPriceWithTax)
                     .min(BigDecimal::compareTo).orElse(null);
         }
-        m.put("startingPrice", startingPrice);
+        m.put("startingPrice", applyChannelPriceRounding(startingPrice, priceRounding));
 
         // 图片
         List<HotelImage> images = imageRepo.findByHotelCodeOrderBySortOrderAsc(hotel.getHotelCode());
@@ -275,6 +282,7 @@ public class OpenHotelController {
             @RequestParam(required = false) String memberLevel) {
         try {
             TenantChannel channel = getChannel(req);
+            String priceRounding = channel.getPriceRounding();
 
             Hotel hotel = hotelRepo.findByHotelCodeAndTenantId(hotelCode, channel.getTenantId()).orElse(null);
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
@@ -282,6 +290,11 @@ public class OpenHotelController {
             }
             if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
+            }
+
+            String checkInValidationMessage = validateOpenApiCheckInDate(checkInDate);
+            if (checkInValidationMessage != null) {
+                return ResponseEntity.badRequest().body(err(400, checkInValidationMessage));
             }
 
             long nights = (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24);
@@ -382,14 +395,15 @@ public class OpenHotelController {
                     for (int i = 0; i < nights; i++) {
                         String key = rp.getRateCode() + "_" + rt.getRoomTypeCode() + "_" + formatDate(cal.getTime());
                         HotelPrice hp = priceMap.get(key);
-                        if (hp == null || hp.getPriceWithTax() == null) {
+                        if (!isEffectiveHotelPrice(hp)) {
                             priceComplete = false; break;
                         }
+                        BigDecimal roundedPrice = applyChannelPriceRounding(hp.getPriceWithTax(), priceRounding);
                         Map<String, Object> dp = new LinkedHashMap<>();
                         dp.put("date", formatDate(cal.getTime()));
-                        dp.put("priceWithTax", hp.getPriceWithTax());
+                        dp.put("priceWithTax", roundedPrice);
                         dailyPrices.add(dp);
-                        totalPrice = totalPrice.add(hp.getPriceWithTax());
+                        totalPrice = totalPrice.add(roundedPrice);
                         cal.add(Calendar.DATE, 1);
                     }
                     if (!priceComplete) continue;
@@ -410,7 +424,9 @@ public class OpenHotelController {
                     rpMap.put("ratePlanName", rp.getRateName());
                     rpMap.put("availableRooms", minAvail);
                     rpMap.put("totalPrice", totalPrice);
-                    rpMap.put("averagePrice", totalPrice.divide(BigDecimal.valueOf(nights * roomCount), 2, java.math.RoundingMode.HALF_UP));
+                    rpMap.put("averagePrice", applyChannelPriceRounding(
+                            totalPrice.divide(BigDecimal.valueOf(nights * roomCount), 2, java.math.RoundingMode.HALF_UP),
+                            priceRounding));
                     rpMap.put("currency", "CNY");
                     rpMap.put("dailyPrices", dailyPrices);
                     rpMap.put("packages", parsePackages(hotel.getTenantId(), rp.getPackages()));
@@ -443,6 +459,7 @@ public class OpenHotelController {
             @RequestBody Map<String, Object> body) {
         try {
             TenantChannel channel = getChannel(req);
+            String priceRounding = channel.getPriceRounding();
 
             String hotelCode = (String) body.get("hotelCode");
             String roomTypeCode = (String) body.get("roomTypeCode");
@@ -464,6 +481,11 @@ public class OpenHotelController {
             Date checkOut = sdf.parse(checkOutStr);
             long nights = (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24);
             if (nights <= 0) return ResponseEntity.badRequest().body(err(400, "离店日期必须晚于入住日期"));
+
+            String checkInValidationMessage = validateOpenApiCheckInDate(checkIn);
+            if (checkInValidationMessage != null) {
+                return ResponseEntity.badRequest().body(err(400, checkInValidationMessage));
+            }
 
             Calendar cal = Calendar.getInstance();
             cal.setTime(checkOut); cal.add(Calendar.DATE, -1);
@@ -556,20 +578,42 @@ public class OpenHotelController {
             // 11. 价格完整性
             List<HotelPrice> prices = priceRepo.findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotelCode, ratePlanCode, roomTypeCode, checkIn, lastNight);
-            if (prices.size() < nights) {
+            Map<String, HotelPrice> validPriceMap = prices.stream()
+                    .filter(this::isEffectiveHotelPrice)
+                    .collect(Collectors.toMap(
+                            p -> formatDate(p.getPriceDate()),
+                            p -> p,
+                            (existing, replacement) -> replacement,
+                            LinkedHashMap::new));
+
+            List<HotelPrice> effectivePrices = new ArrayList<>();
+            cal.setTime(checkIn);
+            for (int i = 0; i < nights; i++) {
+                String dateKey = formatDate(cal.getTime());
+                HotelPrice validPrice = validPriceMap.get(dateKey);
+                if (validPrice == null) {
+                    return ResponseEntity.status(409).body(unavailable("PRICE_NOT_SET", "部分日期未设置价格", null));
+                }
+                effectivePrices.add(validPrice);
+                cal.add(Calendar.DATE, 1);
+            }
+
+            if (effectivePrices.size() < nights) {
                 return ResponseEntity.status(409).body(unavailable("PRICE_NOT_SET", "部分日期未设置价格", null));
             }
 
             // 构建成功响应
-            List<Map<String, Object>> dailyPrices = prices.stream()
+            List<Map<String, Object>> dailyPrices = effectivePrices.stream()
                     .sorted(Comparator.comparing(HotelPrice::getPriceDate))
                     .map(p -> { Map<String, Object> dp = new LinkedHashMap<>();
                         dp.put("date", formatDate(p.getPriceDate()));
-                        dp.put("priceWithTax", p.getPriceWithTax()); return dp; })
+                        dp.put("priceWithTax", applyChannelPriceRounding(p.getPriceWithTax(), priceRounding)); return dp; })
                     .collect(Collectors.toList());
 
-            BigDecimal totalPrice = prices.stream().filter(p -> p.getPriceWithTax() != null)
-                    .map(HotelPrice::getPriceWithTax).reduce(BigDecimal.ZERO, BigDecimal::add)
+            BigDecimal totalPrice = effectivePrices.stream()
+                    .map(HotelPrice::getPriceWithTax)
+                    .map(price -> applyChannelPriceRounding(price, priceRounding))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .multiply(BigDecimal.valueOf(roomCount));
 
             int minAvail = availResult.getAvailableCount() != null ? availResult.getAvailableCount() : 0;
@@ -622,11 +666,72 @@ public class OpenHotelController {
         return new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
     }
 
+    private LocalDate getEarliestAllowedCheckInDate() {
+        ZonedDateTime now = ZonedDateTime.now();
+        LocalDate today = now.toLocalDate();
+        return now.getHour() < 6 ? today.minusDays(1) : today;
+    }
+
+    private String validateOpenApiCheckInDate(Date checkInDate) {
+        if (checkInDate == null) {
+            return null;
+        }
+        LocalDate targetDate = checkInDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        LocalDate earliestDate = getEarliestAllowedCheckInDate();
+        if (targetDate.isBefore(earliestDate)) {
+            return String.format("入住日期不能早于允许预订日期 %s", earliestDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        }
+        return null;
+    }
+
+    private BigDecimal applyChannelPriceRounding(BigDecimal price, String rounding) {
+        if (price == null || rounding == null || rounding.isBlank() || "keep".equals(rounding)) {
+            return price;
+        }
+        if ("floor".equals(rounding)) {
+            return price.setScale(0, java.math.RoundingMode.FLOOR);
+        }
+        if ("ceil".equals(rounding)) {
+            return price.setScale(0, java.math.RoundingMode.CEILING);
+        }
+        return price;
+    }
+
+    private boolean isEffectiveHotelPrice(HotelPrice hotelPrice) {
+        return hotelPrice != null
+                && "active".equalsIgnoreCase(hotelPrice.getStatus())
+                && hotelPrice.getPriceWithTax() != null
+                && hotelPrice.getPriceWithTax().compareTo(BigDecimal.ZERO) > 0;
+    }
+
     private List<Map<String, Object>> parsePackages(Integer tenantId, String packagesJson) {
         if (packagesJson == null || packagesJson.isBlank() || packagesJson.equals("null")) return Collections.emptyList();
         try {
-            List<Map<String, Object>> raw = objectMapper.readValue(packagesJson, new TypeReference<>() {});
-            List<String> packageCodes = raw.stream()
+            List<Object> rawItems = objectMapper.readValue(packagesJson, new TypeReference<>() {});
+            List<Map<String, Object>> packageBindings = new ArrayList<>();
+
+            for (Object item : rawItems) {
+                if (item instanceof String code) {
+                    if (code != null && !code.isBlank()) {
+                        Map<String, Object> binding = new LinkedHashMap<>();
+                        binding.put("code", code);
+                        packageBindings.add(binding);
+                    }
+                    continue;
+                }
+
+                if (item instanceof Map<?, ?> rawMap) {
+                    Map<String, Object> binding = new LinkedHashMap<>();
+                    rawMap.forEach((key, value) -> binding.put(Objects.toString(key, null), value));
+                    String code = Objects.toString(binding.get("code"), Objects.toString(binding.get("packageCode"), null));
+                    if (code != null && !code.isBlank()) {
+                        binding.put("code", code);
+                        packageBindings.add(binding);
+                    }
+                }
+            }
+
+            List<String> packageCodes = packageBindings.stream()
                     .map(p -> Objects.toString(p.get("code"), null))
                     .filter(Objects::nonNull)
                     .filter(code -> !code.isBlank())
@@ -642,7 +747,7 @@ public class OpenHotelController {
                     .stream()
                     .collect(Collectors.toMap(com.crs.entity.Package::getCode, p -> p, (a, b) -> a, LinkedHashMap::new));
 
-            return raw.stream()
+            return packageBindings.stream()
                     .filter(p -> {
                         String code = Objects.toString(p.get("code"), null);
                         return code != null && activePackageMap.containsKey(code);

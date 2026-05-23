@@ -47,8 +47,8 @@ public class BookingControl {
     @Temporal(TemporalType.DATE)
     private Date controlDate;
 
-    @Column(name = "cancellation_policy_code", length = 50)
-    private String cancellationPolicyCode;
+    @Column(name = "cancellation_rule", length = 20)
+    private String cancellationRule;
 
     @Column(name = "advance_booking_days")
     private Integer advanceBookingDays = 0;
@@ -84,8 +84,8 @@ public class BookingControl {
     public void setDimensionCode(String dimensionCode) { this.dimensionCode = dimensionCode; }
     public Date getControlDate() { return controlDate; }
     public void setControlDate(Date controlDate) { this.controlDate = controlDate; }
-    public String getCancellationPolicyCode() { return cancellationPolicyCode; }
-    public void setCancellationPolicyCode(String cancellationPolicyCode) { this.cancellationPolicyCode = cancellationPolicyCode; }
+    public String getCancellationRule() { return cancellationRule; }
+    public void setCancellationRule(String cancellationRule) { this.cancellationRule = cancellationRule; }
     public Integer getAdvanceBookingDays() { return advanceBookingDays; }
     public void setAdvanceBookingDays(Integer advanceBookingDays) { this.advanceBookingDays = advanceBookingDays; }
     public Integer getMinStay() { return minStay; }
