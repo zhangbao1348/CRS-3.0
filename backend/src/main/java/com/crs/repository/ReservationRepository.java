@@ -84,6 +84,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
         List<Reservation> findTop10ByTenantIdAndStatusNotOrderByCreatedAtDesc(Integer tenantId,
                         Reservation.Status excludeStatus);
 
+        /** 获取租户下最近订单快照（投影，避免触发跨酒店重复编码关联） */
+        @Query("SELECT r.reservationCode, r.hotelName, r.roomTypeName, r.ratePlanName, r.channelName, " +
+               "r.contactName, r.checkInDate, r.checkOutDate, r.nights, r.roomCount, r.totalPrice, " +
+               "r.reservationStatus, r.paymentStatus, r.createdAt " +
+               "FROM Reservation r WHERE r.tenantId = :tenantId AND r.status <> :excludeStatus " +
+               "ORDER BY r.createdAt DESC")
+        List<Object[]> findTop10SnapshotByTenantIdAndStatusNotOrderByCreatedAtDesc(
+                        @Param("tenantId") Integer tenantId,
+                        @Param("excludeStatus") Reservation.Status excludeStatus,
+                        Pageable pageable);
+
         /** 按渠道分组统计订单贡献分布 (租户维度) */
         @Query("SELECT r.channelName, COUNT(r) FROM Reservation r WHERE r.tenantId = :tenantId AND r.status <> 'cancelled' AND r.createdAt >= :startDate GROUP BY r.channelName ORDER BY COUNT(r) DESC")
         List<Object[]> countByChannelGrouped(@Param("tenantId") Integer tenantId, @Param("startDate") Date startDate);
@@ -163,6 +174,17 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
 
         /** 获取酒店最近的订单列表 (使用 hotelCode) */
         List<Reservation> findTop10ByTenantIdAndHotelCodeOrderByCreatedAtDesc(Integer tenantId, String hotelCode);
+
+        /** 获取酒店最近订单快照（投影，避免触发跨酒店重复编码关联） */
+        @Query("SELECT r.reservationCode, r.hotelName, r.roomTypeName, r.ratePlanName, r.channelName, " +
+               "r.contactName, r.checkInDate, r.checkOutDate, r.nights, r.roomCount, r.totalPrice, " +
+               "r.reservationStatus, r.paymentStatus, r.createdAt " +
+               "FROM Reservation r WHERE r.tenantId = :tenantId AND r.hotelCode = :hotelCode " +
+               "ORDER BY r.createdAt DESC")
+        List<Object[]> findTop10SnapshotByTenantIdAndHotelCodeOrderByCreatedAtDesc(
+                        @Param("tenantId") Integer tenantId,
+                        @Param("hotelCode") String hotelCode,
+                        Pageable pageable);
 
         /** 按渠道编码分组统计 (租户维度) */
         @Query("SELECT r.channelCode, COUNT(r) FROM Reservation r WHERE r.tenantId = :tenantId AND r.status <> 'cancelled' AND r.createdAt >= :startDate GROUP BY r.channelCode ORDER BY COUNT(r) DESC")

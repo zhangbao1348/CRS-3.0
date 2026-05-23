@@ -1,18 +1,25 @@
 package com.crs.controller;
 
-import com.crs.entity.Package;
-import com.crs.repository.GroupRateCodeRepository;
-import com.crs.repository.PackageRepository;
-import com.crs.service.PackageService;
-import com.crs.util.CodeValidator;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.crs.entity.Package;
+import com.crs.repository.GroupRateCodeRepository;
+import com.crs.service.PackageService;
+import com.crs.util.CodeValidator;
 
 /**
  * 包价控制器
@@ -24,9 +31,6 @@ public class PackageController {
     
     @Autowired
     private PackageService packageService;
-    
-    @Autowired
-    private PackageRepository packageRepository;
     
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
@@ -155,27 +159,30 @@ public class PackageController {
      */
     @PostMapping("/search")
     public ResponseEntity<List<Package>> searchPackages(@RequestBody Map<String, String> params) {
-        String name = params.get("name");
-        String type = params.get("type");
-        String status = params.get("status");
-        
-        List<Package> packages;
-        if (name != null && !name.isEmpty()) {
-            packages = packageService.searchPackagesByName(name);
-        } else if (type != null && !type.isEmpty()) {
-            packages = packageService.searchPackagesByType(type);
-        } else if (status != null && !status.isEmpty()) {
+        String name = normalize(params.get("name"));
+        String code = normalize(params.get("code"));
+        String type = normalize(params.get("type"));
+        String status = normalize(params.get("status"));
+
+        Package.Status packageStatus = null;
+        if (status != null) {
             try {
-                Package.Status packageStatus = Package.Status.valueOf(status);
-                packages = packageService.searchPackagesByStatus(packageStatus);
+                packageStatus = Package.Status.valueOf(status);
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body(null);
             }
-        } else {
-            packages = packageService.getAllPackages();
         }
-        
+
+        List<Package> packages = packageService.searchPackages(name, code, type, packageStatus);
         return ResponseEntity.ok(packages);
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmedValue = value.trim();
+        return trimmedValue.isEmpty() ? null : trimmedValue;
     }
     
     /**

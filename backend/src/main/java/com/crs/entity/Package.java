@@ -11,9 +11,9 @@ import java.util.Date;
  * 
  * <p>业务配置：</p>
  * <ul>
- *     <li>**发放规则**：通过 `quantityType` (固定份数/按人数) 和 `frequency` (每日发放/每单发放) 组合定义。</li>
- *     <li>**定价逻辑**：`priceType` 决定了价格是由集团统一设定还是由酒店自行调整。</li>
- *     <li>**财务归类**：通过 `type` 区分餐饮、交通、娱乐等不同性质的增值项目。</li>
+ *     <li>发放规则：通过 `quantityType`（固定份数/按订单/按房间/按人数/按成人数/按儿童数）和 `frequency` 组合定义。</li>
+ *     <li>定价逻辑：通过 `fixedPrice + priceType` 表达固定价格或酒店设置。</li>
+ *     <li>财务归类：通过 `type` 区分早餐、综合、延时退房等不同性质的增值项目。</li>
  * </ul>
  */
 
@@ -50,33 +50,33 @@ public class Package {
     private Status status = Status.active;
     
     /** 
-     * 包价类型
-     * 可选值：breakfast(早餐), lunch(午餐), dinner(晚餐), entertainment(娱乐), transportation(交通) 等
+     * 包价类型。
+     * 当前前端使用中文值，如：早餐、午餐、晚餐、综合、下午茶、门票、其他、免费增早、延时退房、提前入住。
      */
     @Column(name = "type", nullable = false, length = 50)
     private String type;
     
     /** 
-     * 份数类型
-     * 可选值：fixed(固定份数), per_person(按成人人数), per_child(按儿童人数), per_room(按房间数)
+     * 份数类型。
+     * 可选值：fixed、per_order、per_room、per_person、per_adult、per_child。
      */
     @Column(name = "quantity_type", nullable = false, length = 20)
     private String quantityType;
     
-    /** 固定份数 (当 quantityType 为 fixed 时有效) */
+    /** 份数值。根据 quantityType 表示固定份数、每订单份数、每房间份数、每人份数等。 */
     @Column(name = "fixed_quantity")
     private Integer fixedQuantity;
     
     /** 
-     * 发放频率
-     * 可选值：daily(每天一次), once(整个入住周期仅一次), first_night(仅首晚)
+     * 发放频率。
+     * 可选值：daily、per_stay、arrival_day、departure_day、except_departure。
      */
     @Column(name = "frequency", nullable = false, length = 50)
     private String frequency;
     
     /** 
-     * 定价模式
-     * 可选值：group(集团统一定价), hotel(酒店差异定价)
+     * 定价模式。
+     * 可选值：group（固定价格，由集团统一维护）、hotel（酒店设置）。
      */
     @Column(name = "price_type", nullable = false, length = 20)
     private String priceType;
@@ -148,4 +148,3 @@ public class Package {
     public Date getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 }
-

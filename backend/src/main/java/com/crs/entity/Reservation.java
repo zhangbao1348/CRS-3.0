@@ -1,9 +1,23 @@
 package com.crs.entity;
 
 
-import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.util.Date;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 
 /**
  * 预订订单核心实体类 (Reservation)
@@ -292,12 +306,7 @@ public class Reservation {
     @JoinColumn(name = "hotel_code", referencedColumnName = "hotel_code", insertable = false, updatable = false)
     private Hotel hotel;
 
-    /** 关联价格计划实体 (基于 rate_plan_code) */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rate_plan_code", referencedColumnName = "rate_code", insertable = false, updatable = false)
-    private RatePlan ratePlan;
-
-    /** 关联房型实体 (基于 room_type_code) */
+    /** 关联房型实体 (基于 room_type_code，默认懒加载避免展示场景误触发重复编码关联) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_type_code", referencedColumnName = "code", insertable = false, updatable = false)
     private RoomType roomType;

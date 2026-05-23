@@ -88,10 +88,10 @@ public class HotelRoomTypeService {
                 tenantId, hotelRoomType.getHotelCode(), hotelRoomType.getRoomTypeCode())) {
             throw new RuntimeException("Room type code already exists for this hotel");
         }
-
-        // 强制校验房型分类
-        if (hotelRoomType.getRoomTypeCategoryCode() == null || hotelRoomType.getRoomTypeCategoryCode().trim().isEmpty()) {
-            throw new RuntimeException("Room type category is required");
+        
+        if (hotelRoomType.getRoomTypeCategoryCode() != null) {
+            String categoryCode = hotelRoomType.getRoomTypeCategoryCode().trim();
+            hotelRoomType.setRoomTypeCategoryCode(categoryCode.isEmpty() ? null : categoryCode);
         }
         
         hotelRoomType.setTenantId(tenantId);
@@ -125,11 +125,6 @@ public class HotelRoomTypeService {
         if (existingByCode.isPresent() && !existingByCode.get().getId().equals(id)) {
             throw new RuntimeException("Room type code already exists for this hotel");
         }
-
-        // 强制校验房型分类
-        if (hotelRoomType.getRoomTypeCategoryCode() == null || hotelRoomType.getRoomTypeCategoryCode().trim().isEmpty()) {
-            throw new RuntimeException("Room type category is required");
-        }
         
         // 更新房型信息
         existingHotelRoomType.setRoomTypeName(hotelRoomType.getRoomTypeName());
@@ -142,7 +137,12 @@ public class HotelRoomTypeService {
         existingHotelRoomType.setBedType(hotelRoomType.getBedType());
         existingHotelRoomType.setMaxOccupancy(hotelRoomType.getMaxOccupancy());
         existingHotelRoomType.setMaxChildren(hotelRoomType.getMaxChildren());
-        existingHotelRoomType.setRoomTypeCategoryCode(hotelRoomType.getRoomTypeCategoryCode());
+        if (hotelRoomType.getRoomTypeCategoryCode() != null) {
+            String categoryCode = hotelRoomType.getRoomTypeCategoryCode().trim();
+            if (!categoryCode.isEmpty()) {
+                existingHotelRoomType.setRoomTypeCategoryCode(categoryCode);
+            }
+        }
         if (hotelRoomType.getStatus() != null) {
             existingHotelRoomType.setStatus(hotelRoomType.getStatus());
         }

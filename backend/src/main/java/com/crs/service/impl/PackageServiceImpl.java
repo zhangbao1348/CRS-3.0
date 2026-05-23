@@ -61,7 +61,7 @@ public class PackageServiceImpl implements PackageService {
     public Package updatePackage(Integer id, Package pkg) {
         Integer tenantId = getCurrentTenantId();
         // 验证所有权
-        Package existingPackage = getPackageById(id)
+        getPackageById(id)
                 .orElseThrow(() -> new IllegalArgumentException("包价不存在或无权访问"));
         
         // 检查代码是否已被同一租户内的其他包价使用
@@ -98,6 +98,11 @@ public class PackageServiceImpl implements PackageService {
     @Override
     public List<Package> searchPackagesByStatus(Package.Status status) {
         return packageRepository.findByTenantIdAndStatus(getCurrentTenantId(), status);
+    }
+
+    @Override
+    public List<Package> searchPackages(String name, String code, String type, Package.Status status) {
+        return packageRepository.searchPackages(getCurrentTenantId(), name, code, type, status);
     }
     
     @Override

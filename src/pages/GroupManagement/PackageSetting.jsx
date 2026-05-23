@@ -1,203 +1,41 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  EyeOutlined,
   GiftOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 
-// 演示模式标志
-const DEMO_MODE = false
-
-// 模拟包价数据
-const mockPackages = [
-  {
-    id: 1,
-    name: '早餐包价',
-    code: 'BREAKFAST',
-    type: '早餐',
-    status: '启用',
-    description: '包含每日早餐',
-    price: '¥30'
-  },
-  {
-    id: 2,
-    name: '午餐包价',
-    code: 'LUNCH',
-    type: '午餐',
-    status: '启用',
-    description: '包含每日午餐',
-    price: '¥50'
-  },
-  {
-    id: 3,
-    name: '晚餐包价',
-    code: 'DINNER',
-    type: '晚餐',
-    status: '启用',
-    description: '包含每日晚餐',
-    price: '¥80'
-  },
-  {
-    id: 4,
-    name: '三餐包价',
-    code: 'THREE_MEALS',
-    type: '综合',
-    status: '启用',
-    description: '包含每日三餐',
-    price: '¥150'
-  },
-  {
-    id: 5,
-    name: '免费增早',
-    code: 'FREE_BREAKFAST',
-    type: '免费增早',
-    status: '启用',
-    description: '免费增加一份早餐',
-    price: '酒店设置'
-  },
-  {
-    id: 6,
-    name: '延时退房',
-    code: 'LATE_CHECKOUT',
-    type: '延时退房',
-    status: '启用',
-    description: '可延迟退房至14:00',
-    price: '¥20'
-  },
-  {
-    id: 7,
-    name: '提前入住',
-    code: 'EARLY_CHECKIN',
-    type: '提前入住',
-    status: '启用',
-    description: '可提前入住至10:00',
-    price: '¥20'
-  },
-  {
-    id: 8,
-    name: '行政礼遇',
-    code: 'EXECUTIVE_LOUNGE',
-    type: '综合',
-    status: '启用',
-    description: '包含行政酒廊使用权',
-    price: '¥100'
-  },
-  {
-    id: 9,
-    name: 'SPA包价',
-    code: 'SPA_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含一次SPA体验',
-    price: '¥200'
-  },
-  {
-    id: 10,
-    name: '健身包价',
-    code: 'FITNESS_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含健身房使用权',
-    price: '¥50'
-  },
-  {
-    id: 11,
-    name: '洗衣包价',
-    code: 'LAUNDRY_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含洗衣服务',
-    price: '¥80'
-  },
-  {
-    id: 12,
-    name: '接机包价',
-    code: 'AIRPORT_PICKUP',
-    type: '综合',
-    status: '启用',
-    description: '包含机场接机服务',
-    price: '¥150'
-  },
-  {
-    id: 13,
-    name: '送机包价',
-    code: 'AIRPORT_DROPOFF',
-    type: '综合',
-    status: '启用',
-    description: '包含机场送机服务',
-    price: '¥150'
-  },
-  {
-    id: 14,
-    name: '会议包价',
-    code: 'MEETING_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含会议室使用权',
-    price: '¥300'
-  },
-  {
-    id: 15,
-    name: '婚礼包价',
-    code: 'WEDDING_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含婚礼场地使用权',
-    price: '¥5000'
-  },
-  {
-    id: 16,
-    name: '生日包价',
-    code: 'BIRTHDAY_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含生日蛋糕和布置',
-    price: '¥200'
-  },
-  {
-    id: 17,
-    name: '蜜月包价',
-    code: 'HONEYMOON_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含蜜月布置和香槟',
-    price: '¥500'
-  },
-  {
-    id: 18,
-    name: '家庭包价',
-    code: 'FAMILY_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含儿童用品和活动',
-    price: '¥300'
-  },
-  {
-    id: 19,
-    name: '商务包价',
-    code: 'BUSINESS_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含商务中心服务',
-    price: '¥100'
-  },
-  {
-    id: 20,
-    name: '度假包价',
-    code: 'VACATION_PACKAGE',
-    type: '综合',
-    status: '启用',
-    description: '包含景点门票和活动',
-    price: '¥500'
-  }
-]
-
 const { Option } = Select
+
+const formatPackagePrice = (pkg) => {
+  if (pkg.fixedPrice !== null && pkg.fixedPrice !== undefined) {
+    return `¥${pkg.fixedPrice}`
+  }
+
+  if (pkg.priceType === 'hotel') {
+    return '酒店设置'
+  }
+
+  if (pkg.priceType === 'group') {
+    return '集团设置'
+  }
+
+  return '-'
+}
+
+const mapPackageToRow = (pkg) => ({
+  id: pkg.id,
+  name: pkg.name,
+  code: pkg.code,
+  type: pkg.type,
+  status: pkg.status === 'active' ? '启用' : '停用',
+  description: pkg.description,
+  price: formatPackagePrice(pkg)
+})
 
 const PackageSetting = () => {
   const [packages, setPackages] = useState([])
@@ -216,6 +54,9 @@ const PackageSetting = () => {
     { value: '午餐', label: '午餐' },
     { value: '晚餐', label: '晚餐' },
     { value: '综合', label: '综合' },
+    { value: '下午茶', label: '下午茶' },
+    { value: '门票', label: '门票' },
+    { value: '其他', label: '其他' },
     { value: '免费增早', label: '免费增早' },
     { value: '延时退房', label: '延时退房' },
     { value: '提前入住', label: '提前入住' }
@@ -236,24 +77,8 @@ const PackageSetting = () => {
   const fetchPackages = async () => {
     setLoading(true)
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setPackages(mockPackages)
-      } else {
-        // 非演示模式下从后端获取数据
-        const response = await api.get('/packages')
-        // 转换数据格式以匹配前端需求
-        const formattedPackages = response.map(pkg => ({
-          id: pkg.id,
-          name: pkg.name,
-          code: pkg.code,
-          type: pkg.type,
-          status: pkg.status === 'active' ? '启用' : '停用',
-          description: pkg.description,
-          price: pkg.fixedPrice ? `¥${pkg.fixedPrice}` : '酒店设置'
-        }))
-        setPackages(formattedPackages)
-      }
+      const response = await api.get('/packages')
+      setPackages(response.map(mapPackageToRow))
     } catch (error) {
       console.error('获取包价列表失败:', error)
       message.error('获取包价列表失败，请稍后重试')
@@ -266,52 +91,14 @@ const PackageSetting = () => {
   const handleSearch = async () => {
     setLoading(true)
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据进行过滤
-        let filteredPackages = [...mockPackages]
-        if (searchParams.name) {
-          filteredPackages = filteredPackages.filter(pkg => pkg.name.includes(searchParams.name))
-        }
-        if (searchParams.code) {
-          filteredPackages = filteredPackages.filter(pkg => pkg.code.includes(searchParams.code))
-        }
-        if (searchParams.type) {
-          filteredPackages = filteredPackages.filter(pkg => pkg.type === searchParams.type)
-        }
-        if (searchParams.status) {
-          filteredPackages = filteredPackages.filter(pkg => {
-            if (searchParams.status === 'active') {
-              return pkg.status === '启用'
-            } else {
-              return pkg.status === '停用'
-            }
-          })
-        }
-        setPackages(filteredPackages)
-      } else {
-        // 非演示模式下从后端获取数据
-        // 构建搜索参数
-        const params = {}
-        if (searchParams.name) params.name = searchParams.name
-        if (searchParams.code) params.code = searchParams.code
-        if (searchParams.type) params.type = searchParams.type
-        if (searchParams.status) params.status = searchParams.status
-        
-        // 调用搜索API
-        const response = await api.post('/packages/search', params)
-        
-        // 转换数据格式
-        const formattedPackages = response.map(pkg => ({
-          id: pkg.id,
-          name: pkg.name,
-          code: pkg.code,
-          type: pkg.type,
-          status: pkg.status === 'active' ? '启用' : '停用',
-          description: pkg.description,
-          price: pkg.fixedPrice ? `¥${pkg.fixedPrice}` : '酒店设置'
-        }))
-        setPackages(formattedPackages)
-      }
+      const params = {}
+      if (searchParams.name) params.name = searchParams.name
+      if (searchParams.code) params.code = searchParams.code
+      if (searchParams.type) params.type = searchParams.type
+      if (searchParams.status) params.status = searchParams.status
+
+      const response = await api.post('/packages/search', params)
+      setPackages(response.map(mapPackageToRow))
     } catch (error) {
       console.error('搜索包价失败:', error)
       message.error('搜索失败，请稍后重试')

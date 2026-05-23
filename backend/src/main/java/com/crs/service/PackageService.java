@@ -71,6 +71,16 @@ public interface PackageService {
      * @return 包价列表
      */
     List<Package> searchPackagesByStatus(Package.Status status);
+
+    /**
+     * 组合条件搜索包价
+     * @param name 包价名称，支持模糊匹配
+     * @param code 包价代码，支持模糊匹配
+     * @param type 包价类型，精确匹配
+     * @param status 包价状态，精确匹配
+     * @return 包价列表
+     */
+    List<Package> searchPackages(String name, String code, String type, Package.Status status);
     
     /**
      * 检查租户内包价代码是否存在

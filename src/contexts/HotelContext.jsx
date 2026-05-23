@@ -3,6 +3,7 @@ import { hotelApi } from '../utils/api'
 import { useTenantContext } from './TenantContext.jsx'
 
 const HotelContext = createContext()
+const SELECTED_HOTEL_KEY_PREFIX = 'crs_selected_hotel_'
 
 export const useHotelContext = () => {
   const context = useContext(HotelContext)
@@ -18,7 +19,10 @@ export const HotelProvider = ({ children }) => {
   const [selectedHotelId, setSelectedHotelId] = useState(null)   // id（向后兼容）
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [hasInitializedSelection, setHasInitializedSelection] = useState(false)
   const { selectedTenant } = useTenantContext()
+
+  const getHotelStorageKey = (tenantId) => `${SELECTED_HOTEL_KEY_PREFIX}${tenantId}`
 
   const fetchHotels = async () => {
     setLoading(true)
@@ -29,6 +33,7 @@ export const HotelProvider = ({ children }) => {
         setHotels([])
         setSelectedHotel(null)
         setSelectedHotelId(null)
+        setHasInitializedSelection(false)
         return
       }
       
@@ -40,14 +45,19 @@ export const HotelProvider = ({ children }) => {
         const hotelList = response.data || []
         setHotels(hotelList)
         if (hotelList.length > 0) {
-          // 总是选择第一个酒店作为默认选中项
-          setSelectedHotel(hotelList[0].hotelCode)
-          setSelectedHotelId(hotelList[0].id)
+          const savedHotelCode = localStorage.getItem(getHotelStorageKey(selectedTenant))
+          const matchedHotel = savedHotelCode
+            ? hotelList.find(hotel => hotel.hotelCode === savedHotelCode)
+            : null
+          const nextHotel = matchedHotel || hotelList[0]
+          setSelectedHotel(nextHotel.hotelCode)
+          setSelectedHotelId(nextHotel.id)
         } else {
           // 没有酒店时，清空选中状态
           setSelectedHotel(null)
           setSelectedHotelId(null)
         }
+        setHasInitializedSelection(true)
       } else {
         // 添加模拟酒店数据
         const mockHotels = [
@@ -60,6 +70,7 @@ export const HotelProvider = ({ children }) => {
         setHotels(mockHotels)
         setSelectedHotel(mockHotels[0].hotelCode)
         setSelectedHotelId(mockHotels[0].id)
+        setHasInitializedSelection(true)
       }
     } catch (err) {
       setError('获取酒店列表失败')
@@ -75,21 +86,36 @@ export const HotelProvider = ({ children }) => {
       setHotels(mockHotels)
       setSelectedHotel(mockHotels[0].hotelCode)
       setSelectedHotelId(mockHotels[0].id)
+      setHasInitializedSelection(true)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
+    setHasInitializedSelection(false)
     fetchHotels()
   }, [selectedTenant])
 
   const changeHotel = (hotelCode) => {
-    setSelectedHotel(hotelCode)
+    setSelectedHotel(hotelCode || null)
     // 根据hotelCode查找对应的id
     const hotel = hotels.find(h => h.hotelCode === hotelCode)
     setSelectedHotelId(hotel ? hotel.id : null)
   }
+
+  useEffect(() => {
+    if (!selectedTenant || !hasInitializedSelection) {
+      return
+    }
+
+    const storageKey = getHotelStorageKey(selectedTenant)
+    if (selectedHotel) {
+      localStorage.setItem(storageKey, selectedHotel)
+    } else {
+      localStorage.removeItem(storageKey)
+    }
+  }, [selectedHotel, selectedTenant])
 
   const value = {
     hotels,

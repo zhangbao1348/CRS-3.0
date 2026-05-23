@@ -1,22 +1,32 @@
 package com.crs.controller;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.crs.entity.Hotel;
-import com.crs.entity.Inventory;
 import com.crs.entity.Reservation;
 import com.crs.repository.HotelRepository;
 import com.crs.repository.InventoryRepository;
 import com.crs.repository.ReservationRepository;
 import com.crs.util.JwtUtil;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 首页数据聚合控制器
@@ -118,8 +128,8 @@ public class DashboardController {
                 hotelData.put("monthRevenue", reservationRepo.sumTotalPriceByTenantIdAndHotelCodeAndDateRange(
                         tenantId, hotel.getHotelCode(), monthStart, monthEnd));
                 // 今日可用库存
-                List<Inventory> todayInv = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), today);
-                int todayAvailable = todayInv.stream().mapToInt(Inventory::getAvailableRooms).sum();
+                int todayAvailable = safeInt(inventoryRepo.sumAvailableRoomsByTenantIdAndHotelCodeAndDate(
+                        tenantId, hotel.getHotelCode(), today));
                 hotelData.put("todayAvailableRooms", todayAvailable);
 
                 hotelOverview.add(hotelData);
@@ -147,14 +157,14 @@ public class DashboardController {
             data.put("channelDistribution", channels);
 
             // === 模块 E: 库存预警 ===
-            List<Inventory> lowInv = inventoryRepo.findLowInventory(tenantId, 2, today, sevenDaysLater);
-            List<Map<String, Object>> alerts = lowInv.stream().limit(20).map(inv -> {
+            List<Object[]> lowInv = inventoryRepo.findLowInventorySnapshot(tenantId, 2, today, sevenDaysLater);
+            List<Map<String, Object>> alerts = lowInv.stream().limit(20).map(row -> {
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("hotelCode", inv.getHotelCode());
-                m.put("roomTypeCode", inv.getRoomTypeCode());
-                m.put("date", sdf.format(inv.getDate()));
-                m.put("availableRooms", inv.getAvailableRooms());
-                m.put("channelCode", inv.getChannelCode());
+                m.put("hotelCode", row[0]);
+                m.put("roomTypeCode", row[1]);
+                m.put("date", row[2] != null ? sdf.format((Date) row[2]) : null);
+                m.put("availableRooms", row[3]);
+                m.put("channelCode", row[4]);
                 return m;
             }).collect(Collectors.toList());
             data.put("inventoryAlerts", alerts);
@@ -163,8 +173,9 @@ public class DashboardController {
             data.put("groupPacing", calculatePacingData(tenantId, hotelCode, today, activeHotels));
 
             // === 模块 G: 最新订单 ===
-            List<Reservation> recentOrders = reservationRepo.findTop10ByTenantIdAndStatusNotOrderByCreatedAtDesc(tenantId, Reservation.Status.cancelled);
-            List<Map<String, Object>> recentList = recentOrders.stream().map(this::mapReservation).collect(Collectors.toList());
+            List<Object[]> recentOrders = reservationRepo.findTop10SnapshotByTenantIdAndStatusNotOrderByCreatedAtDesc(
+                    tenantId, Reservation.Status.cancelled, PageRequest.of(0, 10));
+            List<Map<String, Object>> recentList = recentOrders.stream().map(this::mapReservationRow).collect(Collectors.toList());
             data.put("recentOrders", recentList);
 
             return ResponseEntity.ok(data);
@@ -220,8 +231,8 @@ public class DashboardController {
                     tenantId, hotel.getHotelCode(), today);
 
             // 今日可售
-            List<Inventory> todayInv = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), today);
-            int todayAvailable = todayInv.stream().mapToInt(Inventory::getAvailableRooms).sum();
+            int todayAvailable = safeInt(inventoryRepo.sumAvailableRoomsByTenantIdAndHotelCodeAndDate(
+                    tenantId, hotel.getHotelCode(), today));
 
             // 出租率
             int totalRooms = hotel.getTotalRooms() != null && hotel.getTotalRooms() > 0 ? hotel.getTotalRooms() : 1;
@@ -238,26 +249,29 @@ public class DashboardController {
             data.put("stats", stats);
 
             // === 模块 B: 未来7天库存日历 ===
-            List<Inventory> weekInv = inventoryRepo.findByTenantIdAndHotelCodeAndDateBetween(tenantId, hotel.getHotelCode(), today, sevenDaysLater);
+            List<Object[]> weekInv = inventoryRepo.sumAvailableRoomsByTenantIdAndHotelCodeAndDateBetween(
+                    tenantId, hotel.getHotelCode(), today, sevenDaysLater);
             // 按日期分组汇总可用库存
             Map<String, Integer> dailyInventory = new LinkedHashMap<>();
+            Map<String, Integer> weekInventoryMap = weekInv.stream().collect(Collectors.toMap(
+                    row -> sdf.format((Date) row[0]),
+                    row -> safeInt((Number) row[1]),
+                    (a, b) -> b,
+                    LinkedHashMap::new));
             Calendar cal = Calendar.getInstance();
             cal.setTime(today);
             for (int i = 0; i < 7; i++) {
                 String dateStr = sdf.format(cal.getTime());
-                final Date d = cal.getTime();
-                int available = weekInv.stream()
-                        .filter(inv -> sdf.format(inv.getDate()).equals(dateStr))
-                        .mapToInt(Inventory::getAvailableRooms)
-                        .sum();
+                int available = weekInventoryMap.getOrDefault(dateStr, 0);
                 dailyInventory.put(dateStr, available);
                 cal.add(Calendar.DATE, 1);
             }
             data.put("weekInventory", dailyInventory);
 
             // === 模块 C: 今日订单列表 ===
-            List<Reservation> recentOrders = reservationRepo.findTop10ByTenantIdAndHotelCodeOrderByCreatedAtDesc(tenantId, hotel.getHotelCode());
-            data.put("recentOrders", recentOrders.stream().map(this::mapReservation).collect(Collectors.toList()));
+            List<Object[]> recentOrders = reservationRepo.findTop10SnapshotByTenantIdAndHotelCodeOrderByCreatedAtDesc(
+                    tenantId, hotel.getHotelCode(), PageRequest.of(0, 10));
+            data.put("recentOrders", recentOrders.stream().map(this::mapReservationRow).collect(Collectors.toList()));
 
             // === 模块 D: 经营趋势透视 (OCC & ADR) ===
             Date trendStart = getDaysAgo(30);
@@ -321,8 +335,8 @@ public class DashboardController {
                 exceptions.add(Map.of("type", "待确认", "detail", "有 " + pendingConfirm + " 笔订单等待确认", "level", "warning"));
             }
             // 示例：库存不足预警
-            List<Inventory> lowInv = inventoryRepo.findLowInventoryByHotel(tenantId, hotel.getHotelCode(), 0, today, getDaysLater(3));
-            if (!lowInv.isEmpty()) {
+            long lowInvCount = inventoryRepo.countLowInventoryByHotel(tenantId, hotel.getHotelCode(), 0, today, getDaysLater(3));
+            if (lowInvCount > 0) {
                 exceptions.add(Map.of("type", "超卖预警", "detail", "未来3天存在库存为0的房型", "level", "error"));
             }
             data.put("exceptions", exceptions);
@@ -378,14 +392,14 @@ public class DashboardController {
                         .findFirst().orElse(null);
                 if (hotel != null) {
                     totalRooms = hotel.getTotalRooms() != null ? hotel.getTotalRooms() : 0;
-                    List<Inventory> invList = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotelCode, date);
-                    availableRooms = invList.stream().mapToInt(Inventory::getAvailableRooms).sum();
+                    availableRooms = safeInt(inventoryRepo.sumAvailableRoomsByTenantIdAndHotelCodeAndDate(
+                            tenantId, hotelCode, date));
                 }
             } else {
                 for (Hotel hotel : activeHotels) {
                     totalRooms += hotel.getTotalRooms() != null ? hotel.getTotalRooms() : 0;
-                    List<Inventory> invList = inventoryRepo.findByTenantIdAndHotelCodeAndDate(tenantId, hotel.getHotelCode(), date);
-                    availableRooms += invList.stream().mapToInt(Inventory::getAvailableRooms).sum();
+                    availableRooms += safeInt(inventoryRepo.sumAvailableRoomsByTenantIdAndHotelCodeAndDate(
+                            tenantId, hotel.getHotelCode(), date));
                 }
             }
             
@@ -438,23 +452,27 @@ public class DashboardController {
     // 辅助方法
     // =========================================================================
 
-    private Map<String, Object> mapReservation(Reservation r) {
+    private Map<String, Object> mapReservationRow(Object[] row) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("reservationCode", r.getReservationCode());
-        m.put("hotelName", r.getHotelName());
-        m.put("roomTypeName", r.getRoomTypeName());
-        m.put("ratePlanName", r.getRatePlanName());
-        m.put("channelName", r.getChannelName());
-        m.put("contactName", r.getContactName());
-        m.put("checkInDate", r.getCheckInDate() != null ? sdf.format(r.getCheckInDate()) : null);
-        m.put("checkOutDate", r.getCheckOutDate() != null ? sdf.format(r.getCheckOutDate()) : null);
-        m.put("nights", r.getNights());
-        m.put("roomCount", r.getRoomCount());
-        m.put("totalPrice", r.getTotalPrice());
-        m.put("reservationStatus", r.getReservationStatus());
-        m.put("paymentStatus", r.getPaymentStatus());
-        m.put("createdAt", r.getCreatedAt());
+        m.put("reservationCode", row[0]);
+        m.put("hotelName", row[1]);
+        m.put("roomTypeName", row[2]);
+        m.put("ratePlanName", row[3]);
+        m.put("channelName", row[4]);
+        m.put("contactName", row[5]);
+        m.put("checkInDate", row[6] != null ? sdf.format((Date) row[6]) : null);
+        m.put("checkOutDate", row[7] != null ? sdf.format((Date) row[7]) : null);
+        m.put("nights", row[8]);
+        m.put("roomCount", row[9]);
+        m.put("totalPrice", row[10]);
+        m.put("reservationStatus", row[11]);
+        m.put("paymentStatus", row[12]);
+        m.put("createdAt", row[13]);
         return m;
+    }
+
+    private int safeInt(Number value) {
+        return value != null ? value.intValue() : 0;
     }
 
     private Date getToday() {

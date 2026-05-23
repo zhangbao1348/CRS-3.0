@@ -42,6 +42,16 @@ public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
                                      @org.springframework.data.repository.query.Param("startDate") Date startDate,
                                      @org.springframework.data.repository.query.Param("endDate") Date endDate);
 
+    /** Dashboard 预警投影，避免加载 Inventory 关联实体。 */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT i.hotelCode, i.roomTypeCode, i.date, i.availableRooms, i.channelCode " +
+            "FROM Inventory i WHERE i.tenantId = :tenantId AND i.availableRooms <= :threshold " +
+            "AND i.date >= :startDate AND i.date <= :endDate AND i.status = 'active' ORDER BY i.date, i.hotelCode")
+    List<Object[]> findLowInventorySnapshot(@org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+                                            @org.springframework.data.repository.query.Param("threshold") int threshold,
+                                            @org.springframework.data.repository.query.Param("startDate") Date startDate,
+                                            @org.springframework.data.repository.query.Param("endDate") Date endDate);
+
     /**
      * 根据租户和酒店编码安全获取库存。
      */
@@ -87,6 +97,25 @@ public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
      */
     List<Inventory> findByTenantIdAndHotelCodeAndDate(Integer tenantId, String hotelCode, Date date);
 
+    /** 按日期汇总酒店可售库存。 */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(i.availableRooms), 0) FROM Inventory i " +
+            "WHERE i.tenantId = :tenantId AND i.hotelCode = :hotelCode AND i.date = :date")
+    Integer sumAvailableRoomsByTenantIdAndHotelCodeAndDate(@org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+                                                           @org.springframework.data.repository.query.Param("hotelCode") String hotelCode,
+                                                           @org.springframework.data.repository.query.Param("date") Date date);
+
+    /** 按日期汇总酒店一段时间内的可售库存。 */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT i.date, COALESCE(SUM(i.availableRooms), 0) FROM Inventory i " +
+            "WHERE i.tenantId = :tenantId AND i.hotelCode = :hotelCode AND i.date >= :startDate AND i.date <= :endDate " +
+            "GROUP BY i.date ORDER BY i.date")
+    List<Object[]> sumAvailableRoomsByTenantIdAndHotelCodeAndDateBetween(
+            @org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+            @org.springframework.data.repository.query.Param("hotelCode") String hotelCode,
+            @org.springframework.data.repository.query.Param("startDate") Date startDate,
+            @org.springframework.data.repository.query.Param("endDate") Date endDate);
+
     /**
      * 根据租户酒店编码和状态查询。
      */
@@ -104,4 +133,15 @@ public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
                                             @org.springframework.data.repository.query.Param("threshold") int threshold,
                                             @org.springframework.data.repository.query.Param("startDate") Date startDate,
                                             @org.springframework.data.repository.query.Param("endDate") Date endDate);
+
+    /** 统计酒店未来窗口内的低库存记录数。 */
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COUNT(i) FROM Inventory i WHERE i.tenantId = :tenantId AND i.hotelCode = :hotelCode " +
+            "AND i.availableRooms <= :threshold AND i.date >= :startDate AND i.date <= :endDate " +
+            "AND i.status = 'active'")
+    long countLowInventoryByHotel(@org.springframework.data.repository.query.Param("tenantId") Integer tenantId,
+                                  @org.springframework.data.repository.query.Param("hotelCode") String hotelCode,
+                                  @org.springframework.data.repository.query.Param("threshold") int threshold,
+                                  @org.springframework.data.repository.query.Param("startDate") Date startDate,
+                                  @org.springframework.data.repository.query.Param("endDate") Date endDate);
 }

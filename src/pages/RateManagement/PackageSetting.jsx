@@ -1,16 +1,41 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  EyeOutlined,
   GiftOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import api from '../../utils/api'
 
 const { Option } = Select
+
+const formatPackagePrice = (pkg) => {
+  if (pkg.fixedPrice !== null && pkg.fixedPrice !== undefined) {
+    return `¥${pkg.fixedPrice}`
+  }
+
+  if (pkg.priceType === 'hotel') {
+    return '酒店设置'
+  }
+
+  if (pkg.priceType === 'group') {
+    return '集团设置'
+  }
+
+  return '-'
+}
+
+const mapPackageToRow = (pkg) => ({
+  id: pkg.id,
+  name: pkg.name,
+  code: pkg.code,
+  type: pkg.type,
+  status: pkg.status === 'active' ? '启用' : '停用',
+  description: pkg.description,
+  price: formatPackagePrice(pkg)
+})
 
 const PackageSetting = () => {
   const [packages, setPackages] = useState([])
@@ -28,6 +53,7 @@ const PackageSetting = () => {
     { value: '早餐', label: '早餐' },
     { value: '午餐', label: '午餐' },
     { value: '晚餐', label: '晚餐' },
+    { value: '综合', label: '综合' },
     { value: '下午茶', label: '下午茶' },
     { value: '门票', label: '门票' },
     { value: '其他', label: '其他' },
@@ -51,46 +77,8 @@ const PackageSetting = () => {
   const fetchPackages = async () => {
     setLoading(true)
     try {
-      // 模拟数据
-      const mockPackages = [
-        {
-          id: 1,
-          name: '早餐套餐',
-          code: 'BB',
-          type: '早餐',
-          status: '启用',
-          description: '包含自助早餐',
-          price: '¥50'
-        },
-        {
-          id: 2,
-          name: '早晚餐套餐',
-          code: 'HB',
-          type: '综合',
-          status: '启用',
-          description: '包含自助早餐和晚餐',
-          price: '¥120'
-        },
-        {
-          id: 3,
-          name: '全餐套餐',
-          code: 'FB',
-          type: '综合',
-          status: '停用',
-          description: '包含早餐、午餐和晚餐',
-          price: '¥180'
-        },
-        {
-          id: 4,
-          name: '下午茶套餐',
-          code: 'TEA',
-          type: '下午茶',
-          status: '启用',
-          description: '包含下午茶点心和饮品',
-          price: '¥80'
-        }
-      ]
-      setPackages(mockPackages)
+      const response = await api.get('/packages')
+      setPackages(response.map(mapPackageToRow))
     } catch (error) {
       console.error('获取包价列表失败:', error)
       message.error('获取包价列表失败，请稍后重试')
@@ -103,28 +91,14 @@ const PackageSetting = () => {
   const handleSearch = async () => {
     setLoading(true)
     try {
-      // 模拟搜索功能
-      const mockPackages = [
-        {
-          id: 1,
-          name: '早餐套餐',
-          code: 'BB',
-          type: '早餐',
-          status: '启用',
-          description: '包含自助早餐',
-          price: '¥50'
-        },
-        {
-          id: 2,
-          name: '早晚餐套餐',
-          code: 'HB',
-          type: '综合',
-          status: '启用',
-          description: '包含自助早餐和晚餐',
-          price: '¥120'
-        }
-      ]
-      setPackages(mockPackages)
+      const params = {}
+      if (searchParams.name) params.name = searchParams.name
+      if (searchParams.code) params.code = searchParams.code
+      if (searchParams.type) params.type = searchParams.type
+      if (searchParams.status) params.status = searchParams.status
+
+      const response = await api.post('/packages/search', params)
+      setPackages(response.map(mapPackageToRow))
     } catch (error) {
       console.error('搜索包价失败:', error)
       message.error('搜索失败，请稍后重试')

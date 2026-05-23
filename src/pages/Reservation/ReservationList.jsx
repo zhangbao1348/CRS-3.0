@@ -101,7 +101,6 @@ const ReservationList = () => {
         pageSize: data.pageSize || pageSize,
         total: data.totalElements || 0
       })
-      message.success('查询成功')
     } catch (error) {
       console.error('获取订单列表失败:', error)
       message.error('获取订单列表失败')

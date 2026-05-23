@@ -60,10 +60,6 @@ public class Inventory {
     private Hotel hotel;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rate_plan_code", referencedColumnName = "rate_code", insertable = false, updatable = false)
-    private RatePlan ratePlan;
-    
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_type_code", referencedColumnName = "code", insertable = false, updatable = false)
     private RoomType roomType;
     

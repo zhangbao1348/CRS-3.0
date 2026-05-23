@@ -2,6 +2,8 @@ package com.crs.repository;
 
 import com.crs.entity.Package;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -58,6 +60,33 @@ public interface PackageRepository extends JpaRepository<Package, Integer> {
      * @return 包价列表
      */
     List<Package> findByTenantIdAndType(Integer tenantId, String type);
+
+    /**
+     * 组合条件搜索租户内包价。
+     *
+     * @param tenantId 租户 ID
+     * @param name 包价名称，支持模糊匹配
+     * @param code 包价代码，支持模糊匹配
+     * @param type 包价类型，精确匹配
+     * @param status 包价状态，精确匹配
+     * @return 包价列表
+     */
+    @Query("""
+        SELECT p
+        FROM Package p
+        WHERE p.tenantId = :tenantId
+          AND (:name IS NULL OR p.name LIKE CONCAT('%', :name, '%'))
+          AND (:code IS NULL OR p.code LIKE CONCAT('%', :code, '%'))
+          AND (:type IS NULL OR p.type = :type)
+          AND (:status IS NULL OR p.status = :status)
+        ORDER BY p.id DESC
+        """)
+    List<Package> searchPackages(
+            @Param("tenantId") Integer tenantId,
+            @Param("name") String name,
+            @Param("code") String code,
+            @Param("type") String type,
+            @Param("status") Package.Status status);
     
     /**
      * 校验租户内是否存在重复的包价编码。
@@ -92,4 +121,3 @@ public interface PackageRepository extends JpaRepository<Package, Integer> {
     @Deprecated
     boolean existsByCode(String code);
 }
-

@@ -1,20 +1,19 @@
 package com.crs.service;
 
-import com.crs.entity.GroupRoomType;
-import com.crs.entity.GroupRoomTypeHotel;
-import com.crs.entity.Hotel;
-import com.crs.entity.HotelRoomType;
-import com.crs.repository.GroupRoomTypeRepository;
-import com.crs.repository.GroupRoomTypeHotelRepository;
-import com.crs.repository.HotelRepository;
-import com.crs.repository.HotelRoomTypeRepository;
-import com.crs.util.TenantContext;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.crs.entity.GroupRoomType;
+import com.crs.entity.GroupRoomTypeHotel;
+import com.crs.repository.GroupRoomTypeHotelRepository;
+import com.crs.repository.GroupRoomTypeRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.util.TenantContext;
 
 /**
  * GroupRoomTypeService 服务接口 (Service Interface)
@@ -123,6 +122,13 @@ public class GroupRoomTypeService {
         Integer tenantId = getCurrentTenantId();
         var hotelRoomTypes = hotelRoomTypeRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
         var allocations = groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomType.getRoomTypeCode());
+        String categoryCode = groupRoomType.getRoomTypeCategoryCode();
+        if (categoryCode != null) {
+            categoryCode = categoryCode.trim();
+            if (categoryCode.isEmpty()) {
+                categoryCode = null;
+            }
+        }
         
         for (var hotelRoomType : hotelRoomTypes) {
             var allocation = allocations.stream()
@@ -133,6 +139,7 @@ public class GroupRoomTypeService {
                 hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
                 hotelRoomType.setDescription(groupRoomType.getDescription());
                 hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
+                hotelRoomType.setRoomTypeCategoryCode(categoryCode);
                 hotelRoomType.setStatus(groupRoomType.getStatus());
                 hotelRoomTypeRepository.save(hotelRoomType);
             }

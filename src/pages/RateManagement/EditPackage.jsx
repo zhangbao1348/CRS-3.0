@@ -1,27 +1,76 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Modal, DatePicker } from 'antd'
-import { SaveOutlined, LeftOutlined, EditOutlined, PlusOutlined, LeftOutlined as LeftIcon, RightOutlined as RightIcon } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
+import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Checkbox } from 'antd'
+import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
-import axios from 'axios'
-import dayjs from 'dayjs'
+import api from '../../utils/api'
 
 const { TabPane } = Tabs
 const { Option } = Select
 const { Group: RadioGroup } = Radio
-const { RangePicker } = DatePicker
+
+const frequencyOptions = [
+  { value: 'daily', label: '每天1次' },
+  { value: 'per_stay', label: '每入住一次' },
+  { value: 'arrival_day', label: '到达当天发放一次' },
+  { value: 'departure_day', label: '最后一天发放一次' },
+  { value: 'except_departure', label: '除最后一天每天一次' }
+]
+
+const legacyFrequencyMap = {
+  '每天1次': 'daily',
+  '每入住一次': 'per_stay',
+  '到达当天发放一次': 'arrival_day',
+  '最后一天发放一次': 'departure_day',
+  '除最后一天每天一次': 'except_departure'
+}
+
+const quantityTypeOptions = [
+  { value: 'fixed', label: '固定份数' },
+  { value: 'per_order', label: '按订单' },
+  { value: 'per_room', label: '按房间' },
+  { value: 'per_person', label: '按人数' },
+  { value: 'per_adult', label: '按成人数' },
+  { value: 'per_child', label: '按儿童数' }
+]
+
+const getQuantityLabel = (quantityType) => {
+  const quantityLabelMap = {
+    fixed: '固定份数',
+    per_order: '每订单份数',
+    per_room: '每房间份数',
+    per_person: '每人份数',
+    per_adult: '每成人份数',
+    per_child: '每儿童份数'
+  }
+
+  return quantityLabelMap[quantityType] || '份数'
+}
+
+const getEditPriceType = (packageData) => {
+  if (packageData.fixedPrice !== null && packageData.fixedPrice !== undefined) {
+    return 'fixed'
+  }
+
+  return 'hotel'
+}
+
+const getErrorMessage = (error, fallbackMessage) => {
+  if (typeof error?.error === 'string') {
+    return error.error
+  }
+
+  if (typeof error?.response?.data?.error === 'string') {
+    return error.response.data.error
+  }
+
+  return fallbackMessage
+}
 
 const EditPackage = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('1')
   const [quantityType, setQuantityType] = useState('')
   const [priceType, setPriceType] = useState('fixed')
-  const [selectedMonth, setSelectedMonth] = useState('2025-12')
-  const [isPriceModalVisible, setIsPriceModalVisible] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(null)
-  const [priceForm] = Form.useForm()
-  const [isBatchModalVisible, setIsBatchModalVisible] = useState(false)
-  const [batchForm] = Form.useForm()
   const navigate = useNavigate()
   const location = useLocation()
   
@@ -41,138 +90,6 @@ const EditPackage = () => {
     { value: '提前入住', label: '提前入住' }
   ]
   
-  // 发放频率选项
-  const frequencyOptions = [
-    { value: '每天1次', label: '每天1次' },
-    { value: '到达当天发放一次', label: '到达当天发放一次' },
-    { value: '最后一天发放一次', label: '最后一天发放一次' },
-    { value: '除最后一天每天一次', label: '除最后一天每天一次' }
-  ]
-  
-  // 生成日期
-  const generateDates = (month) => {
-    const dates = []
-    const [year, mon] = month.split('-').map(Number)
-    const daysInMonth = new Date(year, mon, 0).getDate()
-    
-    for (let i = 1; i <= daysInMonth; i++) {
-      const date = new Date(year, mon - 1, i)
-      const dayOfWeek = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()]
-      dates.push({
-        date: date,
-        dateStr: `${mon}.${i.toString().padStart(2, '0')}`,
-        dayOfWeek: dayOfWeek,
-        day: i,
-        key: `date_${year}-${mon}-${i.toString().padStart(2, '0')}`
-      })
-    }
-    return dates
-  }
-  
-  const dates = generateDates(selectedMonth)
-  
-  // 价格数据
-  const [priceData, setPriceData] = useState({})
-  
-  // 初始化价格数据
-  React.useEffect(() => {
-    const data = {}
-    dates.forEach(date => {
-      data[date.key] = {
-        price: Math.floor(Math.random() * 500) + 100
-      }
-    })
-    setPriceData(data)
-  }, [selectedMonth])
-  
-  const getDaysInMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon, 0).getDate()
-  }
-  
-  const getFirstDayOfMonth = (month) => {
-    const [year, mon] = month.split('-').map(Number)
-    return new Date(year, mon - 1, 1).getDay()
-  }
-  
-  const daysInMonth = getDaysInMonth(selectedMonth)
-  const firstDay = getFirstDayOfMonth(selectedMonth)
-  
-  const handlePrevMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month - 1
-    if (newMonth < 1) {
-      newMonth = 12
-      newYear -= 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-  
-  const handleNextMonth = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    let newYear = year
-    let newMonth = month + 1
-    if (newMonth > 12) {
-      newMonth = 1
-      newYear += 1
-    }
-    setSelectedMonth(`${newYear}-${newMonth.toString().padStart(2, '0')}`)
-  }
-  
-  const handleDateClick = (date) => {
-    setSelectedDate(date)
-    const data = priceData[date.key] || {}
-    priceForm.setFieldsValue({
-      price: data.price || 0
-    })
-    setIsPriceModalVisible(true)
-  }
-  
-  const handlePriceSubmit = () => {
-    priceForm.validateFields().then(values => {
-      if (selectedDate) {
-        setPriceData(prev => ({
-          ...prev,
-          [selectedDate.key]: {
-            ...prev[selectedDate.key],
-            price: values.price
-          }
-        }))
-        message.success(`${selectedDate.dateStr} 价格已更新`)
-      }
-      setIsPriceModalVisible(false)
-    })
-  }
-  
-  const handleBatchSubmit = () => {
-    batchForm.validateFields().then(values => {
-      const [startDate, endDate] = values.dateRange
-      const newPriceData = { ...priceData }
-      
-      let currentDate = dayjs(startDate)
-      const end = dayjs(endDate)
-      
-      while (currentDate.isBefore(end) || currentDate.isSame(end)) {
-        const dateKey = `date_${currentDate.format('YYYY-M-D')}`
-        const [year, month, day] = currentDate.format('YYYY-M-D').split('-').map(Number)
-        const fullDateKey = `date_${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-        
-        newPriceData[fullDateKey] = {
-          ...newPriceData[fullDateKey],
-          price: values.price
-        }
-        
-        currentDate = currentDate.add(1, 'day')
-      }
-      
-      setPriceData(newPriceData)
-      message.success('批量修改成功')
-      setIsBatchModalVisible(false)
-      batchForm.resetFields()
-    })
-  }
-  
   // 加载包价数据
   useEffect(() => {
     if (packageId) {
@@ -187,8 +104,9 @@ const EditPackage = () => {
   const loadPackageData = async () => {
     setLoading(true)
     try {
-      const response = await axios.get(`/api/packages/${packageId}`)
-      const packageData = response.data
+      const packageData = await api.get(`/packages/${packageId}`)
+      const normalizedFrequency = legacyFrequencyMap[packageData.frequency] || packageData.frequency
+      const normalizedPriceType = getEditPriceType(packageData)
       
       // 转换数据格式以匹配表单
       const formData = {
@@ -198,8 +116,8 @@ const EditPackage = () => {
         type: packageData.type,
         quantityType: packageData.quantityType,
         fixedQuantity: packageData.fixedQuantity,
-        frequency: packageData.frequency,
-        priceType: packageData.priceType,
+        frequency: normalizedFrequency,
+        priceType: normalizedPriceType,
         fixedPrice: packageData.fixedPrice,
         taxIncluded: packageData.taxIncluded
       }
@@ -210,14 +128,7 @@ const EditPackage = () => {
       setQuantityType(formData.quantityType)
       
       // 设置计价方式状态
-      setPriceType(formData.priceType)
-      
-      // 如果有价格数据，加载它
-      if (packageData.priceData) {
-        setPriceData(packageData.priceData)
-      }
-      
-      setActiveTab('1')
+      setPriceType(normalizedPriceType)
     } catch (error) {
       console.error('加载包价数据失败:', error)
       message.error('加载包价数据失败，请稍后重试')
@@ -240,28 +151,23 @@ const EditPackage = () => {
         description: values.description || '',
         type: values.type,
         quantityType: values.quantityType,
-        fixedQuantity: values.quantityType === 'fixed' ? values.fixedQuantity : null,
+        fixedQuantity: values.fixedQuantity,
         frequency: values.frequency,
-        priceType: values.priceType,
+        priceType: values.priceType === 'fixed' ? 'group' : 'hotel',
         fixedPrice: values.priceType === 'fixed' ? values.fixedPrice : null,
-        priceData: priceData,
         taxIncluded: values.taxIncluded || false,
         status: 'active'
       }
       
       // 更新包价
-      const response = await axios.put(`/api/packages/${packageId}`, packageData)
+      await api.put(`/packages/${packageId}`, packageData)
       message.success('包价更新成功')
       
       // 跳转到包价列表页面
       navigate('/rate-management/package-setting')
     } catch (error) {
       console.error('保存包价失败:', error)
-      if (error.response && error.response.data) {
-        message.error(error.response.data)
-      } else {
-        message.error('保存失败，请稍后重试')
-      }
+      message.error(getErrorMessage(error, '保存失败，请稍后重试'))
     } finally {
       setLoading(false)
     }
@@ -270,86 +176,6 @@ const EditPackage = () => {
   // 处理返回
   const handleBack = () => {
     navigate('/rate-management/package-setting')
-  }
-  
-  // 处理TAB切换
-  const handleTabChange = (key) => {
-    setActiveTab(key)
-  }
-  
-  // 渲染日历
-  const renderCalendar = () => {
-    const dayNames = ['日', '一', '二', '三', '四', '五', '六']
-    
-    return (
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {dayNames.map(day => (
-              <th key={day} style={{ 
-                padding: '8px', 
-                border: '1px solid #d9d9d9', 
-                backgroundColor: '#fafafa',
-                textAlign: 'center'
-              }}>
-                {day}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            const rows = []
-            let cells = []
-            
-            for (let i = 0; i < firstDay; i++) {
-              cells.push(<td key={`empty-${i}`} style={{ border: '1px solid #d9d9d9', minHeight: 80 }}></td>)
-            }
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-              const findDate = dates.find(d => d.day === i)
-              const data = priceData[findDate?.key] || {}
-              const dayOfWeek = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1] - 1, i).getDay()
-              const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
-              
-              cells.push(
-                <td 
-                  key={i} 
-                  style={{ 
-                    border: '1px solid #d9d9d9', 
-                    padding: 8, 
-                    cursor: 'pointer',
-                    backgroundColor: isWeekend ? '#fffbf0' : '#fff',
-                    textAlign: 'center',
-                    minHeight: 80
-                  }}
-                  onClick={() => handleDateClick(findDate)}
-                >
-                  <div style={{ fontWeight: 500, marginBottom: 4 }}>{i}</div>
-                  <div style={{ fontSize: 14, color: '#1890ff', fontWeight: 500 }}>
-                    ¥{data.price || 0}
-                  </div>
-                </td>
-              )
-              
-              if ((firstDay + i) % 7 === 0) {
-                rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-                cells = []
-              }
-            }
-            
-            if (cells.length > 0) {
-              while (cells.length < 7) {
-                cells.push(<td key={`empty-end-${cells.length}`} style={{ border: '1px solid #d9d9d9' }}></td>)
-              }
-              rows.push(<tr key={`row-${rows.length}`}>{cells}</tr>)
-            }
-            
-            return rows
-          })()}
-        </tbody>
-      </table>
-    )
   }
   
   return (
@@ -372,8 +198,11 @@ const EditPackage = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          initialValues={{
+            taxIncluded: false
+          }}
         >
-          <Tabs activeKey={activeTab} onChange={handleTabChange}>
+          <Tabs defaultActiveKey="1">
             <TabPane tab="基础信息" key="1">
               <Row gutter={[16, 16]}>
                 <Col span={12}>
@@ -431,60 +260,25 @@ const EditPackage = () => {
                   >
                     <Select 
                       placeholder="请选择计数方式"
-                      onChange={(value) => setQuantityType(value)}
+                      onChange={(value) => {
+                        setQuantityType(value)
+                        form.setFieldValue('fixedQuantity', undefined)
+                      }}
                     >
-                      <Option value="per_order">按订单</Option>
-                      <Option value="per_room">按房间</Option>
-                      <Option value="per_person">按人数</Option>
-                      <Option value="per_adult">按成人数</Option>
-                      <Option value="per_child">按儿童数</Option>
+                      {quantityTypeOptions.map(item => (
+                        <Option key={item.value} value={item.value}>{item.label}</Option>
+                      ))}
                     </Select>
                   </Form.Item>
                 </Col>
                 <Col span={12}>
-                  {quantityType === 'per_order' && (
+                  {quantityType && (
                     <Form.Item
-                      name="perOrderQuantity"
-                      label="每订单份数"
-                      rules={[{ required: true, message: '请输入每订单份数' }]}
+                      name="fixedQuantity"
+                      label={getQuantityLabel(quantityType)}
+                      rules={[{ required: true, message: `请输入${getQuantityLabel(quantityType)}` }]}
                     >
-                      <Input type="number" min={1} placeholder="请输入每订单份数" />
-                    </Form.Item>
-                  )}
-                  {quantityType === 'per_room' && (
-                    <Form.Item
-                      name="perRoomQuantity"
-                      label="每房间份数"
-                      rules={[{ required: true, message: '请输入每房间份数' }]}
-                    >
-                      <Input type="number" min={1} placeholder="请输入每房间份数" />
-                    </Form.Item>
-                  )}
-                  {quantityType === 'per_person' && (
-                    <Form.Item
-                      name="perPersonQuantity"
-                      label="每人份数"
-                      rules={[{ required: true, message: '请输入每人份数' }]}
-                    >
-                      <Input type="number" min={1} placeholder="请输入每人份数" />
-                    </Form.Item>
-                  )}
-                  {quantityType === 'per_adult' && (
-                    <Form.Item
-                      name="perAdultQuantity"
-                      label="每成人份数"
-                      rules={[{ required: true, message: '请输入每成人份数' }]}
-                    >
-                      <Input type="number" min={1} placeholder="请输入每成人份数" />
-                    </Form.Item>
-                  )}
-                  {quantityType === 'per_child' && (
-                    <Form.Item
-                      name="perChildQuantity"
-                      label="每儿童份数"
-                      rules={[{ required: true, message: '请输入每儿童份数' }]}
-                    >
-                      <Input type="number" min={1} placeholder="请输入每儿童份数" />
+                      <InputNumber style={{ width: '100%' }} min={1} precision={0} placeholder={`请输入${getQuantityLabel(quantityType)}`} />
                     </Form.Item>
                   )}
                 </Col>
@@ -496,7 +290,7 @@ const EditPackage = () => {
                   >
                     <RadioGroup onChange={(e) => setPriceType(e.target.value)}>
                       <Radio value="fixed">固定价格</Radio>
-                      <Radio value="date">按日期设置价格</Radio>
+                      <Radio value="hotel">酒店设置</Radio>
                     </RadioGroup>
                   </Form.Item>
                 </Col>
@@ -507,10 +301,10 @@ const EditPackage = () => {
                       label="价格"
                       dependencies={['priceType']}
                       rules={[
-                        {
-                          required: ({ priceType }) => priceType === 'fixed',
+                        ({ getFieldValue }) => ({
+                          required: getFieldValue('priceType') === 'fixed',
                           message: '请输入价格'
-                        }
+                        })
                       ]}
                     >
                       <InputNumber
@@ -528,7 +322,7 @@ const EditPackage = () => {
                     name="taxIncluded"
                     valuePropName="checked"
                   >
-                    <Radio>设置价格是否含税</Radio>
+                    <Checkbox>设置价格是否含税</Checkbox>
                   </Form.Item>
                 </Col>
               </Row>
@@ -540,28 +334,6 @@ const EditPackage = () => {
                 <Input.TextArea rows={4} placeholder="请输入包价描述" />
               </Form.Item>
             </TabPane>
-            
-            {priceType === 'date' && (
-              <TabPane tab="设置价格" key="2">
-                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-                  <Button icon={<LeftIcon />} onClick={handlePrevMonth}>上月</Button>
-                  <span style={{ fontSize: 16, fontWeight: 500, minWidth: 80, textAlign: 'center' }}>
-                    {selectedMonth.replace('-', '年')}月
-                  </span>
-                  <Button icon={<RightIcon />} onClick={handleNextMonth}>下月</Button>
-                  <Button 
-                    type="primary" 
-                    icon={<PlusOutlined />}
-                    style={{ marginLeft: 24 }}
-                    onClick={() => setIsBatchModalVisible(true)}
-                  >
-                    批量修改
-                  </Button>
-                </div>
-                
-                {renderCalendar()}
-              </TabPane>
-            )}
           </Tabs>
           
           <div style={{ marginTop: 32, padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -586,66 +358,6 @@ const EditPackage = () => {
           </div>
         </Form>
       </div>
-      
-      {/* 单个日期修改价格 */}
-      <Modal
-        title={selectedDate ? `${selectedDate.dateStr} 设置价格` : '设置价格'}
-        open={isPriceModalVisible}
-        onOk={handlePriceSubmit}
-        onCancel={() => setIsPriceModalVisible(false)}
-        okText="确认"
-        cancelText="取消"
-      >
-        <Form form={priceForm} layout="vertical">
-          <Form.Item
-            name="price"
-            label="价格"
-            rules={[{ required: true, message: '请输入价格' }]}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder="请输入价格"
-              min={0}
-              step={0.01}
-              prefix="¥"
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
-      
-      {/* 批量修改价格 */}
-      <Modal
-        title="批量修改价格"
-        open={isBatchModalVisible}
-        onOk={handleBatchSubmit}
-        onCancel={() => setIsBatchModalVisible(false)}
-        okText="确认"
-        cancelText="取消"
-        width={500}
-      >
-        <Form form={batchForm} layout="vertical">
-          <Form.Item
-            name="dateRange"
-            label="日期范围"
-            rules={[{ required: true, message: '请选择日期范围' }]}
-          >
-            <RangePicker style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="price"
-            label="价格"
-            rules={[{ required: true, message: '请输入价格' }]}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder="请输入价格"
-              min={0}
-              step={0.01}
-              prefix="¥"
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }
