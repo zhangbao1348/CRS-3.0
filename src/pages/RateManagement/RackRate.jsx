@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react'
+import { useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { Button, Checkbox, DatePicker, Input, Card, Row, Col, Modal, Form, Select, message, Spin, Empty, Table, Tag } from 'antd'
 import { DollarOutlined, HistoryOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -21,12 +21,13 @@ const OP_TYPE_MAP = {
 const RackRate = () => {
   const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
+  const tableScrollRef = useRef(null)
 
   // Filter state
   const [ratePlans, setRatePlans] = useState([])
   const [selectedRateCode, setSelectedRateCode] = useState(null)
   const [roomTypes, setRoomTypes] = useState([])
-  const [dateRange, setDateRange] = useState([dayjs(), dayjs().add(13, 'day')])
+  const [selectedMonth, setSelectedMonth] = useState(dayjs())
 
   // Price grid state
   const [dates, setDates] = useState([])
@@ -59,6 +60,21 @@ const RackRate = () => {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [hotelCode])
 
+  const baseRatePlans = ratePlans.filter(plan => plan?.rateType === 'basic')
+
+  useEffect(() => {
+    if (!selectedRateCode) {
+      return
+    }
+
+    const selectedPlan = ratePlans.find(plan => plan?.rateCode === selectedRateCode)
+    if (selectedPlan && selectedPlan.rateType !== 'basic') {
+      setSelectedRateCode(null)
+      setDates([])
+      setPrices({})
+    }
+  }, [ratePlans, selectedRateCode])
+
   useEffect(() => {
     if (!hotelCode) { setRoomTypes([]); return }
     hotelRoomTypeApi.getHotelRoomTypesByCode(hotelCode).then(res => {
@@ -66,12 +82,12 @@ const RackRate = () => {
     }).catch(() => {})
   }, [hotelCode])
 
-  // Build date columns from range
-  const buildDates = useCallback((range) => {
-    if (!range || range.length !== 2) return []
+  // Build date columns from month
+  const buildDates = useCallback((month) => {
+    if (!month) return []
     const result = []
-    let cur = range[0].startOf('day')
-    const end = range[1].startOf('day')
+    let cur = month.startOf('month')
+    const end = month.endOf('month')
     while (cur.isBefore(end) || cur.isSame(end, 'day')) {
       result.push(cur.format('YYYY-MM-DD'))
       cur = cur.add(1, 'day')
@@ -79,19 +95,60 @@ const RackRate = () => {
     return result
   }, [])
 
+  const getEarliestEditableDate = useCallback(() => {
+    const now = dayjs()
+    return now.hour() < 6
+      ? now.subtract(1, 'day').startOf('day')
+      : now.startOf('day')
+  }, [])
+
+  const isDateEditable = useCallback((dateLike) => {
+    if (!dateLike) {
+      return false
+    }
+
+    const targetDate = dayjs(dateLike).startOf('day')
+    return !targetDate.isBefore(getEarliestEditableDate(), 'day')
+  }, [getEarliestEditableDate])
+
+  const scrollToTodayColumn = useCallback((cols) => {
+    if (!tableScrollRef.current || !selectedMonth?.isSame(dayjs(), 'month')) {
+      return
+    }
+
+    const todayKey = dayjs().format('YYYY-MM-DD')
+    const todayIndex = cols.indexOf(todayKey)
+
+    if (todayIndex < 0) {
+      return
+    }
+
+    const stickyColumnWidth = 160
+    const dateColumnWidth = 90
+    const containerWidth = tableScrollRef.current.clientWidth || 0
+    const targetLeft = stickyColumnWidth + todayIndex * dateColumnWidth
+    const scrollLeft = Math.max(targetLeft - containerWidth / 2 + dateColumnWidth / 2, 0)
+
+    requestAnimationFrame(() => {
+      if (tableScrollRef.current) {
+        tableScrollRef.current.scrollLeft = scrollLeft
+      }
+    })
+  }, [selectedMonth])
+
   // Fetch prices - 包含已删除的价格记录
   const fetchPrices = useCallback(async () => {
-    if (!hotelCode || !selectedRateCode || !dateRange || dateRange.length !== 2) return
+    if (!hotelCode || !selectedRateCode || !selectedMonth) return
     setLoading(true)
     try {
-      const cols = buildDates(dateRange)
+      const cols = buildDates(selectedMonth)
       setDates(cols)
       const res = await api.get('/hotel-prices', {
         params: {
           hotelCode,
           rateCode: selectedRateCode,
-          startDate: dateRange[0].format('YYYY-MM-DD'),
-          endDate: dateRange[1].format('YYYY-MM-DD')
+          startDate: selectedMonth.startOf('month').format('YYYY-MM-DD'),
+          endDate: selectedMonth.endOf('month').format('YYYY-MM-DD')
         }
       })
       const list = res?.data || []
@@ -108,17 +165,18 @@ const RackRate = () => {
         }
       })
       setPrices(map)
+      scrollToTodayColumn(cols)
     } catch (err) {
       console.error('查询价格失败:', err)
       message.error('查询价格失败')
     } finally {
       setLoading(false)
     }
-  }, [hotelCode, selectedRateCode, dateRange, roomTypes, buildDates])
+  }, [hotelCode, selectedRateCode, selectedMonth, roomTypes, buildDates, scrollToTodayColumn])
 
   // Save single price on blur
   const handlePriceSave = async (roomTypeCode, dateStr, value) => {
-    if (value === '' || value == null) return
+    if (!isDateEditable(dateStr) || value === '' || value == null) return
     setSaving(true)
     try {
       await api.post('/hotel-prices', {
@@ -146,6 +204,10 @@ const RackRate = () => {
 
   // Handle cell value change (local state only)
   const handleCellChange = (roomTypeCode, dateStr, value) => {
+    if (!isDateEditable(dateStr)) {
+      return
+    }
+
     setPrices(prev => ({
       ...prev,
       [roomTypeCode]: { ...prev[roomTypeCode], [dateStr]: { value, status: 'active' } }
@@ -184,7 +246,7 @@ const RackRate = () => {
       const end = batchDateRange[1].startOf('day')
       while (cur.isBefore(end) || cur.isSame(end, 'day')) {
         const wd = cur.day()
-        if (batchWeekdays.length === 0 || batchWeekdays.includes(wd)) {
+        if (isDateEditable(cur) && (batchWeekdays.length === 0 || batchWeekdays.includes(wd))) {
           const dateStr = cur.format('YYYY-MM-DD')
           updateRooms.forEach(([rtCode, v]) => {
             records.push({
@@ -319,7 +381,7 @@ const RackRate = () => {
     return (
       <div className="page-container">
         <h1 className="page-title"><DollarOutlined /> 基础价格设置</h1>
-        <Card bordered={false}><Empty description="请先选择酒店" /></Card>
+        <Card variant="borderless"><Empty description="请先选择酒店" /></Card>
       </div>
     )
   }
@@ -330,7 +392,7 @@ const RackRate = () => {
   return (
     <div className="page-container">
       <h1 className="page-title"><DollarOutlined /> 基础价格设置</h1>
-      <Card bordered={false}>
+      <Card variant="borderless">
         {/* Filters */}
         <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
           <Col>
@@ -342,7 +404,7 @@ const RackRate = () => {
               value={selectedRateCode}
               onChange={setSelectedRateCode}
               style={{ width: 280 }}
-              options={ratePlans.map(rp => ({
+              options={baseRatePlans.map(rp => ({
                 value: rp.rateCode,
                 label: `${rp.rateName}（${rp.rateCode}）`
               }))}
@@ -351,8 +413,13 @@ const RackRate = () => {
         </Row>
         <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
           <Col>
-            <span style={{ marginRight: 8 }}>日期:</span>
-            <RangePicker value={dateRange} onChange={setDateRange} />
+            <span style={{ marginRight: 8 }}>月份:</span>
+            <DatePicker.MonthPicker
+              value={selectedMonth}
+              onChange={(value) => value && setSelectedMonth(value)}
+              placeholder="选择月份"
+              allowClear={false}
+            />
           </Col>
           <Col flex="auto" style={{ textAlign: 'right' }}>
             <Button type="primary" onClick={fetchPrices} loading={loading} style={{ marginRight: 8 }}>
@@ -370,7 +437,7 @@ const RackRate = () => {
         {/* Price Grid */}
         <Spin spinning={loading || saving}>
           {dates.length > 0 && roomTypes.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
+            <div ref={tableScrollRef} style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: dates.length * 100 + 160 }}>
                 <thead>
                   <tr>
@@ -396,9 +463,10 @@ const RackRate = () => {
                       {dates.map(d => {
                         const cell = prices[rt.roomTypeCode]?.[d]
                         const isDeleted = cell?.status === 'deleted'
-                        const val = cell?.value
+                        const isEditable = isDateEditable(d)
+                        const val = isDeleted ? '' : cell?.value
 
-                        if (isDeleted) {
+                        if (isDeleted && !isEditable) {
                           return (
                             <td key={d} style={{ ...cellStyle, color: '#999', fontSize: 18, fontWeight: 600 }}>
                               -
@@ -413,6 +481,8 @@ const RackRate = () => {
                               size="small"
                               style={{ width: 80, textAlign: 'center' }}
                               value={val ?? ''}
+                              placeholder={isDeleted ? '-' : undefined}
+                              disabled={!isEditable}
                               onChange={e => handleCellChange(rt.roomTypeCode, d, e.target.value)}
                               onBlur={e => handlePriceSave(rt.roomTypeCode, d, e.target.value)}
                             />
@@ -443,7 +513,10 @@ const RackRate = () => {
       >
         <Form form={batchForm} layout="vertical">
           <Form.Item label="日期范围" name="batchDateRange" rules={[{ required: true, message: '请选择日期范围' }]}>
-            <RangePicker style={{ width: '100%' }} />
+            <RangePicker
+              style={{ width: '100%' }}
+              disabledDate={(current) => current && !isDateEditable(current)}
+            />
           </Form.Item>
 
           <Form.Item label="周控">

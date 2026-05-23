@@ -49,6 +49,30 @@ const PriceQuery = () => {
     return result
   }, [])
 
+  const scrollToDateColumn = useCallback((cols, targetDate) => {
+    if (!tableScrollRef.current || !targetDate) {
+      return
+    }
+
+    const targetIndex = cols.indexOf(targetDate)
+    if (targetIndex < 0) {
+      tableScrollRef.current.scrollLeft = 0
+      return
+    }
+
+    const stickyColumnWidth = 200
+    const dateColumnWidth = 70
+    const containerWidth = tableScrollRef.current.clientWidth || 0
+    const targetLeft = stickyColumnWidth + targetIndex * dateColumnWidth
+    const scrollLeft = Math.max(targetLeft - containerWidth / 2 + dateColumnWidth / 2, 0)
+
+    requestAnimationFrame(() => {
+      if (tableScrollRef.current) {
+        tableScrollRef.current.scrollLeft = scrollLeft
+      }
+    })
+  }, [])
+
   // 查询价格
   const fetchPrices = useCallback(async () => {
     if (!hotelCode || !selectedRateCode) return
@@ -81,19 +105,13 @@ const PriceQuery = () => {
       const firstPriceDate = activePrices
         .map((item) => dayjs(item.priceDate).format('YYYY-MM-DD'))
         .sort()[0]
+      const todayKey = dayjs().format('YYYY-MM-DD')
+      const targetDate = selectedMonth.isSame(dayjs(), 'month')
+        ? todayKey
+        : firstPriceDate
 
-      if (firstPriceDate && tableScrollRef.current) {
-        const firstPriceIndex = cols.indexOf(firstPriceDate)
-        if (firstPriceIndex > 0) {
-          const scrollLeft = Math.max(firstPriceIndex * 70 - 140, 0)
-          requestAnimationFrame(() => {
-            if (tableScrollRef.current) {
-              tableScrollRef.current.scrollLeft = scrollLeft
-            }
-          })
-        } else {
-          tableScrollRef.current.scrollLeft = 0
-        }
+      if (targetDate && tableScrollRef.current) {
+        scrollToDateColumn(cols, targetDate)
       } else if (tableScrollRef.current) {
         tableScrollRef.current.scrollLeft = 0
       }
@@ -103,7 +121,7 @@ const PriceQuery = () => {
     } finally {
       setLoading(false)
     }
-  }, [hotelCode, selectedRateCode, selectedMonth, roomTypes, buildMonthDates])
+  }, [hotelCode, selectedRateCode, selectedMonth, roomTypes, buildMonthDates, scrollToDateColumn])
 
   const handleMonthChange = (month) => {
     if (month) setSelectedMonth(month)
