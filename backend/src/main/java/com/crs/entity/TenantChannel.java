@@ -56,6 +56,12 @@ public class TenantChannel {
     @Column(name = "price_rounding", length = 20)
     private String priceRounding = "keep";
 
+    @Column(name = "prepaid_order_requires_payment", nullable = false)
+    private Boolean prepaidOrderRequiresPayment = true;
+
+    @Column(name = "cancel_order_checks_cancellation_rule", nullable = false)
+    private Boolean cancelOrderChecksCancellationRule = true;
+
     @Column(name = "prepaid_commission_type", length = 20)
     private String prepaidCommissionType = "percentage";
 
@@ -105,6 +111,10 @@ public class TenantChannel {
     public void setStatus(String status) { this.status = status; }
     public String getPriceRounding() { return priceRounding; }
     public void setPriceRounding(String priceRounding) { this.priceRounding = priceRounding; }
+    public Boolean getPrepaidOrderRequiresPayment() { return prepaidOrderRequiresPayment; }
+    public void setPrepaidOrderRequiresPayment(Boolean prepaidOrderRequiresPayment) { this.prepaidOrderRequiresPayment = prepaidOrderRequiresPayment; }
+    public Boolean getCancelOrderChecksCancellationRule() { return cancelOrderChecksCancellationRule; }
+    public void setCancelOrderChecksCancellationRule(Boolean cancelOrderChecksCancellationRule) { this.cancelOrderChecksCancellationRule = cancelOrderChecksCancellationRule; }
     public String getPrepaidCommissionType() { return prepaidCommissionType; }
     public void setPrepaidCommissionType(String prepaidCommissionType) { this.prepaidCommissionType = prepaidCommissionType; }
     public java.math.BigDecimal getPrepaidCommissionValue() { return prepaidCommissionValue; }

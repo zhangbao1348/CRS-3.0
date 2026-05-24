@@ -1,24 +1,39 @@
 package com.crs.service;
 
-import com.crs.entity.*;
-import com.crs.repository.*;
-import com.crs.service.inventory.AvailabilityResult;
-import com.crs.service.inventory.InventoryDeductionContext;
-import com.crs.service.inventory.InventoryDeductionService;
-import com.crs.service.inventory.InventoryReleaseContext;
-import com.crs.util.DisplayMapper;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.crs.entity.Reservation;
+import com.crs.entity.ReservationDailyPrice;
+import com.crs.entity.ReservationGuest;
+import com.crs.entity.ReservationHistory;
+import com.crs.entity.ReservationPayment;
+import com.crs.entity.ReservationPromotion;
+import com.crs.repository.ReservationDailyPriceRepository;
+import com.crs.repository.ReservationGuestRepository;
+import com.crs.repository.ReservationHistoryRepository;
+import com.crs.repository.ReservationPaymentRepository;
+import com.crs.repository.ReservationPromotionRepository;
+import com.crs.repository.ReservationRepository;
+import com.crs.service.inventory.InventoryDeductionContext;
+import com.crs.service.inventory.InventoryDeductionService;
+import com.crs.service.inventory.InventoryReleaseContext;
+import com.crs.util.DisplayMapper;
 
 /**
  * ReservationService 服务接口 (Service Interface)
@@ -184,6 +199,32 @@ public class ReservationService {
         Reservation reservation = getReservationById(id)
                 .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
+        return cancelReservationInternal(reservation, cancelledBy, cancelReason, "crs");
+    }
+
+    @Transactional
+    public Reservation cancelReservationBySystem(Integer id, String cancelledBy, String cancelReason) {
+        Reservation reservation = reservationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (!"pending_payment".equals(reservation.getReservationStatus())) {
+            throw new RuntimeException("仅待支付订单允许执行支付超时自动取消");
+        }
+        if (!"unpaid".equals(reservation.getPaymentStatus())) {
+            throw new RuntimeException("订单已支付或支付状态已变更，不能执行支付超时自动取消");
+        }
+        if (reservation.getPaymentDeadline() == null || reservation.getPaymentDeadline().after(new Date())) {
+            throw new RuntimeException("订单尚未到达支付超时时间");
+        }
+
+        return cancelReservationInternal(reservation, cancelledBy, cancelReason, "system");
+    }
+
+    private Reservation cancelReservationInternal(Reservation reservation, String cancelledBy, String cancelReason, String operatorType) {
+        if (reservation == null) {
+            throw new RuntimeException("订单不存在");
+        }
+
         if (!"confirmed".equals(reservation.getReservationStatus())
                 && !"pending".equals(reservation.getReservationStatus())
                 && !"pending_payment".equals(reservation.getReservationStatus())) {
@@ -213,7 +254,7 @@ public class ReservationService {
         history.setContent("取消订单：" + (cancelReason != null ? cancelReason : ""));
         history.setResult("success");
         history.setOperator(cancelledBy);
-        history.setOperatorType("crs");
+        history.setOperatorType(operatorType);
         historyRepository.save(history);
 
         return saved;

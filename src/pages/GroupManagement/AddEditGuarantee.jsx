@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Form, Input, Select, Button, Card, Row, Col, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
+import {
+  GUARANTEE_TYPE_OPTIONS,
+  isCreditCardGuaranteeType,
+  normalizeGuaranteeType
+} from '../../utils/guaranteePolicy'
 
 const { Option } = Select
 
@@ -18,16 +23,6 @@ const AddEditGuarantee = () => {
   const record = location.state?.record
   const isEditing = !!record
   
-  // 担保类型选项
-  const guaranteeTypeOptions = [
-    { value: '无担保', label: '无担保' },
-    { value: '信用卡', label: '信用卡' },
-    { value: '预付', label: '预付' },
-    { value: '公司', label: '公司' },
-    { value: '第三方', label: '第三方' },
-    { value: '特殊', label: '特殊' }
-  ]
-  
   // 状态选项
   const statusOptions = [
     { value: '启用', label: '启用' },
@@ -39,18 +34,19 @@ const AddEditGuarantee = () => {
     if (isEditing && record) {
       // 状态映射：active/inactive -> 启用/停用
       const statusMap = { 'active': '启用', 'inactive': '停用' }
+      const normalizedGuaranteeType = normalizeGuaranteeType(record.type)
       
       form.setFieldsValue({
         name: record.name,
         code: record.code,
-        type: record.type,
+        type: normalizedGuaranteeType,
         guaranteeSubType: record.guaranteeSubType,
         guaranteeAmount: record.guaranteeAmount,
-        latestArrivalTime: record.latestArrivalTime,
+        latestArrivalTime: record.latestArrivalTime || record.latestCheckInTime,
         status: statusMap[record.status] || record.status,
         description: record.description
       })
-      setGuaranteeType(record.type)
+      setGuaranteeType(normalizedGuaranteeType)
       setGuaranteeSubType(record.guaranteeSubType || '')
     }
   }, [isEditing, record, form])
@@ -148,12 +144,13 @@ const AddEditGuarantee = () => {
                   placeholder="请选择担保类型"
                   onChange={(value) => {
                     setGuaranteeType(value)
-                    if (value !== '信用卡') {
+                    if (!isCreditCardGuaranteeType(value)) {
+                      setGuaranteeSubType('')
                       form.setFieldsValue({ guaranteeSubType: undefined, guaranteeAmount: undefined, latestArrivalTime: undefined })
                     }
                   }}
                 >
-                  {guaranteeTypeOptions.map(option => (
+                  {GUARANTEE_TYPE_OPTIONS.map(option => (
                     <Option key={option.value} value={option.value}>{option.label}</Option>
                   ))}
                 </Select>
@@ -162,7 +159,7 @@ const AddEditGuarantee = () => {
           </Row>
           
           {/* 信用卡担保特有字段 */}
-          {guaranteeType === '信用卡' && (
+          {isCreditCardGuaranteeType(guaranteeType) && (
             <Row gutter={[16, 16]}>
               <Col span={12}>
                 <Form.Item

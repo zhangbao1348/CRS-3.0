@@ -3,6 +3,7 @@ package com.crs.service.impl;
 import com.crs.entity.GuaranteePolicy;
 import com.crs.repository.GuaranteePolicyRepository;
 import com.crs.service.GuaranteePolicyService;
+import com.crs.util.GuaranteePolicyTypeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,11 +54,15 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
     @Override
     public GuaranteePolicy create(GuaranteePolicy policy) {
         Integer tenantId = getCurrentTenantId();
+        if (!GuaranteePolicyTypeUtil.isSupportedType(policy.getType())) {
+            throw new IllegalArgumentException("担保类型无效");
+        }
         // 检查代码是否已存在（同一租户下）
         if (guaranteePolicyRepository.existsByTenantIdAndCode(tenantId, policy.getCode())) {
             throw new IllegalArgumentException("担保政策代码已存在");
         }
         policy.setTenantId(tenantId);
+        policy.setType(GuaranteePolicyTypeUtil.normalizeType(policy.getType()));
         return guaranteePolicyRepository.save(policy);
     }
     
@@ -72,6 +77,9 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
             guaranteePolicyRepository.existsByTenantIdAndCode(existingPolicy.getTenantId(), policy.getCode())) {
             throw new IllegalArgumentException("担保政策代码已存在");
         }
+        if (!GuaranteePolicyTypeUtil.isSupportedType(policy.getType())) {
+            throw new IllegalArgumentException("担保类型无效");
+        }
         
         // 执行更新
         existingPolicy.setCode(policy.getCode());
@@ -79,10 +87,11 @@ public class GuaranteePolicyServiceImpl implements GuaranteePolicyService {
         existingPolicy.setDescription(policy.getDescription());
         existingPolicy.setStatus(policy.getStatus());
         existingPolicy.setIsDefault(policy.getIsDefault());
-        existingPolicy.setType(policy.getType());
+        existingPolicy.setType(GuaranteePolicyTypeUtil.normalizeType(policy.getType()));
         existingPolicy.setCardType(policy.getCardType());
+        existingPolicy.setGuaranteeSubType(policy.getGuaranteeSubType());
         existingPolicy.setGuaranteeAmount(policy.getGuaranteeAmount());
-        existingPolicy.setLatestCheckInTime(policy.getLatestCheckInTime());
+        existingPolicy.setLatestArrivalTime(policy.getLatestArrivalTime());
         
         return guaranteePolicyRepository.save(existingPolicy);
     }

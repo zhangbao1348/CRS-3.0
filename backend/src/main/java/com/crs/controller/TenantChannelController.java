@@ -78,7 +78,7 @@ public class TenantChannelController {
     @PutMapping("/{id}")
     public ResponseEntity<TenantChannel> updateChannel(
             @PathVariable Integer id,
-            @RequestBody TenantChannel channelData) {
+            @RequestBody Map<String, Object> channelData) {
         try {
             // 校验归属权
             TenantChannel existing = tenantChannelService.getChannelById(id);
@@ -119,7 +119,7 @@ public class TenantChannelController {
     @PutMapping("/code/{channelCode}")
     public ResponseEntity<TenantChannel> updateChannelByCode(
             @PathVariable String channelCode,
-            @RequestBody TenantChannel channelData) {
+            @RequestBody Map<String, Object> channelData) {
         try {
             TenantChannel updated = tenantChannelService.updateChannelByCode(getCurrentTenantId(), channelCode, channelData);
             if (updated != null) {

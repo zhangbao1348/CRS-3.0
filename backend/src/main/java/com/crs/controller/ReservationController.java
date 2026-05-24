@@ -1,22 +1,45 @@
 package com.crs.controller;
 
-import com.crs.entity.*;
-import com.crs.repository.TenantChannelRepository;
-import com.crs.service.ReservationService;
-import com.crs.util.DisplayMapper;
-import org.springframework.data.domain.Page;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.crs.entity.ApiLog;
+import com.crs.entity.Reservation;
+import com.crs.entity.ReservationDailyPrice;
+import com.crs.entity.ReservationGuest;
+import com.crs.entity.ReservationHistory;
+import com.crs.entity.ReservationPayment;
+import com.crs.entity.ReservationPromotion;
+import com.crs.entity.User;
+import com.crs.repository.ApiLogRepository;
+import com.crs.service.ReservationService;
+import com.crs.service.UserService;
+import com.crs.util.DisplayMapper;
 
 /**
  * ReservationController 控制器 (REST Controller)
@@ -37,11 +60,16 @@ import java.util.stream.Collectors;
 public class ReservationController {
 
     private final ReservationService reservationService;
-    private final TenantChannelRepository tenantChannelRepo;
+    private final ApiLogRepository apiLogRepository;
+    private final UserService userService;
 
-    public ReservationController(ReservationService reservationService, TenantChannelRepository tenantChannelRepo) {
+    public ReservationController(
+            ReservationService reservationService,
+            ApiLogRepository apiLogRepository,
+            UserService userService) {
         this.reservationService = reservationService;
-        this.tenantChannelRepo = tenantChannelRepo;
+        this.apiLogRepository = apiLogRepository;
+        this.userService = userService;
     }
 
     private Integer getCurrentTenantId() {
@@ -104,6 +132,10 @@ public class ReservationController {
         List<ReservationPayment> payments = reservationService.getPayments(id);
         List<ReservationPromotion> promotions = reservationService.getPromotions(id);
         List<ReservationHistory> history = reservationService.getHistory(id);
+        List<ApiLog> apiLogs = apiLogRepository.findByReservationIdOrderByCreatedAtDesc(id);
+        Map<Integer, ApiLog> apiLogById = apiLogs.stream()
+                .filter(log -> log.getId() != null)
+                .collect(Collectors.toMap(ApiLog::getId, log -> log, (existing, ignored) -> existing, LinkedHashMap::new));
 
         Map<String, Object> detail = new LinkedHashMap<>();
 
@@ -232,15 +264,23 @@ public class ReservationController {
         detail.put("remarkInfo", remarkInfo);
 
         List<Map<String, Object>> historyList = history.stream().map(h -> {
+            ApiLog apiLog = h.getLogId() != null ? apiLogById.get(h.getLogId()) : null;
+            if (apiLog == null) {
+                apiLog = findFallbackApiLog(h, apiLogs);
+            }
             Map<String, Object> hMap = new LinkedHashMap<>();
             hMap.put("id", h.getId());
             hMap.put("action", h.getAction());
             hMap.put("content", h.getContent());
             hMap.put("result", h.getResult());
             hMap.put("operator", h.getOperator());
+            hMap.put("operatorDisplay", resolveHistoryOperatorDisplay(reservation, h));
             hMap.put("operatorType", h.getOperatorType());
             hMap.put("operationTime", formatDateTime(h.getOperationTime()));
             hMap.put("detail", h.getDetail());
+            hMap.put("logId", apiLog != null ? apiLog.getId() : h.getLogId());
+            hMap.put("hasApiLog", apiLog != null);
+            hMap.put("apiLog", buildApiLogData(apiLog));
             return hMap;
         }).collect(Collectors.toList());
         detail.put("operationHistory", historyList);
@@ -286,8 +326,11 @@ public class ReservationController {
     public ResponseEntity<Map<String, Object>> cancelReservation(
             @PathVariable Integer id,
             @RequestBody Map<String, Object> body) {
+        String cancelledBy = resolveAuthenticatedOperator();
+        if (cancelledBy == null) {
+            return unauthorizedResponse("请先登录后再执行取消订单操作");
+        }
         try {
-            String cancelledBy = (String) body.getOrDefault("cancelledBy", "system");
             String cancelReason = (String) body.getOrDefault("cancelReason", "");
 
             Reservation cancelled = reservationService.cancelReservation(id, cancelledBy, cancelReason);
@@ -305,13 +348,51 @@ public class ReservationController {
         }
     }
 
+    private String resolveAuthenticatedOperator() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication.getName() == null
+                || authentication.getName().isBlank()
+                || "anonymousUser".equalsIgnoreCase(authentication.getName())) {
+            return null;
+        }
+
+        String username = authentication.getName();
+        return userService.getUserByUsername(username)
+                .map(this::toOperatorName)
+                .orElse(username);
+    }
+
+    private String toOperatorName(User user) {
+        if (user == null) {
+            return "system";
+        }
+        if (user.getName() != null && !user.getName().isBlank()) {
+            return user.getName();
+        }
+        if (user.getUsername() != null && !user.getUsername().isBlank()) {
+            return user.getUsername();
+        }
+        return null;
+    }
+
+    private ResponseEntity<Map<String, Object>> unauthorizedResponse(String message) {
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("error", message);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
     @PutMapping("/{id}/status")
     public ResponseEntity<Map<String, Object>> updateReservationStatus(
             @PathVariable Integer id,
             @RequestBody Map<String, Object> body) {
+        String operator = resolveAuthenticatedOperator();
+        if (operator == null) {
+            return unauthorizedResponse("请先登录后再执行状态更新操作");
+        }
         try {
             String newStatus = (String) body.get("reservationStatus");
-            String operator = (String) body.getOrDefault("operator", "system");
 
             if (newStatus == null || newStatus.isBlank()) {
                 Map<String, Object> error = new LinkedHashMap<>();
@@ -338,9 +419,12 @@ public class ReservationController {
     public ResponseEntity<Map<String, Object>> manualIntervene(
             @PathVariable Integer id,
             @RequestBody Map<String, Object> body) {
+        String operator = resolveAuthenticatedOperator();
+        if (operator == null) {
+            return unauthorizedResponse("请先登录后再执行人工干预操作");
+        }
         try {
             String reason = (String) body.getOrDefault("reason", "");
-            String operator = (String) body.getOrDefault("operator", "system");
 
             Reservation updated = reservationService.manualIntervene(id, reason, operator);
 
@@ -454,6 +538,84 @@ public class ReservationController {
     private String formatDateTime(Date date) {
         if (date == null) return null;
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date);
+    }
+
+    private ApiLog findFallbackApiLog(ReservationHistory history, List<ApiLog> apiLogs) {
+        if (history == null || apiLogs == null || apiLogs.isEmpty()) {
+            return null;
+        }
+        return apiLogs.stream()
+                .filter(log -> matchesHistoryAction(history, log))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean matchesHistoryAction(ReservationHistory history, ApiLog apiLog) {
+        if (history == null || apiLog == null) {
+            return false;
+        }
+        String requestBody = apiLog.getRequestBody();
+        if (requestBody == null || requestBody.isBlank()) {
+            return false;
+        }
+        String action = history.getAction();
+        if ("CREATE".equalsIgnoreCase(action)) {
+            return requestBody.contains("/api/open/reservations")
+                    && !requestBody.contains("/cancel")
+                    && apiLog.getResponseBody() != null
+                    && apiLog.getResponseBody().contains("\"reservationId\"");
+        }
+        if ("CANCEL".equalsIgnoreCase(action)) {
+            return requestBody.contains("/api/open/reservations/")
+                    && requestBody.contains("/cancel");
+        }
+        return false;
+    }
+
+    private Map<String, Object> buildApiLogData(ApiLog apiLog) {
+        if (apiLog == null) {
+            return null;
+        }
+        Map<String, Object> logData = new LinkedHashMap<>();
+        logData.put("id", apiLog.getId());
+        logData.put("requestBody", apiLog.getRequestBody());
+        logData.put("responseBody", apiLog.getResponseBody());
+        logData.put("errorMessage", apiLog.getErrorMessage());
+        logData.put("createdAt", formatDateTime(apiLog.getCreatedAt()));
+        return logData;
+    }
+
+    private String resolveHistoryOperatorDisplay(Reservation reservation, ReservationHistory history) {
+        if (history == null || history.getOperator() == null || history.getOperator().isBlank()) {
+            return "-";
+        }
+
+        String operator = history.getOperator();
+        String operatorType = history.getOperatorType();
+
+        if ("channel".equalsIgnoreCase(operatorType)) {
+            String channelName = reservation != null
+                    ? (reservation.getChannelName() != null && !reservation.getChannelName().isBlank()
+                            ? reservation.getChannelName()
+                            : reservation.getChannelCode())
+                    : null;
+            if ((channelName == null || channelName.isBlank()) && operator.startsWith("channel:")) {
+                channelName = operator.substring("channel:".length());
+            }
+            return "渠道：" + (channelName != null && !channelName.isBlank() ? channelName : operator);
+        }
+
+        if ("system".equalsIgnoreCase(operatorType)) {
+            if ("system:payment-timeout".equalsIgnoreCase(operator)) {
+                return "系统任务：支付超时自动取消";
+            }
+            if (operator.startsWith("system:")) {
+                return "系统任务：" + operator.substring("system:".length());
+            }
+            return "系统";
+        }
+
+        return operator;
     }
 
     @SuppressWarnings("unchecked")

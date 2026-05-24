@@ -50,6 +50,8 @@ import com.crs.service.ReservationService;
 import com.crs.service.inventory.AvailabilityContext;
 import com.crs.service.inventory.AvailabilityResult;
 import com.crs.service.inventory.InventoryDeductionService;
+import com.crs.util.CancellationPolicyTypeUtil;
+import com.crs.util.GuaranteePolicyTypeUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -390,13 +392,12 @@ public class OpenReservationController {
 
             @SuppressWarnings("unchecked")
             Map<String, Object> guaranteeInfo = (Map<String, Object>) body.get("guaranteeInfo");
-            String guaranteeType = getString(body, "guaranteeType");
+            String guaranteeType = GuaranteePolicyTypeUtil.normalizeType(getString(body, "guaranteeType"));
             String guaranteeInfoStr = getString(body, "guaranteeInfo");
             if (guaranteeInfo != null) {
-                if (guaranteeType == null) guaranteeType = getString(guaranteeInfo, "type");
+                if (guaranteeType == null) guaranteeType = GuaranteePolicyTypeUtil.normalizeType(getString(guaranteeInfo, "type"));
                 if (guaranteeInfoStr == null) guaranteeInfoStr = getString(guaranteeInfo, "creditCardInfo");
             }
-            reservation.setGuaranteeType(guaranteeType);
             reservation.setGuaranteeInfo(guaranteeInfoStr);
 
             // 1. 自动填充政策快照
@@ -420,20 +421,28 @@ public class OpenReservationController {
             if (guaranteeRule != null && !guaranteeRule.isBlank()) {
                 GuaranteePolicy gp = guaranteePolicyRepo.findByTenantIdAndCode(channel.getTenantId(), guaranteeRule);
                 if (gp != null) {
+                    String appliedGuaranteeType = GuaranteePolicyTypeUtil.normalizeType(gp.getType());
                     reservation.setGuaranteePolicyCode(gp.getCode());
                     reservation.setGuaranteePolicyDesc(gp.getDescription());
+                    reservation.setGuaranteeType(appliedGuaranteeType);
+
+                    if (guaranteeType != null && appliedGuaranteeType != null && !appliedGuaranteeType.equals(guaranteeType)) {
+                        return ResponseEntity.badRequest().body(err(400, "guaranteeInfo.type 与价格计划绑定的担保政策类型不一致"));
+                    }
                     
-                    if ("credit_card".equalsIgnoreCase(gp.getType()) && (guaranteeInfoStr == null || guaranteeInfoStr.isBlank())) {
+                    if (GuaranteePolicyTypeUtil.isCreditCardType(appliedGuaranteeType) && (guaranteeInfoStr == null || guaranteeInfoStr.isBlank())) {
                         return ResponseEntity.badRequest().body(err(400, "该价格计划要求信用卡担保，必须提供 guaranteeInfo.creditCardInfo"));
                     }
                     
                     // 预付逻辑校验
-                    if ("prepaid".equalsIgnoreCase(gp.getType())) {
+                    if (GuaranteePolicyTypeUtil.isPrepaidType(appliedGuaranteeType)) {
                         paymentType = "prepaid";
-                        reservation.setReservationStatus("pending_payment");
-                        Calendar calDeadline = Calendar.getInstance();
-                        calDeadline.add(Calendar.MINUTE, 30);
-                        reservation.setPaymentDeadline(calDeadline.getTime());
+                        if (!Boolean.FALSE.equals(channel.getPrepaidOrderRequiresPayment())) {
+                            reservation.setReservationStatus("pending_payment");
+                            Calendar calDeadline = Calendar.getInstance();
+                            calDeadline.add(Calendar.MINUTE, 30);
+                            reservation.setPaymentDeadline(calDeadline.getTime());
+                        }
                     }
                 } else {
                     reservation.setGuaranteePolicyCode(guaranteeRule);
@@ -493,7 +502,7 @@ public class OpenReservationController {
             data.put("totalPrice", created.getTotalPrice());
             data.put("originalPrice", created.getOriginalPrice());
             data.put("currency", created.getCurrency());
-            data.put("guaranteeType", created.getGuaranteeType());
+            data.put("guaranteeType", GuaranteePolicyTypeUtil.normalizeType(created.getGuaranteeType()));
             data.put("cancellationPolicyCode", created.getCancellationPolicyCode());
             data.put("cancellationPolicyDesc", created.getCancellationPolicyDesc());
             data.put("guaranteePolicyCode", created.getGuaranteePolicyCode());
@@ -551,7 +560,7 @@ public class OpenReservationController {
             data.put("totalPrice", reservation.getTotalPrice());
             data.put("originalPrice", reservation.getOriginalPrice());
             data.put("currency", reservation.getCurrency());
-            data.put("guaranteeType", reservation.getGuaranteeType());
+            data.put("guaranteeType", GuaranteePolicyTypeUtil.normalizeType(reservation.getGuaranteeType()));
             data.put("cancellationPolicyCode", reservation.getCancellationPolicyCode());
             data.put("cancellationPolicyDesc", reservation.getCancellationPolicyDesc());
             data.put("guaranteePolicyCode", reservation.getGuaranteePolicyCode());
@@ -622,31 +631,33 @@ public class OpenReservationController {
             String cancelReason = body != null ? getString(body, "cancelReason") : "";
             String operator = "channel:" + channel.getChannelCode();
 
-            // 校验取消政策
-            String policyCode = reservation.getCancellationPolicyCode();
-            if (policyCode != null) {
-                CancellationPolicy policy = cancellationPolicyRepo.findByTenantIdAndCode(reservation.getTenantId(), policyCode);
-                if (policy != null) {
-                    if ("non_refundable".equalsIgnoreCase(policy.getType())) {
-                        return ResponseEntity.status(409).body(err(409, "该订单不可退（Non-refundable）"));
-                    }
-                    if ("limited".equalsIgnoreCase(policy.getType())) {
-                        // 计算取消截止时间
-                        Calendar deadline = Calendar.getInstance();
-                        deadline.setTime(reservation.getCheckInDate());
-                        int days = policy.getCancellationDays() != null ? policy.getCancellationDays() : 0;
-                        deadline.add(Calendar.DATE, -days);
-                        
-                        String timeStr = policy.getCancellationTime() != null ? policy.getCancellationTime() : "18:00";
-                        String[] parts = timeStr.split(":");
-                        deadline.set(Calendar.HOUR_OF_DAY, parts.length > 0 ? Integer.parseInt(parts[0]) : 18);
-                        deadline.set(Calendar.MINUTE, parts.length > 1 ? Integer.parseInt(parts[1]) : 0);
-                        deadline.set(Calendar.SECOND, 0);
-                        deadline.set(Calendar.MILLISECOND, 0);
+            if (!Boolean.FALSE.equals(channel.getCancelOrderChecksCancellationRule())) {
+                // 校验取消政策
+                String policyCode = reservation.getCancellationPolicyCode();
+                if (policyCode != null) {
+                    CancellationPolicy policy = cancellationPolicyRepo.findByTenantIdAndCode(reservation.getTenantId(), policyCode);
+                    if (policy != null) {
+                        if (CancellationPolicyTypeUtil.isNonRefundableType(policy.getType())) {
+                            return ResponseEntity.status(409).body(err(409, "该订单不可退（Non-refundable）"));
+                        }
+                        if (CancellationPolicyTypeUtil.isLimitedType(policy.getType())) {
+                            // 计算取消截止时间
+                            Calendar deadline = Calendar.getInstance();
+                            deadline.setTime(reservation.getCheckInDate());
+                            int days = policy.getCancellationDays() != null ? policy.getCancellationDays() : 0;
+                            deadline.add(Calendar.DATE, -days);
 
-                        if (new Date().after(deadline.getTime())) {
-                            return ResponseEntity.status(409).body(err(409, 
-                                    "已超过免费取消截止时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm").format(deadline.getTime())));
+                            String timeStr = policy.getCancellationTime() != null ? policy.getCancellationTime() : "18:00";
+                            String[] parts = timeStr.split(":");
+                            deadline.set(Calendar.HOUR_OF_DAY, parts.length > 0 ? Integer.parseInt(parts[0]) : 18);
+                            deadline.set(Calendar.MINUTE, parts.length > 1 ? Integer.parseInt(parts[1]) : 0);
+                            deadline.set(Calendar.SECOND, 0);
+                            deadline.set(Calendar.MILLISECOND, 0);
+
+                            if (new Date().after(deadline.getTime())) {
+                                return ResponseEntity.status(409).body(err(409,
+                                        "已超过免费取消截止时间: " + new SimpleDateFormat("yyyy-MM-dd HH:mm").format(deadline.getTime())));
+                            }
                         }
                     }
                 }

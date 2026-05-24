@@ -19,5 +19,11 @@ public interface ApiLogRepository extends JpaRepository<ApiLog, Integer> {
      * @return 接口日志列表
      */
     List<ApiLog> findByReservationId(Integer reservationId);
-}
 
+    /**
+     * 根据预订ID查询接口日志，按创建时间倒序
+     * @param reservationId 预订ID
+     * @return 接口日志列表
+     */
+    List<ApiLog> findByReservationIdOrderByCreatedAtDesc(Integer reservationId);
+}

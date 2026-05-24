@@ -1,6 +1,9 @@
 package com.crs.repository;
 
-import com.crs.entity.Reservation;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,9 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Date;
-import java.util.Optional;
+import com.crs.entity.Reservation;
 
 /**
  * 预订订单数据访问接口 (ReservationRepository)
@@ -52,6 +53,13 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
 
         /** 根据支付状态过滤 (基于 hotelCode) */
         List<Reservation> findByTenantIdAndHotelCodeAndPaymentStatus(Integer tenantId, String hotelCode, String paymentStatus);
+
+        /** 获取已超时的待支付订单（系统任务使用） */
+        List<Reservation> findTop100ByReservationStatusAndPaymentStatusAndPaymentDeadlineLessThanEqualAndStatusOrderByPaymentDeadlineAsc(
+                        String reservationStatus,
+                        String paymentStatus,
+                        Date paymentDeadline,
+                        Reservation.Status status);
 
         /** 按创建时间范围查询 (基于 hotelCode) */
         List<Reservation> findByTenantIdAndHotelCodeAndCreatedAtBetween(Integer tenantId, String hotelCode, Date startDate, Date endDate);

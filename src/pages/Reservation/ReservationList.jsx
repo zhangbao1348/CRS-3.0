@@ -23,6 +23,7 @@ const statusFilterMap = {
   '所有状态': '',
   '已确认': 'confirmed',
   '待确认': 'pending',
+  '待支付': 'pending_payment',
   '已取消': 'cancelled',
   '取消失败': 'cancel_failed',
   '已入住': 'checked_in',
@@ -161,6 +162,7 @@ const ReservationList = () => {
                 <Option value="所有状态">所有状态</Option>
                 <Option value="已确认">已确认</Option>
                 <Option value="待确认">待确认</Option>
+                <Option value="待支付">待支付</Option>
                 <Option value="已取消">已取消</Option>
                 <Option value="取消失败">取消失败</Option>
                 <Option value="已入住">已入住</Option>

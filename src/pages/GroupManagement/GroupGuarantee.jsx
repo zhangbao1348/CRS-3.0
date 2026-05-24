@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, Radio, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
-  EditOutlined, 
-  EyeOutlined,
+  EditOutlined,
   LockOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
+import {
+  GUARANTEE_TYPE_OPTIONS,
+  getGuaranteeTypeLabel,
+  normalizeGuaranteeType
+} from '../../utils/guaranteePolicy'
 
 const { Option } = Select
-const { Group: RadioGroup } = Radio
-
 const GroupGuarantee = () => {
   const [guaranteePolicies, setGuaranteePolicies] = useState([])
   const [loading, setLoading] = useState(false)
@@ -52,7 +54,7 @@ const GroupGuarantee = () => {
   const filteredPolicies = guaranteePolicies.filter(item => {
     if (searchName && !item.name?.includes(searchName)) return false
     if (searchCode && !item.code?.includes(searchCode)) return false
-    if (searchType && item.type !== searchType) return false
+    if (searchType && normalizeGuaranteeType(item.type) !== searchType) return false
     if (searchStatus) {
       const statusMap = { '启用': 'active', '停用': 'inactive' }
       if (item.status !== statusMap[searchStatus]) return false
@@ -77,7 +79,8 @@ const GroupGuarantee = () => {
       title: '担保类型',
       dataIndex: 'type',
       key: 'type',
-      width: 120
+      width: 120,
+      render: (type) => getGuaranteeTypeLabel(type)
     },
     {
       title: '描述',
@@ -150,13 +153,9 @@ const GroupGuarantee = () => {
               value={searchType}
               onChange={setSearchType}
             >
-              <Option value="无担保">无担保</Option>
-              <Option value="信用卡">信用卡</Option>
-              <Option value="预付">预付</Option>
-              <Option value="公司">公司</Option>
-              <Option value="第三方">第三方</Option>
-              <Option value="积分">积分</Option>
-              <Option value="特殊">特殊</Option>
+              {GUARANTEE_TYPE_OPTIONS.map(option => (
+                <Option key={option.value} value={option.value}>{option.label}</Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>

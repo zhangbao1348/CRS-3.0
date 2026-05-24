@@ -19,6 +19,7 @@ public class DisplayMapper {
     /** 订单状态映射表 */
     private static final Map<String, String> RESERVATION_STATUS = Map.ofEntries(
             Map.entry("pending", "待确认"),
+            Map.entry("pending_payment", "待支付"),
             Map.entry("confirmed", "已确认"),
             Map.entry("cancelled", "已取消"),
             Map.entry("checked_in", "已入住"),
@@ -30,6 +31,7 @@ public class DisplayMapper {
     /** 订单状态对应的 Ant Design 颜色标签 */
     private static final Map<String, String> STATUS_COLOR = Map.ofEntries(
             Map.entry("pending", "orange"),
+            Map.entry("pending_payment", "gold"),
             Map.entry("confirmed", "green"),
             Map.entry("cancelled", "red"),
             Map.entry("checked_in", "blue"),
@@ -43,8 +45,12 @@ public class DisplayMapper {
             Map.entry("none", "无担保"),
             Map.entry("guarantee", "担保"),
             Map.entry("prepay", "预付"),
+            Map.entry("prepaid", "预付"),
             Map.entry("credit_card", "信用卡担保"),
-            Map.entry("deposit", "押金担保")
+            Map.entry("deposit", "押金担保"),
+            Map.entry("company", "公司"),
+            Map.entry("third_party", "第三方"),
+            Map.entry("special", "特殊")
     );
 
     /** 订单支付状态映射表 */
@@ -113,6 +119,7 @@ public class DisplayMapper {
     /** 历史记录动作映射表 */
     private static final Map<String, String> HISTORY_ACTION = Map.ofEntries(
             Map.entry("pending", "CREATE"),
+            Map.entry("pending_payment", "CREATE"),
             Map.entry("confirmed", "CONFIRM"),
             Map.entry("cancelled", "CANCEL"),
             Map.entry("checked_in", "CHECK_IN"),
@@ -123,6 +130,7 @@ public class DisplayMapper {
     /** 历史记录内容说明映射表 */
     private static final Map<String, String> HISTORY_CONTENT = Map.ofEntries(
             Map.entry("pending", "创建订单"),
+            Map.entry("pending_payment", "创建订单"),
             Map.entry("confirmed", "确认订单"),
             Map.entry("cancelled", "取消订单"),
             Map.entry("checked_in", "客人入住"),
@@ -175,6 +183,10 @@ public class DisplayMapper {
 
     /** 映射担保类型文字 */
     public static String guaranteeType(String type) {
+        String normalizedType = GuaranteePolicyTypeUtil.normalizeType(type);
+        if (GUARANTEE_TYPE.containsKey(normalizedType)) {
+            return GUARANTEE_TYPE.get(normalizedType);
+        }
         return resolve(GUARANTEE_TYPE, type, "-");
     }
 
@@ -235,4 +247,3 @@ public class DisplayMapper {
         return resolve(PACKAGE_TYPE_NAME, type, "其他");
     }
 }
-

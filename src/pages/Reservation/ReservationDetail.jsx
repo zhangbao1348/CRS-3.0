@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Typography, Descriptions, Table, Tag, Button, Space, Divider, Modal, Tabs, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { Card, Typography, Descriptions, Table, Tag, Button, Space, Modal, Tabs, message } from 'antd'
 import { CloseCircleOutlined, HistoryOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { reservationApi } from '../../utils/api'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
 const ReservationDetail = () => {
   const [searchParams] = useSearchParams()
@@ -15,6 +15,7 @@ const ReservationDetail = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [historyModalVisible, setHistoryModalVisible] = useState(false)
   const [logModalVisible, setLogModalVisible] = useState(false)
+  const [selectedApiLog, setSelectedApiLog] = useState(null)
 
   const fetchDetail = async () => {
     if (!reservationId) {
@@ -53,12 +54,32 @@ const ReservationDetail = () => {
     setHistoryModalVisible(false)
   }
 
-  const handleLogClick = () => {
+  const handleLogClick = (apiLog) => {
+    setSelectedApiLog(apiLog)
     setLogModalVisible(true)
   }
 
   const handleLogModalClose = () => {
+    setSelectedApiLog(null)
     setLogModalVisible(false)
+  }
+
+  const formatLogContent = (content) => {
+    if (!content) {
+      return '暂无日志数据'
+    }
+    if (typeof content !== 'string') {
+      try {
+        return JSON.stringify(content, null, 2)
+      } catch (error) {
+        return String(content)
+      }
+    }
+    try {
+      return JSON.stringify(JSON.parse(content), null, 2)
+    } catch (error) {
+      return content
+    }
   }
 
   const handleCancelOrder = async () => {
@@ -346,13 +367,29 @@ const ReservationDetail = () => {
           size="small" 
           bordered 
           pagination={false}
-          dataSource={operationHistory.map((item, index) => ({ key: index + 1, content: item.content || item.action, result: item.result, operator: item.operator, time: item.time || item.createdAt, log: item.log }))} 
+          dataSource={operationHistory.map((item, index) => ({
+            key: index + 1,
+            content: item.content || item.action,
+            result: item.result,
+            operator: item.operatorDisplay || item.operator,
+            time: item.operationTime || item.time || item.createdAt,
+            apiLog: item.apiLog,
+            hasApiLog: item.hasApiLog
+          }))} 
           columns={[
             { title: '操作内容', dataIndex: 'content', width: 150 },
             { title: '结果', dataIndex: 'result' },
             { title: '操作人', dataIndex: 'operator' },
             { title: '操作时间', dataIndex: 'time', width: 180 },
-            { title: '接口日志', dataIndex: 'log', render: (text) => text ? <a href="#" onClick={handleLogClick}>{text}</a> : '-' }
+            {
+              title: '接口日志',
+              dataIndex: 'hasApiLog',
+              render: (_, record) => (
+                record.hasApiLog && record.apiLog
+                  ? <a onClick={() => handleLogClick(record.apiLog)}>查看日志</a>
+                  : '-'
+              )
+            }
           ]}
         />
       </Modal>
@@ -365,6 +402,11 @@ const ReservationDetail = () => {
         footer={null}
         width={800}
       >
+        <div style={{ marginBottom: 12 }}>
+          <Text type="secondary">
+            日志时间：{selectedApiLog?.createdAt || '-'}
+          </Text>
+        </div>
         <div style={{ marginBottom: 16 }}>
           <Text strong>入参：</Text>
           <div style={{ 
@@ -376,7 +418,7 @@ const ReservationDetail = () => {
             marginTop: 8
           }}>
             <pre style={{ margin: 0, fontSize: '12px' }}>
-              暂无日志数据
+              {formatLogContent(selectedApiLog?.requestBody)}
             </pre>
           </div>
         </div>
@@ -391,13 +433,23 @@ const ReservationDetail = () => {
             marginTop: 8
           }}>
             <pre style={{ margin: 0, fontSize: '12px' }}>
-              暂无日志数据
+              {formatLogContent(selectedApiLog?.responseBody)}
             </pre>
           </div>
         </div>
         <div>
           <Text strong>失败原因：</Text>
-          <Text>-</Text>
+          <div style={{
+            border: '1px solid #d9d9d9',
+            borderRadius: '4px',
+            padding: '12px',
+            minHeight: '52px',
+            marginTop: 8,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all'
+          }}>
+            {selectedApiLog?.errorMessage || '-'}
+          </div>
         </div>
       </Modal>
     </div>

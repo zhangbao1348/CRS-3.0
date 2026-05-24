@@ -60,7 +60,9 @@ import com.crs.repository.RoomTypeFacilityRepository;
 import com.crs.service.inventory.AvailabilityContext;
 import com.crs.service.inventory.AvailabilityResult;
 import com.crs.service.inventory.InventoryDeductionService;
+import com.crs.util.CancellationPolicyTypeUtil;
 import com.crs.util.DisplayMapper;
+import com.crs.util.GuaranteePolicyTypeUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -801,7 +803,7 @@ public class OpenHotelController {
         CancellationPolicy policy = cancellationPolicyRepo.findByTenantIdAndCode(tenantId, ruleCode);
         if (policy == null) return null;
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("type", policy.getType());
+        m.put("type", CancellationPolicyTypeUtil.normalizeType(policy.getType()));
         m.put("description", policy.getDescription());
         m.put("freeCancelBeforeDays", policy.getCancellationDays());
         m.put("freeCancelBeforeTime", policy.getCancellationTime());
@@ -814,7 +816,7 @@ public class OpenHotelController {
         GuaranteePolicy policy = guaranteePolicyRepo.findByTenantIdAndCode(tenantId, ruleCode);
         if (policy == null) return null;
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("type", policy.getType());
+        m.put("type", GuaranteePolicyTypeUtil.normalizeType(policy.getType()));
         m.put("subType", policy.getGuaranteeSubType());
         m.put("amount", policy.getGuaranteeAmount());
         m.put("latestArrivalTime", policy.getLatestArrivalTime());
