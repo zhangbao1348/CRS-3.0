@@ -3,7 +3,7 @@ import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbo
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
-import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateCodeAllocationApi, groupRateCodeApi, groupRoomTypeApi, groupRoomTypeHotelApi } from '../../utils/api'
+import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateCodeAllocationApi, groupRateCodeApi, groupRoomTypeApi, groupRoomTypeHotelApi, dictionaryApi } from '../../utils/api'
 
 const { Option } = Select
 
@@ -16,6 +16,7 @@ const EditHotel = () => {
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
   const [hotel, setHotel] = useState(null)
+  const [regionOptions, setRegionOptions] = useState([])
   
   // 集团设施数据状态
   const [groupFacilities, setGroupFacilities] = useState([])
@@ -107,6 +108,22 @@ const EditHotel = () => {
       message.error('未找到酒店ID')
     }
   }, [])
+
+  useEffect(() => {
+    const loadRegionOptions = async () => {
+      try {
+        const response = await dictionaryApi.getActiveDictionaryItems('REGION', {
+          metadata: { skipAutoLogout: true }
+        })
+        const regions = Array.isArray(response) ? response : (response.data || [])
+        setRegionOptions(regions)
+      } catch (error) {
+        console.error('加载酒店所在区域字典失败:', error)
+      }
+    }
+
+    loadRegionOptions()
+  }, [])
   
   // 当设施数据变化时，更新表单
   useEffect(() => {
@@ -176,6 +193,7 @@ const EditHotel = () => {
           hotelStarRating: starRatingDisplay,
           hotelProvince: hotel.province,
           hotelCity: hotel.city,
+          hotelRegion: hotel.region,
           hotelAddress: hotel.address,
           hotelLongitude: hotel.longitude,
           hotelLatitude: hotel.latitude,
@@ -183,6 +201,7 @@ const EditHotel = () => {
           hotelEmail: hotel.email,
           hotelIntroduction: hotel.introduction,
           hotelTotalRooms: hotel.totalRooms || 0,
+          minimumPrice: hotel.minimumPrice,
           supportMultiPrice: hotel.supportMultiPrice || 'no',
           multiPriceOptions: hotel.multiPriceOptions ? hotel.multiPriceOptions.split(',') : [],
           supportRoomTypePriceDiff: hotel.supportRoomTypePriceDiff || 'no',
@@ -511,6 +530,7 @@ const EditHotel = () => {
         starRating: starRatingValue,
         province: values.hotelProvince,
         city: values.hotelCity,
+        region: values.hotelRegion ?? null,
         address: values.hotelAddress,
         longitude: values.hotelLongitude ? parseFloat(values.hotelLongitude) : null,
         latitude: values.hotelLatitude ? parseFloat(values.hotelLatitude) : null,
@@ -518,6 +538,7 @@ const EditHotel = () => {
         email: values.hotelEmail,
         introduction: values.hotelIntroduction || '',
         totalRooms: values.hotelTotalRooms,
+        minimumPrice: values.minimumPrice ?? null,
         status: 'active',
         supportMultiPrice: values.supportMultiPrice || 'no',
         multiPriceOptions: values.multiPriceOptions ? values.multiPriceOptions.join(',') : '',
@@ -968,6 +989,23 @@ const EditHotel = () => {
                   </Select>
                 </Form.Item>
               </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="hotelRegion"
+                  label="酒店所在区域"
+                >
+                  <Select
+                    placeholder="请选择酒店所在区域"
+                    allowClear
+                  >
+                    {regionOptions.map(region => (
+                      <Option key={region.code} value={region.code}>
+                        {region.name || region.code}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
               <Col span={24}>
                 <Form.Item
                   name="hotelAddress"
@@ -1018,6 +1056,14 @@ const EditHotel = () => {
                   rules={[{ required: true, message: '请输入酒店总房间数' }]}
                 >
                   <InputNumber placeholder="请输入酒店总房间数" style={{ width: '100%' }} min={1} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="minimumPrice"
+                  label="酒店最低价格（含税）"
+                >
+                  <InputNumber placeholder="请输入酒店最低价格（含税）" style={{ width: '100%' }} min={0} precision={2} prefix="¥" />
                 </Form.Item>
               </Col>
               <Col span={24}>

@@ -140,6 +140,7 @@ public class OpenReservationController {
             if (hotel == null || hotel.getStatus() != Hotel.Status.active) {
                 return ResponseEntity.status(404).body(err(404, "酒店不存在或已停用"));
             }
+            BigDecimal minimumPrice = getHotelMinimumPrice(hotel);
 
             if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
@@ -250,16 +251,34 @@ public class OpenReservationController {
 
             List<HotelPrice> prices = priceRepo.findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotelCode, ratePlanCode, roomTypeCode, checkIn, lastNight);
-            if (prices.size() < nights) {
-                return ResponseEntity.status(409).body(unavailable("PRICE_NOT_SET", "部分日期未设置价格"));
-            }
-            prices.sort(Comparator.comparing(HotelPrice::getPriceDate));
-            Map<String, BigDecimal> dbPriceMap = prices.stream().collect(Collectors.toMap(
-                    p -> formatDate(p.getPriceDate()), HotelPrice::getPriceWithTax));
+            Map<String, HotelPrice> validPriceMap = prices.stream()
+                    .filter(this::isEffectiveHotelPrice)
+                    .collect(Collectors.toMap(
+                            p -> formatDate(p.getPriceDate()),
+                            p -> p,
+                            (existing, replacement) -> replacement,
+                            LinkedHashMap::new));
 
-            BigDecimal totalPriceFromDb = prices.stream()
-                    .filter(p -> p.getPriceWithTax() != null)
+            List<HotelPrice> effectivePrices = new ArrayList<>();
+            cal.setTime(checkIn);
+            for (int i = 0; i < nights; i++) {
+                String dateKey = formatDate(cal.getTime());
+                HotelPrice validPrice = validPriceMap.get(dateKey);
+                if (validPrice == null) {
+                    return ResponseEntity.status(409).body(unavailable("PRICE_NOT_SET", "部分日期未设置价格"));
+                }
+                effectivePrices.add(validPrice);
+                cal.add(Calendar.DATE, 1);
+            }
+
+            effectivePrices.sort(Comparator.comparing(HotelPrice::getPriceDate));
+            Map<String, BigDecimal> dbPriceMap = effectivePrices.stream().collect(Collectors.toMap(
+                    p -> formatDate(p.getPriceDate()),
+                    p -> applyHotelMinimumPrice(p.getPriceWithTax(), minimumPrice)));
+
+            BigDecimal totalPriceFromDb = effectivePrices.stream()
                     .map(HotelPrice::getPriceWithTax)
+                    .map(price -> applyHotelMinimumPrice(price, minimumPrice))
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .multiply(BigDecimal.valueOf(roomCount));
 
@@ -297,7 +316,7 @@ public class OpenReservationController {
                 }
             }
 
-            BigDecimal originalPriceFromDb = prices.stream()
+            BigDecimal originalPriceFromDb = effectivePrices.stream()
                     .filter(p -> p.getPriceWithoutTax() != null)
                     .map(HotelPrice::getPriceWithoutTax)
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
@@ -308,13 +327,14 @@ public class OpenReservationController {
 
             // 构建每日价格
             List<ReservationDailyPrice> dailyPrices = new ArrayList<>();
-            for (HotelPrice hp : prices) {
+            for (HotelPrice hp : effectivePrices) {
+                BigDecimal actualPrice = applyHotelMinimumPrice(hp.getPriceWithTax(), minimumPrice);
                 ReservationDailyPrice rdp = new ReservationDailyPrice();
                 rdp.setPriceDate(hp.getPriceDate());
                 rdp.setOriginalPrice(hp.getPriceWithoutTax());
-                rdp.setActualPrice(hp.getPriceWithTax());
-                rdp.setTaxAmount(hp.getPriceWithTax() != null && hp.getPriceWithoutTax() != null
-                        ? hp.getPriceWithTax().subtract(hp.getPriceWithoutTax()) : BigDecimal.ZERO);
+                rdp.setActualPrice(actualPrice);
+                rdp.setTaxAmount(actualPrice != null && hp.getPriceWithoutTax() != null
+                        ? actualPrice.subtract(hp.getPriceWithoutTax()) : BigDecimal.ZERO);
                 rdp.setServiceCharge(null);
                 rdp.setBreakfastIncluded(false);
                 rdp.setBreakfastCount(0);
@@ -682,6 +702,24 @@ public class OpenReservationController {
         return null;
     }
 
+    private BigDecimal getHotelMinimumPrice(Hotel hotel) {
+        if (hotel == null) {
+            return null;
+        }
+        BigDecimal minimumPrice = hotel.getMinimumPrice();
+        if (minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return minimumPrice;
+    }
+
+    private BigDecimal applyHotelMinimumPrice(BigDecimal price, BigDecimal minimumPrice) {
+        if (price == null || minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return price;
+        }
+        return price.compareTo(minimumPrice) < 0 ? minimumPrice : price;
+    }
+
     private Map<String, Object> ok(Object data) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("code", 200);
@@ -785,5 +823,12 @@ public class OpenReservationController {
         if (val == null) return null;
         if (val instanceof Number) return BigDecimal.valueOf(((Number) val).doubleValue());
         try { return new BigDecimal(val.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private boolean isEffectiveHotelPrice(HotelPrice hotelPrice) {
+        return hotelPrice != null
+                && "active".equalsIgnoreCase(hotelPrice.getStatus())
+                && hotelPrice.getPriceWithTax() != null
+                && hotelPrice.getPriceWithTax().compareTo(BigDecimal.ZERO) > 0;
     }
 }

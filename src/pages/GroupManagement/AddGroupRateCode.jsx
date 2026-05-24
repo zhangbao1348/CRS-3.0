@@ -4,7 +4,7 @@ import axios from 'axios'
 import dayjs from 'dayjs'
 import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { groupRateCodeApi, hotelApi, marketCodeApi, sourceCodeApi, packageApi, roomTypeCategoryApi, groupRoomTypeApi, guaranteePolicyApi, cancellationPolicyApi, rateTypeApi } from '../../utils/api'
+import { groupRateCodeApi, hotelApi, marketCodeApi, sourceCodeApi, packageApi, roomTypeCategoryApi, groupRoomTypeApi, guaranteePolicyApi, cancellationPolicyApi, rateTypeApi, dictionaryApi } from '../../utils/api'
 import { getCurrentTenantId } from '../../utils/tenantUtils'
 
 const { Option } = Select
@@ -67,6 +67,7 @@ const AddGroupRateCode = () => {
     family: ['family', 'family-suite']
   }
   const [hotelData, setHotelData] = useState([])
+  const [regionDictionaryItems, setRegionDictionaryItems] = useState([])
   const [channelPublishData, setChannelPublishData] = useState([
     {
       key: '1',
@@ -451,7 +452,7 @@ const AddGroupRateCode = () => {
           key: String(hotel.id || index),
           hotelCode: hotel.hotelCode,
           hotel: hotel.chineseName,
-          region: hotel.province,
+          region: hotel.region || '',
           city: hotel.city,
           brand: '',
           allocated: false,
@@ -474,6 +475,17 @@ const AddGroupRateCode = () => {
     }
   }
 
+  const fetchRegionDictionaryItems = async () => {
+    try {
+      const response = await dictionaryApi.getActiveDictionaryItems('REGION')
+      const items = Array.isArray(response) ? response : (response.data || [])
+      setRegionDictionaryItems(items)
+    } catch (error) {
+      console.error('获取区域字典项失败:', error)
+      setRegionDictionaryItems([])
+    }
+  }
+
   // 加载父级房价码数据
   useEffect(() => {
     if (rateType === 'level1' || rateType === 'level2') {
@@ -486,6 +498,7 @@ const AddGroupRateCode = () => {
   // 加载市场码和来源码数据
   useEffect(() => {
     const loadData = async () => {
+      fetchRegionDictionaryItems()
       fetchThirdLevelMarketCodes()
       fetchThirdLevelSourceCodes()
       fetchPackages()
@@ -966,11 +979,31 @@ const AddGroupRateCode = () => {
   const [selectAllGuaranteeRule, setSelectAllGuaranteeRule] = useState(false)
   const [selectAllPromotion, setSelectAllPromotion] = useState(false)
   
+  // 区域筛选状态
+  const [filterRegion, setFilterRegion] = useState('')
   // 城市筛选状态
   const [filterCity, setFilterCity] = useState('')
-  
-  // 根据城市筛选酒店数据
-  const filteredHotelData = filterCity ? hotelData.filter(h => h.city === filterCity) : hotelData
+
+  const regionFilteredHotelData = filterRegion
+    ? hotelData.filter(h => h.region === filterRegion)
+    : hotelData
+
+  const filteredHotelData = filterCity
+    ? regionFilteredHotelData.filter(h => h.city === filterCity)
+    : regionFilteredHotelData
+
+  const regionOptions = [...new Set(hotelData.map(h => h.region).filter(Boolean))]
+  const cityOptions = [...new Set(regionFilteredHotelData.map(h => h.city).filter(Boolean))]
+  const getRegionLabel = (regionCode) => {
+    const matchedItem = regionDictionaryItems.find(item => item.code === regionCode)
+    return matchedItem?.name || regionCode
+  }
+
+  useEffect(() => {
+    if (filterCity && !cityOptions.includes(filterCity)) {
+      setFilterCity('')
+    }
+  }, [filterRegion, filterCity, cityOptions])
 
   const handleSelectAll = (checked) => {
     setSelectAll(checked)
@@ -1750,22 +1783,41 @@ const AddGroupRateCode = () => {
       children: (
         <Card style={{ marginBottom: 24 }}>
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ marginRight: 8 }}>城市筛选：</span>
-                <Select
-                  value={filterCity}
-                  onChange={setFilterCity}
-                  style={{ width: 150 }}
-                  allowClear
-                  placeholder="全部城市"
-                >
-                  {[...new Set(hotelData.map(h => h.city).filter(Boolean))].map(city => {
-                    const count = hotelData.filter(h => h.city === city).length
-                    return (
-                      <Option key={city} value={city}>{city}（{count}家）</Option>
-                    )
-                  })}
-                </Select>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div>
+                  <span style={{ marginRight: 8 }}>区域筛选：</span>
+                  <Select
+                    value={filterRegion}
+                    onChange={setFilterRegion}
+                    style={{ width: 160 }}
+                    allowClear
+                    placeholder="全部区域"
+                  >
+                    {regionOptions.map(region => {
+                      const count = hotelData.filter(h => h.region === region).length
+                      return (
+                        <Option key={region} value={region}>{getRegionLabel(region)}（{count}家）</Option>
+                      )
+                    })}
+                  </Select>
+                </div>
+                <div>
+                  <span style={{ marginRight: 8 }}>城市筛选：</span>
+                  <Select
+                    value={filterCity}
+                    onChange={setFilterCity}
+                    style={{ width: 150 }}
+                    allowClear
+                    placeholder="全部城市"
+                  >
+                    {cityOptions.map(city => {
+                      const count = regionFilteredHotelData.filter(h => h.city === city).length
+                      return (
+                        <Option key={city} value={city}>{city}（{count}家）</Option>
+                      )
+                    })}
+                  </Select>
+                </div>
               </div>
               <Button type="primary" onClick={handleBatchAllocate}>
                 批量分配

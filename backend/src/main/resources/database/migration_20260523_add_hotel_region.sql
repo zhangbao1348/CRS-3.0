@@ -1,0 +1,2 @@
+ALTER TABLE hotels
+    ADD COLUMN region VARCHAR(50) NULL COMMENT '酒店所在区域';

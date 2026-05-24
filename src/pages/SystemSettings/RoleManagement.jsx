@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { 
   Table, 
   Button, 
@@ -173,7 +173,9 @@ const menuTreeData = [
     icon: <FolderOutlined />,
     children: [
       { title: '用户管理', key: 'user-management', icon: <FileTextOutlined /> },
-      { title: '角色管理', key: 'role-management', icon: <FileTextOutlined /> }
+      { title: '角色管理', key: 'role-management', icon: <FileTextOutlined /> },
+      { title: '集团设置', key: 'group-settings', icon: <FileTextOutlined /> },
+      { title: '字典管理', key: 'dictionary-management', icon: <FileTextOutlined /> }
     ]
   }
 ]
@@ -280,7 +282,7 @@ const RoleManagement = () => {
   }
 
   const handleOk = () => {
-    form.validateFields().then(values => {
+    form.validateFields().then(() => {
       message.success(editingRole ? '角色信息已更新' : '角色创建成功')
       setIsModalVisible(false)
     })

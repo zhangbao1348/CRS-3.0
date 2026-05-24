@@ -196,11 +196,13 @@ public class OpenHotelController {
         // 起价计算
         BigDecimal startingPrice = null;
         if (checkIn != null && checkOut != null) {
+            BigDecimal minimumPrice = getHotelMinimumPrice(hotel);
             List<HotelPrice> prices = priceRepo.findByTenantIdAndHotelCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotel.getHotelCode(), checkIn, checkOut);
             startingPrice = prices.stream()
                     .filter(this::isEffectiveHotelPrice)
                     .map(HotelPrice::getPriceWithTax)
+                    .map(price -> applyHotelMinimumPrice(price, minimumPrice))
                     .min(BigDecimal::compareTo).orElse(null);
         }
         m.put("startingPrice", applyChannelPriceRounding(startingPrice, priceRounding));
@@ -291,6 +293,7 @@ public class OpenHotelController {
             if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
             }
+            BigDecimal minimumPrice = getHotelMinimumPrice(hotel);
 
             String checkInValidationMessage = validateOpenApiCheckInDate(checkInDate);
             if (checkInValidationMessage != null) {
@@ -398,7 +401,8 @@ public class OpenHotelController {
                         if (!isEffectiveHotelPrice(hp)) {
                             priceComplete = false; break;
                         }
-                        BigDecimal roundedPrice = applyChannelPriceRounding(hp.getPriceWithTax(), priceRounding);
+                        BigDecimal effectivePrice = applyHotelMinimumPrice(hp.getPriceWithTax(), minimumPrice);
+                        BigDecimal roundedPrice = applyChannelPriceRounding(effectivePrice, priceRounding);
                         Map<String, Object> dp = new LinkedHashMap<>();
                         dp.put("date", formatDate(cal.getTime()));
                         dp.put("priceWithTax", roundedPrice);
@@ -499,6 +503,7 @@ public class OpenHotelController {
             if (!hasHotelAccess(channel, hotel.getHotelCode())) {
                 return ResponseEntity.status(403).body(err(403, "渠道无权访问该酒店"));
             }
+            BigDecimal minimumPrice = getHotelMinimumPrice(hotel);
 
             // 2. 房型有效性
             HotelRoomType roomType = roomTypeRepo.findByTenantIdAndHotelCodeAndRoomTypeCode(hotel.getTenantId(), hotel.getHotelCode(), roomTypeCode).orElse(null);
@@ -607,11 +612,13 @@ public class OpenHotelController {
                     .sorted(Comparator.comparing(HotelPrice::getPriceDate))
                     .map(p -> { Map<String, Object> dp = new LinkedHashMap<>();
                         dp.put("date", formatDate(p.getPriceDate()));
-                        dp.put("priceWithTax", applyChannelPriceRounding(p.getPriceWithTax(), priceRounding)); return dp; })
+                        BigDecimal effectivePrice = applyHotelMinimumPrice(p.getPriceWithTax(), minimumPrice);
+                        dp.put("priceWithTax", applyChannelPriceRounding(effectivePrice, priceRounding)); return dp; })
                     .collect(Collectors.toList());
 
             BigDecimal totalPrice = effectivePrices.stream()
                     .map(HotelPrice::getPriceWithTax)
+                    .map(price -> applyHotelMinimumPrice(price, minimumPrice))
                     .map(price -> applyChannelPriceRounding(price, priceRounding))
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
                     .multiply(BigDecimal.valueOf(roomCount));
@@ -682,6 +689,24 @@ public class OpenHotelController {
             return String.format("入住日期不能早于允许预订日期 %s", earliestDate.format(DateTimeFormatter.ISO_LOCAL_DATE));
         }
         return null;
+    }
+
+    private BigDecimal getHotelMinimumPrice(Hotel hotel) {
+        if (hotel == null) {
+            return null;
+        }
+        BigDecimal minimumPrice = hotel.getMinimumPrice();
+        if (minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return minimumPrice;
+    }
+
+    private BigDecimal applyHotelMinimumPrice(BigDecimal price, BigDecimal minimumPrice) {
+        if (price == null || minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return price;
+        }
+        return price.compareTo(minimumPrice) < 0 ? minimumPrice : price;
     }
 
     private BigDecimal applyChannelPriceRounding(BigDecimal price, String rounding) {

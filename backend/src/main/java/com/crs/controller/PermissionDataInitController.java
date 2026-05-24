@@ -107,6 +107,7 @@ public class PermissionDataInitController {
         Menu systemSettings = createMenu(0, "system-settings", "系统设置", "dir", "/system-settings", "SettingOutlined", 9, null, "crs");
         createMenu(systemSettings.getId(), "user-management", "用户管理", "menu", "/system-settings/user-management", "UserOutlined", 1, "user-management:view", "crs");
         createMenu(systemSettings.getId(), "role-management", "角色管理", "menu", "/system-settings/role-management", "SafetyCertificateOutlined", 2, "role-management:view", "crs");
+        createMenu(systemSettings.getId(), "dictionary-management", "字典管理", "menu", "/system-settings/dictionary-management", "TableOutlined", 3, "dictionary-management:view", "crs");
         
         Menu superAdminSettings = createMenu(0, "super-admin-settings", "超管设置", "dir", "/super-admin-settings", "SafetyCertificateOutlined", 10, null, "crs");
         createMenu(superAdminSettings.getId(), "tenant-management", "租户管理", "menu", "/super-admin-settings/tenant-management", "BuildOutlined", 1, "tenant-management:view", "crs");

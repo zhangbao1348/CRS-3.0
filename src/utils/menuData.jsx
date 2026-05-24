@@ -19,7 +19,6 @@ import {
   MessageOutlined,
   FilterOutlined,
   ExportOutlined,
-  ImportOutlined,
   FolderOutlined,
   InboxOutlined,
   SearchOutlined
@@ -308,6 +307,12 @@ export const crsMenuData = [
         label: '集团设置',
         path: '/system-settings/group-settings',
         icon: <BuildOutlined />
+      },
+      {
+        key: 'dictionary-management',
+        label: '字典管理',
+        path: '/system-settings/dictionary-management',
+        icon: <TableOutlined />
       }
     ]
   },

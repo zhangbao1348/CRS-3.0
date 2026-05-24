@@ -1,5 +1,31 @@
 package com.crs.controller;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.crs.entity.Hotel;
 import com.crs.entity.HotelPrice;
 import com.crs.entity.HotelPriceLog;
@@ -11,18 +37,6 @@ import com.crs.repository.HotelRepository;
 import com.crs.repository.RatePlanRepository;
 import com.crs.repository.RoomTypeRepository;
 import com.crs.util.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.*;
 
 /**
  * 酒店价格控制器
@@ -68,6 +82,20 @@ public class HotelPriceController {
         }
     }
 
+    private BigDecimal getHotelMinimumPrice(Integer tenantId, String hotelCode) {
+        return hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .map(Hotel::getMinimumPrice)
+                .filter(price -> price != null && price.compareTo(BigDecimal.ZERO) > 0)
+                .orElse(null);
+    }
+
+    private BigDecimal applyHotelMinimumPrice(BigDecimal priceWithTax, BigDecimal minimumPrice) {
+        if (priceWithTax == null || minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return priceWithTax;
+        }
+        return priceWithTax.compareTo(minimumPrice) < 0 ? minimumPrice : priceWithTax;
+    }
+
     /**
      * 查询酒店价格（按日期范围），包含已删除的价格记录
      */
@@ -111,6 +139,12 @@ public class HotelPriceController {
             Integer tenantId = getCurrentTenantId();
             hotelPrice.setTenantId(tenantId);
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            BigDecimal minimumPrice = getHotelMinimumPrice(tenantId, hotelPrice.getHotelCode());
+            boolean isDelete = "inactive".equals(hotelPrice.getStatus());
+            BigDecimal effectivePriceWithTax = isDelete
+                    ? hotelPrice.getPriceWithTax()
+                    : applyHotelMinimumPrice(hotelPrice.getPriceWithTax(), minimumPrice);
+            hotelPrice.setPriceWithTax(effectivePriceWithTax);
 
             Optional<HotelPrice> existing = hotelPriceRepository
                     .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(
@@ -124,17 +158,17 @@ public class HotelPriceController {
             if (existing.isPresent()) {
                 HotelPrice existingPrice = existing.get();
                 oldPriceStr = existingPrice.getPriceWithTax() != null ? existingPrice.getPriceWithTax().toString() : null;
-                existingPrice.setPriceWithTax(hotelPrice.getPriceWithTax());
+                existingPrice.setPriceWithTax(effectivePriceWithTax);
                 existingPrice.setPriceWithoutTax(hotelPrice.getPriceWithoutTax());
                 existingPrice.setStatus(hotelPrice.getStatus() != null ? hotelPrice.getStatus() : "active");
                 hotelPriceRepository.save(existingPrice);
                 opType = "inactive".equals(existingPrice.getStatus()) ? "delete" : "update";
-                newPriceStr = hotelPrice.getPriceWithTax() != null ? hotelPrice.getPriceWithTax().toString() : null;
+                newPriceStr = effectivePriceWithTax != null ? effectivePriceWithTax.toString() : null;
             } else {
                 hotelPrice.setStatus(hotelPrice.getStatus() != null ? hotelPrice.getStatus() : "active");
                 hotelPriceRepository.save(hotelPrice);
                 opType = "create";
-                newPriceStr = hotelPrice.getPriceWithTax() != null ? hotelPrice.getPriceWithTax().toString() : null;
+                newPriceStr = effectivePriceWithTax != null ? effectivePriceWithTax.toString() : null;
             }
 
             // 记录日志
@@ -184,6 +218,7 @@ public class HotelPriceController {
             Integer tenantId = getCurrentTenantId();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
             int savedCount = 0;
+            BigDecimal minimumPrice = null;
 
             // 按操作类型分组收集日志明细
             // key: roomTypeCode, value: { dates, oldPrices, newPrice, isDelete }
@@ -198,11 +233,18 @@ public class HotelPriceController {
                 price.setTenantId(tenantId);
                 if (hotelCode == null) hotelCode = price.getHotelCode();
                 if (rateCode == null) rateCode = price.getRateCode();
+                if (minimumPrice == null && price.getHotelCode() != null) {
+                    minimumPrice = getHotelMinimumPrice(tenantId, price.getHotelCode());
+                }
 
                 if (minDate == null || price.getPriceDate().before(minDate)) minDate = price.getPriceDate();
                 if (maxDate == null || price.getPriceDate().after(maxDate)) maxDate = price.getPriceDate();
 
                 boolean isDelete = "inactive".equals(price.getStatus());
+                BigDecimal effectivePriceWithTax = isDelete
+                        ? price.getPriceWithTax()
+                        : applyHotelMinimumPrice(price.getPriceWithTax(), minimumPrice);
+                price.setPriceWithTax(effectivePriceWithTax);
 
                 Optional<HotelPrice> existing = hotelPriceRepository
                         .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(
@@ -217,7 +259,7 @@ public class HotelPriceController {
                         existingPrice.setStatus("inactive");
                         existingPrice.setPriceWithTax(BigDecimal.ZERO);
                     } else {
-                        existingPrice.setPriceWithTax(price.getPriceWithTax());
+                        existingPrice.setPriceWithTax(effectivePriceWithTax);
                         existingPrice.setPriceWithoutTax(price.getPriceWithoutTax());
                         existingPrice.setStatus("active");
                     }
@@ -233,7 +275,7 @@ public class HotelPriceController {
                 Map<String, Object> entry = new HashMap<>();
                 entry.put("date", dateStr);
                 entry.put("oldPrice", oldPriceStr);
-                entry.put("newPrice", isDelete ? null : (price.getPriceWithTax() != null ? price.getPriceWithTax().toString() : null));
+                entry.put("newPrice", isDelete ? null : (effectivePriceWithTax != null ? effectivePriceWithTax.toString() : null));
 
                 Map<String, List<Map<String, Object>>> targetMap = isDelete ? deleteDetails : updateDetails;
                 targetMap.computeIfAbsent(price.getRoomTypeCode(), k -> new ArrayList<>()).add(entry);
@@ -301,7 +343,8 @@ public class HotelPriceController {
             // 级联计算衍生价格 - 对每条变更的价格触发级联
             for (HotelPrice price : prices) {
                 boolean isDelete = "inactive".equals(price.getStatus());
-                BigDecimal cascadePrice = isDelete ? null : price.getPriceWithTax();
+                BigDecimal hotelMinimumPrice = getHotelMinimumPrice(tenantId, price.getHotelCode());
+                BigDecimal cascadePrice = isDelete ? null : applyHotelMinimumPrice(price.getPriceWithTax(), hotelMinimumPrice);
                 cascadeDerivativePrices(tenantId, price.getHotelCode(), price.getRateCode(),
                         price.getRoomTypeCode(), price.getPriceDate(), cascadePrice);
             }
@@ -400,6 +443,7 @@ public class HotelPriceController {
     private void cascadeDerivativePrices(Integer tenantId, String hotelCode, String rateCode,
                                           String roomTypeCode, Date priceDate, BigDecimal newPrice) {
         try {
+            BigDecimal minimumPrice = getHotelMinimumPrice(tenantId, hotelCode);
             // 查找以当前房价码为父级的所有 active 衍生价格计划
             List<RatePlan> childPlans = ratePlanRepository
                     .findByTenantIdAndHotelCodeAndParentRateCodeAndStatus(tenantId, hotelCode, rateCode, "active");
@@ -438,6 +482,7 @@ public class HotelPriceController {
                     } else {
                         derivativeAmount = derivativeAmount.setScale(2, RoundingMode.HALF_UP);
                     }
+                    derivativeAmount = applyHotelMinimumPrice(derivativeAmount, minimumPrice);
                     
                     Optional<HotelPrice> childPriceOpt = hotelPriceRepository
                             .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(

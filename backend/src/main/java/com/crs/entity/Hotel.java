@@ -1,10 +1,25 @@
 package com.crs.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 
 /**
  * 酒店核心实体类 (Hotel)
@@ -56,6 +71,10 @@ public class Hotel {
     /** 所在城市 */
     @Column(name = "city", nullable = false, length = 50)
     private String city;
+
+    /** 酒店所在区域，取值来源于字典类型 REGION */
+    @Column(name = "region", length = 50)
+    private String region;
     
     /** 详细地址 */
     @Column(name = "address", nullable = false, length = 200)
@@ -84,6 +103,10 @@ public class Hotel {
     /** 总房间数 */
     @Column(name = "total_rooms")
     private Integer totalRooms;
+
+    /** 酒店最低价格（含税） */
+    @Column(name = "minimum_price", precision = 10, scale = 2)
+    private BigDecimal minimumPrice;
     
     /** 是否允许酒店自行创建房价码：allow-允许，deny-禁止 */
     @Column(name = "allow_create_rate_code", length = 20)
@@ -237,6 +260,14 @@ public class Hotel {
     public void setAddress(String address) {
         this.address = address;
     }
+
+    public String getRegion() {
+        return region;
+    }
+
+    public void setRegion(String region) {
+        this.region = region;
+    }
     
     public Double getLongitude() {
         return longitude;
@@ -284,6 +315,14 @@ public class Hotel {
     
     public void setTotalRooms(Integer totalRooms) {
         this.totalRooms = totalRooms;
+    }
+
+    public BigDecimal getMinimumPrice() {
+        return minimumPrice;
+    }
+
+    public void setMinimumPrice(BigDecimal minimumPrice) {
+        this.minimumPrice = minimumPrice;
     }
     
     public String getAllowCreateRateCode() {
@@ -400,4 +439,3 @@ public class Hotel {
                 '}';
     }
 }
-

@@ -1,12 +1,16 @@
 package com.crs.service;
 
-import com.crs.entity.Hotel;
-import com.crs.repository.HotelRepository;
-import com.crs.util.TenantContext;
-import org.springframework.stereotype.Service;
-
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
+import com.crs.entity.Hotel;
+import com.crs.entity.HotelPrice;
+import com.crs.repository.HotelPriceRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
 
 /**
  * 酒店服务类
@@ -16,9 +20,11 @@ import java.util.Optional;
 public class HotelService {
     
     private final HotelRepository hotelRepository;
+    private final HotelPriceRepository hotelPriceRepository;
     
-    public HotelService(HotelRepository hotelRepository) {
+    public HotelService(HotelRepository hotelRepository, HotelPriceRepository hotelPriceRepository) {
         this.hotelRepository = hotelRepository;
+        this.hotelPriceRepository = hotelPriceRepository;
     }
     
     /**
@@ -113,6 +119,7 @@ public class HotelService {
         existingHotel.setStarRating(hotel.getStarRating());
         existingHotel.setProvince(hotel.getProvince());
         existingHotel.setCity(hotel.getCity());
+        existingHotel.setRegion(hotel.getRegion());
         existingHotel.setAddress(hotel.getAddress());
         existingHotel.setLongitude(hotel.getLongitude());
         existingHotel.setLatitude(hotel.getLatitude());
@@ -120,6 +127,7 @@ public class HotelService {
         existingHotel.setEmail(hotel.getEmail());
         existingHotel.setIntroduction(hotel.getIntroduction());
         existingHotel.setTotalRooms(hotel.getTotalRooms());
+        existingHotel.setMinimumPrice(hotel.getMinimumPrice());
         existingHotel.setStatus(hotel.getStatus());
         
         // 更新酒店管控字段
@@ -142,7 +150,9 @@ public class HotelService {
             existingHotel.setSupportPersonPriceDiff(hotel.getSupportPersonPriceDiff());
         }
         
-        return hotelRepository.save(existingHotel);
+        Hotel savedHotel = hotelRepository.save(existingHotel);
+        applyMinimumPriceToExistingPrices(savedHotel);
+        return savedHotel;
     }
     
     /**
@@ -171,5 +181,29 @@ public class HotelService {
      */
     public List<Hotel> getHotelsByCity(String city) {
         return hotelRepository.findByTenantIdAndCity(getCurrentTenantId(), city);
+    }
+
+    private void applyMinimumPriceToExistingPrices(Hotel hotel) {
+        if (hotel == null || hotel.getTenantId() == null || hotel.getHotelCode() == null) {
+            return;
+        }
+
+        BigDecimal minimumPrice = hotel.getMinimumPrice();
+        if (minimumPrice == null || minimumPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        List<HotelPrice> prices = hotelPriceRepository.findByTenantIdAndHotelCode(hotel.getTenantId(), hotel.getHotelCode());
+        List<HotelPrice> pricesToUpdate = prices.stream()
+                .filter(price -> price != null)
+                .filter(price -> "active".equalsIgnoreCase(price.getStatus()))
+                .filter(price -> price.getPriceWithTax() != null)
+                .filter(price -> price.getPriceWithTax().compareTo(minimumPrice) < 0)
+                .peek(price -> price.setPriceWithTax(minimumPrice))
+                .toList();
+
+        if (!pricesToUpdate.isEmpty()) {
+            hotelPriceRepository.saveAll(pricesToUpdate);
+        }
     }
 }

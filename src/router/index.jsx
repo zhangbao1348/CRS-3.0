@@ -1,4 +1,3 @@
-import React from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import MainLayout from '../components/Layout/MainLayout'
 import ProtectedRoute from '../components/ProtectedRoute'
@@ -16,7 +15,6 @@ import ReservationDetail from '../pages/Reservation/ReservationDetail'
 // 房控日历
 import Inventory from '../pages/Inventory/Inventory'
 import RoomStatus from '../pages/Inventory/RoomStatus'
-import RoomInventory from '../pages/Inventory/RoomInventory'
 import BookingControl from '../pages/Inventory/BookingControl'
 
 // 集团管理页面
@@ -73,6 +71,7 @@ import PriceQuery from '../pages/RateManagement/PriceQuery'
 import UserManagement from '../pages/SystemSettings/UserManagement'
 import RoleManagement from '../pages/SystemSettings/RoleManagement'
 import GroupSettings from '../pages/SystemSettings/GroupSettings'
+import DictionaryManagement from '../pages/SystemSettings/DictionaryManagement'
 // CRM页面
 import CrmDashboard from '../pages/Crm/CrmDashboard'
 
@@ -402,6 +401,10 @@ export const router = createBrowserRouter([
   {
     path: '/system-settings/group-settings',
     element: <ProtectedRoute><MainLayout><GroupSettings /></MainLayout></ProtectedRoute>
+  },
+  {
+    path: '/system-settings/dictionary-management',
+    element: <ProtectedRoute><MainLayout><DictionaryManagement /></MainLayout></ProtectedRoute>
   },
 
   {

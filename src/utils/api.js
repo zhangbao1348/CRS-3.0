@@ -281,6 +281,30 @@ export const taxSettingApi = {
   deleteTaxSetting: (id) => api.delete(`/tax-settings/${id}`)
 }
 
+export const dictionaryApi = {
+  getDictionaryTypes: (keyword, options = {}) => {
+    const params = {}
+    if (keyword) {
+      params.keyword = keyword
+    }
+    return api.get('/dictionary-types', { params, ...options })
+  },
+  createDictionaryType: (data, options = {}) => api.post('/dictionary-types', data, options),
+  updateDictionaryType: (id, data, options = {}) => api.put(`/dictionary-types/${id}`, data, options),
+  deleteDictionaryType: (id, options = {}) => api.delete(`/dictionary-types/${id}`, options),
+  getDictionaryItems: (typeCode, keyword, options = {}) => {
+    const params = { typeCode }
+    if (keyword) {
+      params.keyword = keyword
+    }
+    return api.get('/dictionary-items', { params, ...options })
+  },
+  createDictionaryItem: (data, options = {}) => api.post('/dictionary-items', data, options),
+  updateDictionaryItem: (id, data, options = {}) => api.put(`/dictionary-items/${id}`, data, options),
+  deleteDictionaryItem: (id, options = {}) => api.delete(`/dictionary-items/${id}`, options),
+  getActiveDictionaryItems: (typeCode, options = {}) => api.get(`/dictionaries/${typeCode}/items`, options)
+}
+
 export const enumApi = {
   getAllEnums: () => api.get('/enums/all'),
   getTaxBearer: () => api.get('/enums/tax-bearer'),

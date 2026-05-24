@@ -3,7 +3,7 @@ import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbo
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
-import { tenantApi, hotelApi, hotelFacilityApi, hotelImageApi, groupRateCodeApi, groupRoomTypeApi, hotelRateCodeAllocationApi, groupRoomTypeHotelApi } from '../../utils/api'
+import { tenantApi, hotelApi, hotelFacilityApi, hotelImageApi, groupRateCodeApi, groupRoomTypeApi, hotelRateCodeAllocationApi, groupRoomTypeHotelApi, dictionaryApi } from '../../utils/api'
 import { useTenantContext } from '../../contexts/TenantContext'
 
 const { Option } = Select
@@ -18,6 +18,7 @@ const AddHotel = () => {
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [hotelId, setHotelId] = useState(null)
   const [hotelCode, setHotelCode] = useState(null)
+  const [regionOptions, setRegionOptions] = useState([])
   
   // 集团房价码数据状态
   const [groupRateCodes, setGroupRateCodes] = useState([])
@@ -66,6 +67,17 @@ const AddHotel = () => {
       }
     }
     loadTenants()
+
+    const loadRegionOptions = async () => {
+      try {
+        const response = await dictionaryApi.getActiveDictionaryItems('REGION')
+        const regions = Array.isArray(response) ? response : (response.data || [])
+        setRegionOptions(regions)
+      } catch (error) {
+        console.error('加载酒店所在区域字典失败:', error)
+      }
+    }
+    loadRegionOptions()
     
     // 加载集团房价码
     const loadGroupRateCodes = async () => {
@@ -341,6 +353,7 @@ const AddHotel = () => {
         starRating: starRatingValue,
         province: values.hotelProvince,
         city: values.hotelCity,
+        region: values.hotelRegion ?? null,
         address: values.hotelAddress,
         longitude: values.hotelLongitude ? parseFloat(values.hotelLongitude) : null,
         latitude: values.hotelLatitude ? parseFloat(values.hotelLatitude) : null,
@@ -348,7 +361,7 @@ const AddHotel = () => {
         email: values.hotelEmail,
         introduction: values.hotelIntroduction || '',
         totalRooms: values.hotelTotalRooms,
-        minimumPrice: values.minimumPrice || null,
+        minimumPrice: values.minimumPrice ?? null,
         status: 'active',
         supportMultiPrice: values.supportMultiPrice || 'no',
         multiPriceOptions: multiPriceOptionsStr,
@@ -828,6 +841,23 @@ const AddHotel = () => {
                   </Select>
                 </Form.Item>
               </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="hotelRegion"
+                  label="酒店所在区域"
+                >
+                  <Select
+                    placeholder="请选择酒店所在区域"
+                    allowClear
+                  >
+                    {regionOptions.map(region => (
+                      <Option key={region.code} value={region.code}>
+                        {region.name || region.code}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
               <Col span={24}>
                 <Form.Item
                   name="hotelAddress"
@@ -885,9 +915,9 @@ const AddHotel = () => {
               <Col span={12}>
                 <Form.Item
                   name="minimumPrice"
-                  label="最低售价"
+                  label="酒店最低价格（含税）"
                 >
-                  <InputNumber placeholder="请输入最低售价" style={{ width: '100%' }} min={0} precision={2} prefix="¥" />
+                  <InputNumber placeholder="请输入酒店最低价格（含税）" style={{ width: '100%' }} min={0} precision={2} prefix="¥" />
                 </Form.Item>
               </Col>
               <Col span={24}>

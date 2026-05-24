@@ -53,7 +53,8 @@ const MENU_PATH_ALIAS_RULES = [
   { path: '/rate-management/add-package', target: '/rate-management/package-setting' },
   { path: '/rate-management/edit-package', target: '/rate-management/package-setting' },
   { path: '/rate-management/add-rate-plan', target: '/rate-management/rate-plan' },
-  { pattern: /^\/rate-management\/edit-rate-plan\/[^/]+$/, target: '/rate-management/rate-plan' }
+  { pattern: /^\/rate-management\/edit-rate-plan\/[^/]+$/, target: '/rate-management/rate-plan' },
+  { path: '/reservation/reservation-detail', target: '/reservation/reservation-list' }
 ]
 
 const MainLayout = ({ children }) => {
@@ -62,8 +63,26 @@ const MainLayout = ({ children }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const { hotels, selectedHotel, loading: hotelLoading, changeHotel } = useHotelContext()
-  const { tenants, selectedTenant, loading: tenantLoading, changeTenant } = useTenantContext()
+  const { tenants, selectedTenant, selectedTenantLabel, loading: tenantLoading, changeTenant } = useTenantContext()
   const { menus, user, logout } = useContext(AuthContext)
+
+  const baseTenantOptions = tenants.map((tenant) => ({
+    value: tenant.id,
+    label: `${tenant.tenantName} (${tenant.tenantCode})`,
+    title: `${tenant.tenantName} (${tenant.tenantCode})`
+  }))
+
+  const hasSelectedTenantOption = baseTenantOptions.some((tenant) => tenant.value === selectedTenant)
+  const tenantOptions = !hasSelectedTenantOption && selectedTenant && selectedTenantLabel
+    ? [
+        {
+          value: selectedTenant,
+          label: selectedTenantLabel,
+          title: selectedTenantLabel
+        },
+        ...baseTenantOptions
+      ]
+    : baseTenantOptions
 
   const toggleCollapsed = () => {
     setCollapsed(!collapsed)
@@ -530,21 +549,13 @@ const MainLayout = ({ children }) => {
                 showSearch
                 allowClear
                 loading={tenantLoading}
+                optionFilterProp="label"
+                options={tenantOptions}
                 filterOption={(input, option) =>
-                  (option?.children || '').toLowerCase().includes(input.toLowerCase()) ||
-                  (option?.props?.title || '').toLowerCase().includes(input.toLowerCase())
+                  (option?.label || '').toLowerCase().includes(input.toLowerCase()) ||
+                  (option?.title || '').toLowerCase().includes(input.toLowerCase())
                 }
-              >
-                {tenants.map(tenant => (
-                  <Option 
-                    key={tenant.id} 
-                    value={tenant.id} 
-                    title={`${tenant.tenantName} (${tenant.tenantCode})`}
-                  >
-                    {tenant.tenantName} ({tenant.tenantCode})
-                  </Option>
-                ))}
-              </Select>
+              />
             )}
             {/* 酒店切换控件 */}
             {systemType !== 'crm' && (
