@@ -225,6 +225,11 @@ public class ReservationService {
             throw new RuntimeException("订单不存在");
         }
 
+        // Cancel is idempotent: an already-cancelled reservation returns success without side effects.
+        if ("cancelled".equals(reservation.getReservationStatus())) {
+            return reservation;
+        }
+
         if (!"confirmed".equals(reservation.getReservationStatus())
                 && !"pending".equals(reservation.getReservationStatus())
                 && !"pending_payment".equals(reservation.getReservationStatus())) {

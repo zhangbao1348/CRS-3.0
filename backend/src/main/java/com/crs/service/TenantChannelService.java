@@ -108,6 +108,7 @@ public class TenantChannelService {
         if (data.getPriceRounding() != null) existing.setPriceRounding(data.getPriceRounding());
         if (data.getPrepaidOrderRequiresPayment() != null) existing.setPrepaidOrderRequiresPayment(data.getPrepaidOrderRequiresPayment());
         if (data.getCancelOrderChecksCancellationRule() != null) existing.setCancelOrderChecksCancellationRule(data.getCancelOrderChecksCancellationRule());
+        if (data.getCancelFailureRequiresManualIntervention() != null) existing.setCancelFailureRequiresManualIntervention(data.getCancelFailureRequiresManualIntervention());
         if (data.getPrepaidCommissionType() != null) existing.setPrepaidCommissionType(data.getPrepaidCommissionType());
         if (data.getPrepaidCommissionValue() != null) existing.setPrepaidCommissionValue(data.getPrepaidCommissionValue());
         if (data.getPostpaidCommissionType() != null) existing.setPostpaidCommissionType(data.getPostpaidCommissionType());
@@ -127,6 +128,7 @@ public class TenantChannelService {
         if (payload.containsKey("priceRounding")) existing.setPriceRounding(toStringValue(payload.get("priceRounding")));
         if (payload.containsKey("prepaidOrderRequiresPayment")) existing.setPrepaidOrderRequiresPayment(toBoolean(payload.get("prepaidOrderRequiresPayment")));
         if (payload.containsKey("cancelOrderChecksCancellationRule")) existing.setCancelOrderChecksCancellationRule(toBoolean(payload.get("cancelOrderChecksCancellationRule")));
+        if (payload.containsKey("cancelFailureRequiresManualIntervention")) existing.setCancelFailureRequiresManualIntervention(toBoolean(payload.get("cancelFailureRequiresManualIntervention")));
         if (payload.containsKey("prepaidCommissionType")) existing.setPrepaidCommissionType(toStringValue(payload.get("prepaidCommissionType")));
         if (payload.containsKey("prepaidCommissionValue")) existing.setPrepaidCommissionValue(toBigDecimal(payload.get("prepaidCommissionValue")));
         if (payload.containsKey("postpaidCommissionType")) existing.setPostpaidCommissionType(toStringValue(payload.get("postpaidCommissionType")));

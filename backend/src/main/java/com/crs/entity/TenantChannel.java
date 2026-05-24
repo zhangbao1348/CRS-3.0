@@ -4,8 +4,17 @@ package com.crs.entity;
 
 
 
-import jakarta.persistence.*;
 import java.util.Date;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Temporal;
+import jakarta.persistence.TemporalType;
 
 /**
  * 租户可对接渠道实体类
@@ -62,6 +71,9 @@ public class TenantChannel {
     @Column(name = "cancel_order_checks_cancellation_rule", nullable = false)
     private Boolean cancelOrderChecksCancellationRule = true;
 
+    @Column(name = "cancel_failure_requires_manual_intervention", nullable = false)
+    private Boolean cancelFailureRequiresManualIntervention = true;
+
     @Column(name = "prepaid_commission_type", length = 20)
     private String prepaidCommissionType = "percentage";
 
@@ -115,6 +127,8 @@ public class TenantChannel {
     public void setPrepaidOrderRequiresPayment(Boolean prepaidOrderRequiresPayment) { this.prepaidOrderRequiresPayment = prepaidOrderRequiresPayment; }
     public Boolean getCancelOrderChecksCancellationRule() { return cancelOrderChecksCancellationRule; }
     public void setCancelOrderChecksCancellationRule(Boolean cancelOrderChecksCancellationRule) { this.cancelOrderChecksCancellationRule = cancelOrderChecksCancellationRule; }
+    public Boolean getCancelFailureRequiresManualIntervention() { return cancelFailureRequiresManualIntervention; }
+    public void setCancelFailureRequiresManualIntervention(Boolean cancelFailureRequiresManualIntervention) { this.cancelFailureRequiresManualIntervention = cancelFailureRequiresManualIntervention; }
     public String getPrepaidCommissionType() { return prepaidCommissionType; }
     public void setPrepaidCommissionType(String prepaidCommissionType) { this.prepaidCommissionType = prepaidCommissionType; }
     public java.math.BigDecimal getPrepaidCommissionValue() { return prepaidCommissionValue; }

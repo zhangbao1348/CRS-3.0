@@ -15,6 +15,8 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
@@ -458,26 +460,17 @@ public class OpenReservationController {
             reservation.setOrderSource("channel");
             reservation.setCreatedBy("channel:" + channel.getChannelCode());
 
+            String guestPayloadValidationError = validateGuestsPayload(body);
+            if (guestPayloadValidationError != null) {
+                return ResponseEntity.badRequest().body(err(400, guestPayloadValidationError));
+            }
+
             List<ReservationGuest> guests = parseGuests(body);
-            if (guests.isEmpty()) {
-                return ResponseEntity.badRequest().body(err(400, "必须提供至少一位入住人信息"));
+            String guestValidationError = validateGuestsForRoomAssignment(guests, roomCount);
+            if (guestValidationError != null) {
+                return ResponseEntity.badRequest().body(err(400, guestValidationError));
             }
-            
-            // 自动补齐缺失房间的入住人（使用联系人信息）
-            if (guests.size() < roomCount) {
-                int startIdx = guests.size();
-                for (int i = startIdx; i < roomCount; i++) {
-                    ReservationGuest rg = new ReservationGuest();
-                    rg.setGuestType("guest");
-                    rg.setName(contactName);
-                    rg.setPhone(contactPhone);
-                    rg.setEmail(contactEmail);
-                    rg.setRoomIndex(i);
-                    rg.setSortOrder(i);
-                    guests.add(rg);
-                }
-            }
-            
+
             List<ReservationPromotion> promotions = parsePromotions(body);
 
             Reservation created = reservationService.createReservation(
@@ -778,12 +771,81 @@ public class OpenReservationController {
             rg.setIdNumber(getString(g, "idNumber"));
             rg.setMemberNo(getString(g, "memberNo"));
             rg.setMemberLevel(getString(g, "memberLevel"));
+            rg.setRoomIndex(null);
             Object ri = g.get("roomIndex");
             if (ri instanceof Number) rg.setRoomIndex(((Number) ri).intValue());
             rg.setSortOrder(sortOrder++);
             result.add(rg);
         }
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String validateGuestsPayload(Map<String, Object> body) {
+        Object gObj = body.get("guests");
+        if (gObj == null) {
+            return null;
+        }
+        if (!(gObj instanceof List<?> rawGuests)) {
+            return "guests 格式不正确，必须为数组";
+        }
+
+        int guestIndex = 0;
+        for (Object rawGuest : rawGuests) {
+            if (!(rawGuest instanceof Map<?, ?> rawGuestMap)) {
+                return "guests[" + guestIndex + "] 格式不正确，必须为对象";
+            }
+            Map<String, Object> guest = (Map<String, Object>) rawGuestMap;
+            if (!guest.containsKey("roomIndex")) {
+                return "guests[" + guestIndex + "].roomIndex 必填";
+            }
+            Object roomIndex = guest.get("roomIndex");
+            if (!(roomIndex instanceof Number)) {
+                return "guests[" + guestIndex + "].roomIndex 格式不正确，必须为整数";
+            }
+            guestIndex++;
+        }
+        return null;
+    }
+
+    private String validateGuestsForRoomAssignment(List<ReservationGuest> guests, int roomCount) {
+        if (guests == null || guests.isEmpty()) {
+            return "必须提供入住人信息，且每个房间至少需要一位入住人";
+        }
+        if (roomCount <= 0) {
+            return "roomCount 必须大于 0";
+        }
+        if (guests.size() < roomCount) {
+            return "预订" + roomCount + "间房时，至少需要" + roomCount + "位入住人";
+        }
+
+        boolean[] coveredRooms = new boolean[roomCount];
+        for (int guestIndex = 0; guestIndex < guests.size(); guestIndex++) {
+            ReservationGuest guest = guests.get(guestIndex);
+            Integer roomIndex = guest.getRoomIndex();
+            if (roomIndex == null) {
+                return "每位入住人都必须提供 roomIndex";
+            }
+            if (roomIndex < 0 || roomIndex >= roomCount) {
+                if (roomCount == 1) {
+                    return "当前只预订了 1 间房，guests[" + guestIndex + "].roomIndex 只能填写 0";
+                }
+                return "guests[" + guestIndex + "].roomIndex 超出范围，当前预订了 " + roomCount
+                        + " 间房，只能填写 0 到 " + (roomCount - 1);
+            }
+            coveredRooms[roomIndex] = true;
+        }
+
+        Set<Integer> missingRooms = new TreeSet<>();
+        for (int i = 0; i < coveredRooms.length; i++) {
+            if (!coveredRooms[i]) {
+                missingRooms.add(i);
+            }
+        }
+        if (!missingRooms.isEmpty()) {
+            return "每个房间至少需要一位入住人，缺少房间序号：" + missingRooms;
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

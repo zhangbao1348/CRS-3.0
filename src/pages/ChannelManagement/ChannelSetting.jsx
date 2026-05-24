@@ -98,6 +98,7 @@ const ChannelSetting = () => {
         priceRounding: data.priceRounding || 'keep',
         prepaidOrderRequiresPayment: data.prepaidOrderRequiresPayment !== false,
         cancelOrderChecksCancellationRule: data.cancelOrderChecksCancellationRule !== false,
+        cancelFailureRequiresManualIntervention: data.cancelFailureRequiresManualIntervention !== false,
         prepaidCommissionType: data.prepaidCommissionType || 'percentage',
         prepaidCommissionValue: data.prepaidCommissionValue || '',
         postpaidCommissionType: data.postpaidCommissionType || 'percentage',
@@ -121,6 +122,7 @@ const ChannelSetting = () => {
         priceRounding: values.priceRounding,
         prepaidOrderRequiresPayment: values.prepaidOrderRequiresPayment,
         cancelOrderChecksCancellationRule: values.cancelOrderChecksCancellationRule,
+        cancelFailureRequiresManualIntervention: values.cancelFailureRequiresManualIntervention,
         prepaidCommissionType: values.prepaidCommissionType,
         prepaidCommissionValue: values.prepaidCommissionValue || null,
         postpaidCommissionType: values.postpaidCommissionType,
@@ -249,7 +251,7 @@ const ChannelSetting = () => {
             </Card>
 
             <Card title="订单规则" style={{ marginBottom: 24 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
                 <Form.Item name="prepaidOrderRequiresPayment" label="预付订单是否需要支付">
                   <Radio.Group>
                     <Radio value={true}>是</Radio>
@@ -257,6 +259,12 @@ const ChannelSetting = () => {
                   </Radio.Group>
                 </Form.Item>
                 <Form.Item name="cancelOrderChecksCancellationRule" label="取消订单是否校验取消规则">
+                  <Radio.Group>
+                    <Radio value={true}>是</Radio>
+                    <Radio value={false}>否</Radio>
+                  </Radio.Group>
+                </Form.Item>
+                <Form.Item name="cancelFailureRequiresManualIntervention" label="取消失败时，是否需要人工介入">
                   <Radio.Group>
                     <Radio value={true}>是</Radio>
                     <Radio value={false}>否</Radio>

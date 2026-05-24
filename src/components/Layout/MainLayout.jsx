@@ -54,6 +54,12 @@ const MENU_PATH_ALIAS_RULES = [
   { path: '/rate-management/edit-package', target: '/rate-management/package-setting' },
   { path: '/rate-management/add-rate-plan', target: '/rate-management/rate-plan' },
   { pattern: /^\/rate-management\/edit-rate-plan\/[^/]+$/, target: '/rate-management/rate-plan' },
+  { path: '/channel-management/ctrip-setting', target: '/channel-management/channel-list' },
+  { path: '/channel-management/fliggy-setting', target: '/channel-management/channel-list' },
+  { pattern: /^\/channel-management\/channel-setting\/[^/]+$/, target: '/channel-management/channel-list' },
+  { path: '/channel-management/ctrip-setting/promotion/add', target: '/channel-management/channel-list' },
+  { pattern: /^\/channel-management\/ctrip-setting\/promotion\/edit\/[^/]+$/, target: '/channel-management/channel-list' },
+  { pattern: /^\/channel-management\/ctrip-setting\/promotion\/registration\/[^/]+$/, target: '/channel-management/channel-list' },
   { path: '/reservation/reservation-detail', target: '/reservation/reservation-list' }
 ]
 
