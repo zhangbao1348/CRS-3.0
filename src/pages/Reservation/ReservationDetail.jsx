@@ -13,6 +13,7 @@ const ReservationDetail = () => {
   const [orderDetail, setOrderDetail] = useState(null)
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [selectedDateDetail, setSelectedDateDetail] = useState(null)
   const [historyModalVisible, setHistoryModalVisible] = useState(false)
   const [logModalVisible, setLogModalVisible] = useState(false)
   const [selectedApiLog, setSelectedApiLog] = useState(null)
@@ -38,11 +39,13 @@ const ReservationDetail = () => {
     fetchDetail()
   }, [reservationId])
 
-  const handleDateClick = () => {
+  const handleDateClick = (item) => {
+    setSelectedDateDetail(item)
     setModalVisible(true)
   }
 
   const handleModalClose = () => {
+    setSelectedDateDetail(null)
     setModalVisible(false)
   }
 
@@ -109,6 +112,76 @@ const ReservationDetail = () => {
   const remarkInfo = orderDetail.remarkInfo || {}
   const operationHistory = orderDetail.operationHistory || []
 
+  // 组装当前选中日期的各项 Tab 的数据源
+  const getFeeDataSource = () => {
+    if (!selectedDateDetail) return []
+    return [
+      { key: '1', name: '折扣前房费', value: selectedDateDetail.originalPrice !== null ? `¥${Number(selectedDateDetail.originalPrice).toFixed(2)}` : '-' },
+      { key: '2', name: '折扣后房费', value: selectedDateDetail.actualPrice !== null ? `¥${Number(selectedDateDetail.actualPrice || selectedDateDetail.price || 0).toFixed(2)}` : '-' }
+    ]
+  }
+
+  const getPackageDataSource = () => {
+    if (!selectedDateDetail) return []
+    let list = []
+    if (selectedDateDetail.packagesJson) {
+      try {
+        const pkgs = JSON.parse(selectedDateDetail.packagesJson)
+        if (Array.isArray(pkgs)) {
+          list = pkgs.map((pkg, idx) => {
+            let typeDesc = pkg.type || '其他'
+            if (typeDesc === 'breakfast') typeDesc = '早餐'
+            else if (typeDesc === 'transfer') typeDesc = '接送服务'
+            else if (typeDesc === 'scenic') typeDesc = '景区门票'
+            else if (typeDesc === 'dinner') typeDesc = '正餐'
+            
+            return {
+              key: String(idx + 1),
+              typeDesc: typeDesc,
+              name: pkg.name || pkg.code,
+              quantityDesc: `${pkg.quantity || 1} 份`,
+              priceDesc: pkg.price !== undefined && pkg.price !== null ? `¥${Number(pkg.price).toFixed(2)}` : '-',
+              exclusivePriceDesc: pkg.exclusivePrice !== undefined && pkg.exclusivePrice !== null ? `¥${Number(pkg.exclusivePrice).toFixed(2)}` : '-',
+              inclusivePriceDesc: pkg.inclusivePrice !== undefined && pkg.inclusivePrice !== null ? `¥${Number(pkg.inclusivePrice).toFixed(2)}` : '-'
+            }
+          })
+        }
+      } catch (e) {
+        console.error('解析包价快照JSON失败:', e)
+      }
+    }
+    if (list.length === 0) {
+      return [{ key: 'none', typeDesc: '-', name: '无包价信息', quantityDesc: '-', priceDesc: '-', exclusivePriceDesc: '-', inclusivePriceDesc: '-' }]
+    }
+    return list
+  }
+
+  const getTaxDataSource = () => {
+    if (!selectedDateDetail) return []
+    return [
+      { key: '1', name: '增值税', value: selectedDateDetail.taxAmount !== null && selectedDateDetail.taxAmount !== undefined ? `¥${Number(selectedDateDetail.taxAmount).toFixed(2)}` : '-' },
+      { key: '2', name: '服务费', value: selectedDateDetail.serviceCharge !== null && selectedDateDetail.serviceCharge !== undefined ? `¥${Number(selectedDateDetail.serviceCharge).toFixed(2)}` : '-' }
+    ]
+  }
+
+  const getRoomTypeDisplay = () => {
+    const name = hotelInfo.roomTypeName || '-'
+    const code = hotelInfo.roomTypeCode
+    if (code && code !== '-') {
+      return `${name}（${code}）`
+    }
+    return name
+  }
+
+  const getRatePlanDisplay = () => {
+    const name = hotelInfo.ratePlanName || hotelInfo.roomType || '-'
+    const code = hotelInfo.ratePlanCode
+    if (code && code !== '-') {
+      return `${name}（${code}）`
+    }
+    return name
+  }
+
   return (
     <div className="fade-in">
       <h1 className="page-title">
@@ -158,15 +231,19 @@ const ReservationDetail = () => {
 
       {/* 酒店及房间信息 */}
       <Card title="酒店及房间信息" style={{ marginBottom: 24 }}>
-        <Descriptions size="small" column={3}>
+        <Descriptions size="small" column={2}>
           <Descriptions.Item label="酒店">{hotelInfo.hotelName}</Descriptions.Item>
-          <Descriptions.Item label="房型">{hotelInfo.roomType}</Descriptions.Item>
-          <Descriptions.Item label="房号">{hotelInfo.roomTypeName}</Descriptions.Item>
           <Descriptions.Item label="入住日期">
             <span>
               {hotelInfo.checkInDate} - {hotelInfo.checkOutDate} 
               ({hotelInfo.nights}晚) {hotelInfo.roomCount}间
             </span>
+          </Descriptions.Item>
+          <Descriptions.Item label="房型">
+            <Text strong>{getRoomTypeDisplay()}</Text>
+          </Descriptions.Item>
+          <Descriptions.Item label="房价名称">
+            <Text strong>{getRatePlanDisplay()}</Text>
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -249,7 +326,7 @@ const ReservationDetail = () => {
               '&:hover': {
                 borderColor: '#1890ff'
               }
-            }} onClick={handleDateClick}>
+            }} onClick={() => handleDateClick(item)}>
               <div style={{ marginBottom: 8, fontWeight: 'bold' }}>{item.date}</div>
               {item.originalPrice && <div style={{ marginBottom: 4, textDecoration: 'line-through', fontSize: '12px', color: '#999' }}>¥{Number(item.originalPrice).toFixed(2)}</div>}
               <div style={{ marginBottom: 4 }}>¥{Number(item.actualPrice || item.price || 0).toFixed(2)}</div>
@@ -297,63 +374,57 @@ const ReservationDetail = () => {
           style={{ marginBottom: 24 }}
         />
       </Card>
-      
       {/* 日期点击弹框 */}
       <Modal
         title="价格详情"
         open={modalVisible}
-        onCancel={handleModalClose}
-        footer={null}
-        width={800}
-      >
-        <Tabs defaultActiveKey="1">
-          <Tabs.TabPane tab="费用" key="1">
-            <Table 
-              size="small" 
-              bordered 
-              pagination={false}
-              dataSource={[
-                { key: '1', name: '折扣前房费', value: priceInfo.originalPrice || '-' },
-                { key: '2', name: '折扣后房费', value: priceInfo.actualPrice || '-' }
-              ]} 
-              columns={[
-                { title: '', dataIndex: 'name', width: 150 },
-                { title: '', dataIndex: 'value' }
-              ]}
-            />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab="包价" key="2">
-            <Table 
-              size="small" 
-              bordered 
-              pagination={false}
-              dataSource={[
-                { key: '1', name: '早餐', value: '-' },
-                { key: '2', name: '接机', value: '-' }
-              ]} 
-              columns={[
-                { title: '', dataIndex: 'name', width: 150 },
-                { title: '', dataIndex: 'value' }
-              ]}
-            />
-          </Tabs.TabPane>
-          <Tabs.TabPane tab="税费" key="3">
-            <Table 
-              size="small" 
-              bordered 
-              pagination={false}
-              dataSource={[
-                { key: '1', name: '增值税', value: '-' },
-                { key: '2', name: '服务费', value: '-' }
-              ]} 
-              columns={[
-                { title: '', dataIndex: 'name', width: 150 },
-                { title: '', dataIndex: 'value' }
-              ]}
-            />
-          </Tabs.TabPane>
-        </Tabs>
-      </Modal>
+    onCancel={handleModalClose}
+    footer={null}
+    width={800}
+  >
+    <Tabs defaultActiveKey="1">
+      <Tabs.TabPane tab="费用" key="1">
+        <Table 
+          size="small" 
+          bordered 
+          pagination={false}
+          dataSource={getFeeDataSource()} 
+          columns={[
+            { title: '', dataIndex: 'name', width: 150 },
+            { title: '', dataIndex: 'value' }
+          ]}
+        />
+      </Tabs.TabPane>
+      <Tabs.TabPane tab="包价" key="2">
+        <Table 
+          size="small" 
+          bordered 
+          pagination={false}
+          dataSource={getPackageDataSource()} 
+          columns={[
+            { title: '包价类型', dataIndex: 'typeDesc', width: 110 },
+            { title: '包价名称', dataIndex: 'name' },
+            { title: '包价份数', dataIndex: 'quantityDesc', width: 90 },
+            { title: '包价价格', dataIndex: 'priceDesc', width: 100 },
+            { title: '不含税价', dataIndex: 'exclusivePriceDesc', width: 100 },
+            { title: '含税价', dataIndex: 'inclusivePriceDesc', width: 100 }
+          ]}
+        />
+      </Tabs.TabPane>
+      <Tabs.TabPane tab="税费" key="3">
+        <Table 
+          size="small" 
+          bordered 
+          pagination={false}
+          dataSource={getTaxDataSource()} 
+          columns={[
+            { title: '', dataIndex: 'name', width: 150 },
+            { title: '', dataIndex: 'value' }
+          ]}
+        />
+      </Tabs.TabPane>
+    </Tabs>
+  </Modal>
       
       {/* 操作历史弹框 */}
       <Modal

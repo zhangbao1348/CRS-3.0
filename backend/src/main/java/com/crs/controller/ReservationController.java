@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -62,14 +63,18 @@ public class ReservationController {
     private final ReservationService reservationService;
     private final ApiLogRepository apiLogRepository;
     private final UserService userService;
+    private final com.crs.repository.PackageRepository packageRepo;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public ReservationController(
             ReservationService reservationService,
             ApiLogRepository apiLogRepository,
-            UserService userService) {
+            UserService userService,
+            com.crs.repository.PackageRepository packageRepo) {
         this.reservationService = reservationService;
         this.apiLogRepository = apiLogRepository;
         this.userService = userService;
+        this.packageRepo = packageRepo;
     }
 
     private Integer getCurrentTenantId() {
@@ -159,6 +164,8 @@ public class ReservationController {
         hotelInfo.put("roomType", reservation.getRatePlanName() != null ? reservation.getRatePlanName() : reservation.getRatePlanCode());
         hotelInfo.put("roomTypeName", reservation.getRoomTypeName());
         hotelInfo.put("roomTypeCode", reservation.getRoomTypeCode());
+        hotelInfo.put("ratePlanName", reservation.getRatePlanName());
+        hotelInfo.put("ratePlanCode", reservation.getRatePlanCode());
         hotelInfo.put("checkInDate", formatDate(reservation.getCheckInDate()));
         hotelInfo.put("checkOutDate", formatDate(reservation.getCheckOutDate()));
         hotelInfo.put("nights", reservation.getNights());
@@ -669,6 +676,7 @@ public class ReservationController {
         if (dpObj == null) return Collections.emptyList();
         List<Map<String, Object>> dpList = (List<Map<String, Object>>) dpObj;
         List<ReservationDailyPrice> result = new ArrayList<>();
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
         for (Map<String, Object> dp : dpList) {
             ReservationDailyPrice rdp = new ReservationDailyPrice();
             rdp.setPriceDate(parseDate(getString(dp, "date")));
@@ -678,7 +686,7 @@ public class ReservationController {
             rdp.setServiceCharge(getBigDecimal(dp, "serviceCharge"));
             rdp.setBreakfastIncluded(getBoolean(dp, "breakfastIncluded"));
             rdp.setBreakfastCount(getInteger(dp, "breakfastCount") != null ? getInteger(dp, "breakfastCount") : 0);
-            rdp.setPackagesJson(getString(dp, "packagesJson"));
+            rdp.setPackagesJson(resolvePackagePriceDetails(tenantId, getString(dp, "packagesJson")));
             result.add(rdp);
         }
         return result;
@@ -751,5 +759,82 @@ public class ReservationController {
         if (val == null) return false;
         if (val instanceof Boolean) return (Boolean) val;
         return "true".equalsIgnoreCase(val.toString());
+    }
+
+    private String resolvePackagePriceDetails(Integer tenantId, String packagesJson) {
+        if (packagesJson == null || packagesJson.isBlank() || packagesJson.equals("null") || packagesJson.equals("[]")) {
+            return "[]";
+        }
+        try {
+            List<Object> rawItems = objectMapper.readValue(packagesJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            List<String> packageCodes = new ArrayList<>();
+
+            for (Object item : rawItems) {
+                if (item instanceof String code) {
+                    if (code != null && !code.isBlank()) {
+                        packageCodes.add(code);
+                    }
+                } else if (item instanceof Map<?, ?> rawMap) {
+                    String code = Objects.toString(rawMap.get("code"), Objects.toString(rawMap.get("packageCode"), null));
+                    if (code != null && !code.isBlank()) {
+                        packageCodes.add(code);
+                    }
+                }
+            }
+
+            if (packageCodes.isEmpty()) {
+                return "[]";
+            }
+
+            List<com.crs.entity.Package> activePackages = packageRepo
+                    .findByTenantIdAndCodeInAndStatus(tenantId, packageCodes, com.crs.entity.Package.Status.active);
+
+            List<Map<String, Object>> snapshotList = new ArrayList<>();
+
+            for (com.crs.entity.Package ap : activePackages) {
+                int qty = 1;
+                for (Object item : rawItems) {
+                    if (item instanceof Map<?, ?> rawMap) {
+                        String code = Objects.toString(rawMap.get("code"), Objects.toString(rawMap.get("packageCode"), null));
+                        if (ap.getCode().equalsIgnoreCase(code)) {
+                            Object qVal = rawMap.get("quantity");
+                            if (qVal instanceof Number num) {
+                                qty = num.intValue();
+                            } else if (qVal != null) {
+                                try { qty = Integer.parseInt(qVal.toString()); } catch (Exception ignored) {}
+                            }
+                        }
+                    }
+                }
+
+                BigDecimal price = ap.getFixedPrice() != null ? BigDecimal.valueOf(ap.getFixedPrice()) : BigDecimal.ZERO;
+                Boolean taxIncluded = ap.getTaxIncluded() != null ? ap.getTaxIncluded() : false;
+                BigDecimal inclusivePrice;
+                BigDecimal exclusivePrice;
+
+                if (taxIncluded) {
+                    inclusivePrice = price.setScale(2, java.math.RoundingMode.HALF_UP);
+                    exclusivePrice = price.divide(BigDecimal.valueOf(1.06), 2, java.math.RoundingMode.HALF_UP);
+                } else {
+                    exclusivePrice = price.setScale(2, java.math.RoundingMode.HALF_UP);
+                    inclusivePrice = price.multiply(BigDecimal.valueOf(1.06)).setScale(2, java.math.RoundingMode.HALF_UP);
+                }
+
+                Map<String, Object> pSnapshot = new LinkedHashMap<>();
+                pSnapshot.put("code", ap.getCode());
+                pSnapshot.put("name", ap.getName());
+                pSnapshot.put("type", ap.getType());
+                pSnapshot.put("quantity", qty);
+                pSnapshot.put("price", price.doubleValue());
+                pSnapshot.put("taxIncluded", taxIncluded);
+                pSnapshot.put("inclusivePrice", inclusivePrice.doubleValue());
+                pSnapshot.put("exclusivePrice", exclusivePrice.doubleValue());
+                snapshotList.add(pSnapshot);
+            }
+
+            return objectMapper.writeValueAsString(snapshotList);
+        } catch (Exception e) {
+            return packagesJson;
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.crs.service.inventory;
 
+import java.util.List;
+
 /**
  * InventoryDeductionService 服务接口 (Service Interface)
  * 
@@ -16,6 +18,15 @@ package com.crs.service.inventory;
 public interface InventoryDeductionService {
 
     AvailabilityResult checkAvailability(AvailabilityContext context);
+
+    /**
+     * 房控日历独立的范围日计算机制
+     * 不受订单级超卖熔断限制，无条件返回每日计算扣减明细，保证大盘日历展现的可用数与预订算力模型绝对一致。
+     *
+     * @param context 可用性查询上下文
+     * @return 每日可用库存明细列表
+     */
+    List<AvailabilityResult.DailyAvailability> checkDailyRangeAvailability(AvailabilityContext context);
 
     void deductInventory(InventoryDeductionContext context);
 

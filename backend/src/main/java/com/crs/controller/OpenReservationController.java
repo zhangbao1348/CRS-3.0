@@ -15,9 +15,11 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.crs.entity.BookingControl;
 import com.crs.entity.CancellationPolicy;
 import com.crs.entity.ChannelHotelMapping;
 import com.crs.entity.GuaranteePolicy;
@@ -39,6 +42,8 @@ import com.crs.entity.ReservationDailyPrice;
 import com.crs.entity.ReservationGuest;
 import com.crs.entity.ReservationPromotion;
 import com.crs.entity.TenantChannel;
+import com.crs.repository.BookingControlRepository;
+import com.crs.repository.PackageRepository;
 import com.crs.repository.CancellationPolicyRepository;
 import com.crs.repository.ChannelHotelMappingRepository;
 import com.crs.repository.ChannelPublishRecordRepository;
@@ -86,6 +91,8 @@ public class OpenReservationController {
     private final GuaranteePolicyRepository guaranteePolicyRepo;
     private final ChannelPublishRecordRepository channelPublishRecordRepo;
     private final ReservationRepository reservationRepo;
+    private final BookingControlRepository bookingControlRepo;
+    private final PackageRepository packageRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OpenReservationController(
@@ -99,7 +106,9 @@ public class OpenReservationController {
             CancellationPolicyRepository cancellationPolicyRepo,
             GuaranteePolicyRepository guaranteePolicyRepo,
             ChannelPublishRecordRepository channelPublishRecordRepo,
-            ReservationRepository reservationRepo) {
+            ReservationRepository reservationRepo,
+            BookingControlRepository bookingControlRepo,
+            PackageRepository packageRepo) {
         this.reservationService = reservationService;
         this.hotelRepo = hotelRepo;
         this.roomTypeRepo = roomTypeRepo;
@@ -111,6 +120,8 @@ public class OpenReservationController {
         this.guaranteePolicyRepo = guaranteePolicyRepo;
         this.channelPublishRecordRepo = channelPublishRecordRepo;
         this.reservationRepo = reservationRepo;
+        this.bookingControlRepo = bookingControlRepo;
+        this.packageRepo = packageRepo;
     }
 
     @PostMapping("/reservations")
@@ -329,7 +340,12 @@ public class OpenReservationController {
                 originalPriceFromDb = totalPriceFromDb;
             }
 
-            // 构建每日价格
+            // 构建每日价格（自动解析包价详情快照与早餐翻译）
+            Map<String, Object> bfPkgInfo = resolvePackageDetailsAndBreakfast(hotel.getTenantId(), ratePlan.getPackages());
+            String snapshotJson = (String) bfPkgInfo.get("packagesJson");
+            boolean bfIncluded = (Boolean) bfPkgInfo.get("breakfastIncluded");
+            int bfCount = (Integer) bfPkgInfo.get("breakfastCount");
+
             List<ReservationDailyPrice> dailyPrices = new ArrayList<>();
             for (HotelPrice hp : effectivePrices) {
                 BigDecimal actualPrice = applyHotelMinimumPrice(hp.getPriceWithTax(), minimumPrice);
@@ -340,9 +356,9 @@ public class OpenReservationController {
                 rdp.setTaxAmount(actualPrice != null && hp.getPriceWithoutTax() != null
                         ? actualPrice.subtract(hp.getPriceWithoutTax()) : BigDecimal.ZERO);
                 rdp.setServiceCharge(null);
-                rdp.setBreakfastIncluded(false);
-                rdp.setBreakfastCount(0);
-                rdp.setPackagesJson(ratePlan.getPackages());
+                rdp.setBreakfastIncluded(bfIncluded);
+                rdp.setBreakfastCount(bfCount);
+                rdp.setPackagesJson(snapshotJson);
                 dailyPrices.add(rdp);
             }
 
@@ -402,15 +418,19 @@ public class OpenReservationController {
             }
             reservation.setGuaranteeInfo(guaranteeInfoStr);
 
-            // 1. 自动填充政策快照
+            // 1. 自动填充政策快照（合并计算多日期与多维度最严取消规则）
             String cancelRule = ratePlan.getCancellationRule();
-            if (cancelRule != null && !cancelRule.isBlank()) {
-                CancellationPolicy cp = cancellationPolicyRepo.findByTenantIdAndCode(channel.getTenantId(), cancelRule);
+            String effectiveCancelRule = resolveEffectiveCancellationRule(
+                    channel.getTenantId(), cancelRule, hotelCode, ratePlanCode,
+                    channel.getChannelCode(), ratePlan.getRateCategory(), null,
+                    checkIn, checkOut);
+            if (effectiveCancelRule != null && !effectiveCancelRule.isBlank()) {
+                CancellationPolicy cp = cancellationPolicyRepo.findByTenantIdAndCode(channel.getTenantId(), effectiveCancelRule);
                 if (cp != null) {
                     reservation.setCancellationPolicyCode(cp.getCode());
                     reservation.setCancellationPolicyDesc(cp.getDescription());
                 } else {
-                    reservation.setCancellationPolicyCode(cancelRule);
+                    reservation.setCancellationPolicyCode(effectiveCancelRule);
                 }
             }
 
@@ -903,5 +923,160 @@ public class OpenReservationController {
                 && "active".equalsIgnoreCase(hotelPrice.getStatus())
                 && hotelPrice.getPriceWithTax() != null
                 && hotelPrice.getPriceWithTax().compareTo(BigDecimal.ZERO) > 0;
+    }
+
+    private int getCancellationPolicySeverityScore(CancellationPolicy policy) {
+        if (policy == null) return 0;
+        String normType = CancellationPolicyTypeUtil.normalizeType(policy.getType());
+        if (CancellationPolicyTypeUtil.isNonRefundableType(normType)) {
+            return 99999;
+        }
+        if (CancellationPolicyTypeUtil.isLimitedType(normType)) {
+            int base = 1000;
+            if ("full_amount".equalsIgnoreCase(policy.getCancellationFeeType())) {
+                base = 2000;
+            }
+            int days = policy.getCancellationDays() != null ? policy.getCancellationDays() : 0;
+            return base + (days * 24);
+        }
+        if (CancellationPolicyTypeUtil.isFreeType(normType)) {
+            return 10;
+        }
+        return 0;
+    }
+
+    private String resolveEffectiveCancellationRule(
+            Integer tenantId, String rpCancelRule, String hotelCode, String ratePlanCode,
+            String channelCode, String rateCategoryCode, String marketCode,
+            Date checkIn, Date checkOut) {
+        
+        String bestRule = rpCancelRule;
+        int maxScore = 0;
+        
+        if (rpCancelRule != null && !rpCancelRule.isBlank()) {
+            CancellationPolicy defaultPolicy = cancellationPolicyRepo.findByTenantIdAndCode(tenantId, rpCancelRule);
+            maxScore = getCancellationPolicySeverityScore(defaultPolicy);
+        }
+        
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(checkIn);
+        
+        String[][] dimensions = {
+            {"hotel", ""},
+            {"rate", ratePlanCode},
+            {"channel", channelCode},
+            {"rate_category", rateCategoryCode},
+            {"market", marketCode}
+        };
+        
+        Map<String, CancellationPolicy> policyCache = new java.util.HashMap<>();
+        
+        while (cal.getTime().before(checkOut)) {
+            Date date = cal.getTime();
+            for (String[] dim : dimensions) {
+                String dimType = dim[0];
+                String dimCode = dim[1];
+                if (dimCode == null) continue;
+                
+                Optional<BookingControl> controlOpt = bookingControlRepo
+                        .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndControlDate(
+                                tenantId, hotelCode, dimType, dimCode, date);
+                
+                if (controlOpt.isPresent()) {
+                    String ruleCode = controlOpt.get().getCancellationRule();
+                    if (ruleCode != null && !ruleCode.isBlank()) {
+                        CancellationPolicy policy = policyCache.computeIfAbsent(ruleCode, 
+                                code -> cancellationPolicyRepo.findByTenantIdAndCode(tenantId, code));
+                        int score = getCancellationPolicySeverityScore(policy);
+                        if (score > maxScore) {
+                            maxScore = score;
+                            bestRule = ruleCode;
+                        }
+                    }
+                }
+            }
+            cal.add(Calendar.DATE, 1);
+        }
+        
+        return bestRule;
+    }
+
+    private Map<String, Object> resolvePackageDetailsAndBreakfast(Integer tenantId, String packagesJson) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("packagesJson", "[]");
+        result.put("breakfastIncluded", false);
+        result.put("breakfastCount", 0);
+
+        if (packagesJson == null || packagesJson.isBlank() || packagesJson.equals("null")) {
+            return result;
+        }
+
+        try {
+            List<Object> rawItems = objectMapper.readValue(packagesJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            List<String> packageCodes = new ArrayList<>();
+
+            for (Object item : rawItems) {
+                if (item instanceof String code) {
+                    if (code != null && !code.isBlank()) {
+                        packageCodes.add(code);
+                    }
+                } else if (item instanceof Map<?, ?> rawMap) {
+                    String code = Objects.toString(rawMap.get("code"), Objects.toString(rawMap.get("packageCode"), null));
+                    if (code != null && !code.isBlank()) {
+                        packageCodes.add(code);
+                    }
+                }
+            }
+
+            if (packageCodes.isEmpty()) {
+                return result;
+            }
+
+            List<com.crs.entity.Package> activePackages = packageRepo
+                    .findByTenantIdAndCodeInAndStatus(tenantId, packageCodes, com.crs.entity.Package.Status.active);
+
+            List<Map<String, Object>> snapshotList = new ArrayList<>();
+            boolean hasBreakfast = false;
+            int totalBreakfastCount = 0;
+
+            for (com.crs.entity.Package ap : activePackages) {
+                int qty = ap.getFixedQuantity() != null ? ap.getFixedQuantity() : 1;
+                
+                BigDecimal price = ap.getFixedPrice() != null ? BigDecimal.valueOf(ap.getFixedPrice()) : BigDecimal.ZERO;
+                Boolean taxIncluded = ap.getTaxIncluded() != null ? ap.getTaxIncluded() : false;
+                BigDecimal inclusivePrice;
+                BigDecimal exclusivePrice;
+                
+                if (taxIncluded) {
+                    inclusivePrice = price.setScale(2, java.math.RoundingMode.HALF_UP);
+                    exclusivePrice = price.divide(BigDecimal.valueOf(1.06), 2, java.math.RoundingMode.HALF_UP);
+                } else {
+                    exclusivePrice = price.setScale(2, java.math.RoundingMode.HALF_UP);
+                    inclusivePrice = price.multiply(BigDecimal.valueOf(1.06)).setScale(2, java.math.RoundingMode.HALF_UP);
+                }
+
+                Map<String, Object> pSnapshot = new LinkedHashMap<>();
+                pSnapshot.put("code", ap.getCode());
+                pSnapshot.put("name", ap.getName());
+                pSnapshot.put("type", ap.getType());
+                pSnapshot.put("quantity", qty);
+                pSnapshot.put("price", price.doubleValue());
+                pSnapshot.put("taxIncluded", taxIncluded);
+                pSnapshot.put("inclusivePrice", inclusivePrice.doubleValue());
+                pSnapshot.put("exclusivePrice", exclusivePrice.doubleValue());
+                snapshotList.add(pSnapshot);
+
+                if ("breakfast".equalsIgnoreCase(ap.getType())) {
+                    hasBreakfast = true;
+                    totalBreakfastCount += qty;
+                }
+            }
+
+            result.put("packagesJson", objectMapper.writeValueAsString(snapshotList));
+            result.put("breakfastIncluded", hasBreakfast);
+            result.put("breakfastCount", totalBreakfastCount);
+        } catch (Exception ignored) {}
+
+        return result;
     }
 }

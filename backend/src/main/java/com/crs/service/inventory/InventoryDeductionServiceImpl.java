@@ -120,6 +120,16 @@ public class InventoryDeductionServiceImpl implements InventoryDeductionService 
         }
     }
 
+    @Override
+    public List<AvailabilityResult.DailyAvailability> checkDailyRangeAvailability(AvailabilityContext ctx) {
+        List<AvailabilityResult.DailyAvailability> dailyDetails = new ArrayList<>();
+        for (LocalDate date = ctx.getCheckInDate(); date.isBefore(ctx.getCheckOutDate()); date = date.plusDays(1)) {
+            AvailabilityResult.DailyAvailability daily = checkDailyAvailability(ctx, date);
+            dailyDetails.add(daily);
+        }
+        return dailyDetails;
+    }
+
     private AvailabilityResult.DailyAvailability checkDailyAvailability(AvailabilityContext ctx, LocalDate date) {
         AvailabilityResult.DailyAvailability daily = new AvailabilityResult.DailyAvailability();
         daily.setDate(date);

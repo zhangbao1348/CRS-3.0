@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -391,6 +392,26 @@ public class OpenHotelController {
                     // C. 检查价格计划是否适用该房型
                     if (!isRatePlanApplicable(rp, rt.getRoomTypeCode())) continue;
 
+                    // C.5 校验预订控制规则（开关房、提前预订天数、连住天数限制），不满足时直接前置过滤隐藏价格计划
+                    AvailabilityContext availCtx = new AvailabilityContext();
+                    availCtx.setTenantId(hotel.getTenantId());
+                    availCtx.setHotelCode(hotelCode);
+                    availCtx.setRoomTypeCode(rt.getRoomTypeCode());
+                    availCtx.setRateCode(rp.getRateCode());
+                    availCtx.setChannelCode(channel.getChannelCode());
+                    availCtx.setRateCategoryCode(rp.getRateCategory());
+                    availCtx.setCheckInDate(checkInDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                    availCtx.setCheckOutDate(checkOutDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                    availCtx.setRequestedRooms(roomCount);
+
+                    AvailabilityResult availResult = inventoryDeductionService.checkAvailability(availCtx);
+                    if (!availResult.isAvailable()) {
+                        String reject = availResult.getRejectReason();
+                        if (reject != null && (reject.contains("房态") || reject.contains("提前") || reject.contains("需住") || reject.contains("可住"))) {
+                            continue; // 房态关闭、提前预订违规或连住违规，前置隐藏该价格计划
+                        }
+                    }
+
                     // D. 聚合每日价格与总价
                     List<Map<String, Object>> dailyPrices = new ArrayList<>();
                     BigDecimal totalPrice = BigDecimal.ZERO;
@@ -415,16 +436,16 @@ public class OpenHotelController {
                     if (!priceComplete) continue;
                     totalPrice = totalPrice.multiply(BigDecimal.valueOf(roomCount));
 
-                    // E. 计算最小可用库存
-                    int minAvail = Integer.MAX_VALUE;
-                    cal.setTime(checkInDate);
-                    for (int i = 0; i < nights; i++) {
-                        String key = rp.getRateCode() + "_" + rt.getRoomTypeCode() + "_" + formatDate(cal.getTime());
-                        minAvail = Math.min(minAvail, invMap.getOrDefault(key, 0));
-                        cal.add(Calendar.DATE, 1);
-                    }
+                    // E. 计算最小可用库存 (直接复用可订检查返回的可用配额/物理库存最小值)
+                    int minAvail = availResult.getAvailableCount() != null ? availResult.getAvailableCount() : 0;
 
-                    // F. 组装 RatePlan 数据
+                    // F. 合并计算多日期与多维度最严取消规则
+                    String effectiveCancelRule = resolveEffectiveCancellationRule(
+                            channel.getTenantId(), rp.getCancellationRule(), hotelCode, rp.getRateCode(),
+                            channel.getChannelCode(), rp.getRateCategory(), null,
+                            checkInDate, checkOutDate);
+
+                    // G. 组装 RatePlan 数据
                     Map<String, Object> rpMap = new LinkedHashMap<>();
                     rpMap.put("ratePlanCode", rp.getRateCode());
                     rpMap.put("ratePlanName", rp.getRateName());
@@ -436,7 +457,7 @@ public class OpenHotelController {
                     rpMap.put("currency", "CNY");
                     rpMap.put("dailyPrices", dailyPrices);
                     rpMap.put("packages", parsePackages(hotel.getTenantId(), rp.getPackages()));
-                    rpMap.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), rp.getCancellationRule()));
+                    rpMap.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), effectiveCancelRule));
                     rpMap.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), rp.getGuaranteeRule()));
                     ratePlanResults.add(rpMap);
                 }
@@ -641,7 +662,11 @@ public class OpenHotelController {
             data.put("totalPrice", totalPrice);
             data.put("currency", "CNY");
             data.put("packages", parsePackages(hotel.getTenantId(), ratePlan.getPackages()));
-            data.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), ratePlan.getCancellationRule()));
+            String effectiveCancelRule = resolveEffectiveCancellationRule(
+                    channel.getTenantId(), ratePlan.getCancellationRule(), hotelCode, ratePlanCode,
+                    channel.getChannelCode(), ratePlan.getRateCategory(), null,
+                    checkIn, checkOut);
+            data.put("cancellationPolicy", buildCancellationPolicy(channel.getTenantId(), effectiveCancelRule));
             data.put("guaranteePolicy", buildGuaranteePolicy(channel.getTenantId(), ratePlan.getGuaranteeRule()));
             return ResponseEntity.ok(ok(data));
         } catch (Exception e) {
@@ -859,5 +884,81 @@ public class OpenHotelController {
             List<String> applicableCodes = applicableRaw.stream().map(Object::toString).collect(Collectors.toList());
             return applicableCodes.contains(roomTypeCode);
         } catch (Exception e) { return true; }
+    }
+
+    private int getCancellationPolicySeverityScore(CancellationPolicy policy) {
+        if (policy == null) return 0;
+        String normType = CancellationPolicyTypeUtil.normalizeType(policy.getType());
+        if (CancellationPolicyTypeUtil.isNonRefundableType(normType)) {
+            return 99999;
+        }
+        if (CancellationPolicyTypeUtil.isLimitedType(normType)) {
+            int base = 1000;
+            if ("full_amount".equalsIgnoreCase(policy.getCancellationFeeType())) {
+                base = 2000;
+            }
+            int days = policy.getCancellationDays() != null ? policy.getCancellationDays() : 0;
+            return base + (days * 24);
+        }
+        if (CancellationPolicyTypeUtil.isFreeType(normType)) {
+            return 10;
+        }
+        return 0;
+    }
+
+    private String resolveEffectiveCancellationRule(
+            Integer tenantId, String rpCancelRule, String hotelCode, String ratePlanCode,
+            String channelCode, String rateCategoryCode, String marketCode,
+            Date checkIn, Date checkOut) {
+        
+        String bestRule = rpCancelRule;
+        int maxScore = 0;
+        
+        if (rpCancelRule != null && !rpCancelRule.isBlank()) {
+            CancellationPolicy defaultPolicy = cancellationPolicyRepo.findByTenantIdAndCode(tenantId, rpCancelRule);
+            maxScore = getCancellationPolicySeverityScore(defaultPolicy);
+        }
+        
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(checkIn);
+        
+        String[][] dimensions = {
+            {"hotel", ""},
+            {"rate", ratePlanCode},
+            {"channel", channelCode},
+            {"rate_category", rateCategoryCode},
+            {"market", marketCode}
+        };
+        
+        Map<String, CancellationPolicy> policyCache = new java.util.HashMap<>();
+        
+        while (cal.getTime().before(checkOut)) {
+            Date date = cal.getTime();
+            for (String[] dim : dimensions) {
+                String dimType = dim[0];
+                String dimCode = dim[1];
+                if (dimCode == null) continue;
+                
+                Optional<BookingControl> controlOpt = bookingControlRepo
+                        .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndControlDate(
+                                tenantId, hotelCode, dimType, dimCode, date);
+                
+                if (controlOpt.isPresent()) {
+                    String ruleCode = controlOpt.get().getCancellationRule();
+                    if (ruleCode != null && !ruleCode.isBlank()) {
+                        CancellationPolicy policy = policyCache.computeIfAbsent(ruleCode, 
+                                code -> cancellationPolicyRepo.findByTenantIdAndCode(tenantId, code));
+                        int score = getCancellationPolicySeverityScore(policy);
+                        if (score > maxScore) {
+                            maxScore = score;
+                            bestRule = ruleCode;
+                        }
+                    }
+                }
+            }
+            cal.add(Calendar.DATE, 1);
+        }
+        
+        return bestRule;
     }
 }
