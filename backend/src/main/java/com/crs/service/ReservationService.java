@@ -204,7 +204,8 @@ public class ReservationService {
 
     @Transactional
     public Reservation cancelReservationBySystem(Integer id, String cancelledBy, String cancelReason) {
-        Reservation reservation = reservationRepository.findById(id)
+        // 使用悲观写锁锁定该订单，确保后续读写数据具有最高并发原子安全性
+        Reservation reservation = reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
 
         if (!"pending_payment".equals(reservation.getReservationStatus())) {
@@ -218,6 +219,79 @@ public class ReservationService {
         }
 
         return cancelReservationInternal(reservation, cancelledBy, cancelReason, "system");
+    }
+
+    /**
+     * 对预订订单进行支付回调核销，具备高并发行锁保护及防重幂等机制。
+     * 关联PRD文档：.kiro/specs/prd/14-订单管理.md
+     */
+    @Transactional
+    public Reservation payReservation(String reservationCode, String paymentMethod, java.math.BigDecimal paymentAmount, String transactionId, String operator) {
+        // 1. 使用悲观写锁获取该订单，防止与超时任务或人工干预并发抢占导致的状态覆盖
+        Reservation reservation = reservationRepository.findByTenantIdAndReservationCodeForUpdate(getCurrentTenantId(), reservationCode)
+                .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        // 2. 状态拦截判断 (订单一旦被系统自动超时取消或渠道主动取消，不可再执行支付)
+        if ("cancelled".equals(reservation.getReservationStatus())) {
+            throw new RuntimeException("ORDER_ALREADY_CANCELLED");
+        }
+
+        // 3. 幂等性校验 (订单已支付时，如果交易流水号一致，属于重复回调，作幂等返回)
+        if ("paid".equals(reservation.getPaymentStatus())) {
+            List<ReservationPayment> existingPayments = paymentRepository.findByReservationIdOrderByCreatedAtDesc(reservation.getId());
+            boolean sameTransaction = existingPayments.stream()
+                    .anyMatch(p -> transactionId != null && transactionId.equals(p.getTransactionId()));
+            if (sameTransaction) {
+                return reservation;
+            }
+            throw new RuntimeException("订单已支付，请勿重复支付");
+        }
+
+        // 4. 对账金额严格校验
+        if (paymentAmount == null || reservation.getTotalPrice() == null 
+                || paymentAmount.subtract(reservation.getTotalPrice()).abs().compareTo(new java.math.BigDecimal("0.01")) > 0) {
+            throw new RuntimeException("支付金额与订单总价不符，订单总价: " + reservation.getTotalPrice() + ", 传入支付金额: " + paymentAmount);
+        }
+
+        // 5. 校验支付流水是否存在 (防止在未支付状态下因网络抖动产生的重复入账)
+        List<ReservationPayment> checkTxPayments = paymentRepository.findByReservationIdOrderByCreatedAtDesc(reservation.getId());
+        boolean duplicateTx = checkTxPayments.stream().anyMatch(p -> transactionId != null && transactionId.equals(p.getTransactionId()));
+        if (duplicateTx) {
+            return reservation;
+        }
+
+        // 6. 保存支付流水明细
+        ReservationPayment payment = new ReservationPayment();
+        payment.setReservationId(reservation.getId());
+        payment.setPaymentMethod(paymentMethod);
+        payment.setPaymentType("payment");
+        payment.setPaymentAmount(paymentAmount);
+        payment.setTransactionId(transactionId);
+        payment.setStatus("success");
+        payment.setPaidAt(new Date());
+        paymentRepository.save(payment);
+
+        // 7. 更新订单状态与清空 Deadline (使订单彻底跳出超时扫描器)
+        if ("pending_payment".equals(reservation.getReservationStatus())) {
+            reservation.setReservationStatus("confirmed");
+        }
+        reservation.setPaymentStatus("paid");
+        reservation.setPaymentDeadline(null);
+        reservation.setModifiedBy(operator);
+
+        Reservation saved = reservationRepository.save(reservation);
+
+        // 8. 归档操作历史
+        ReservationHistory history = new ReservationHistory();
+        history.setReservationId(saved.getId());
+        history.setAction("PAY");
+        history.setContent("支付成功，流水号：" + transactionId);
+        history.setResult("success");
+        history.setOperator(operator);
+        history.setOperatorType("channel");
+        historyRepository.save(history);
+
+        return saved;
     }
 
     private Reservation cancelReservationInternal(Reservation reservation, String cancelledBy, String cancelReason, String operatorType) {

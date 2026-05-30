@@ -694,6 +694,51 @@ public class OpenReservationController {
         }
     }
 
+    @PostMapping("/reservations/{reservationCode}/pay")
+    public ResponseEntity<Map<String, Object>> payReservation(
+            HttpServletRequest req,
+            @PathVariable String reservationCode,
+            @RequestBody Map<String, Object> body) {
+        try {
+            TenantChannel channel = getChannel(req);
+            if (channel == null) {
+                return ResponseEntity.status(401).body(err(401, "渠道认证失败"));
+            }
+
+            String paymentMethod = getString(body, "paymentMethod");
+            BigDecimal paymentAmount = getBigDecimal(body, "paymentAmount");
+            String transactionId = getString(body, "transactionId");
+
+            if (paymentMethod == null || paymentAmount == null || transactionId == null || transactionId.isBlank()) {
+                return ResponseEntity.badRequest().body(err(400, "缺少必填参数：paymentMethod, paymentAmount, transactionId"));
+            }
+
+            String operator = "channel:" + channel.getChannelCode();
+
+            Reservation paidReservation;
+            try {
+                paidReservation = reservationService.payReservation(
+                        reservationCode, paymentMethod, paymentAmount, transactionId, operator);
+            } catch (RuntimeException e) {
+                if ("ORDER_ALREADY_CANCELLED".equals(e.getMessage())) {
+                    return ResponseEntity.status(409).body(unavailable("ORDER_ALREADY_CANCELLED", "当前订单已被取消，无法进行支付核销"));
+                }
+                return ResponseEntity.status(409).body(err(409, e.getMessage()));
+            }
+
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("reservationCode", paidReservation.getReservationCode());
+            data.put("reservationStatus", paidReservation.getReservationStatus());
+            data.put("paymentStatus", paidReservation.getPaymentStatus());
+            data.put("paidAmount", paymentAmount);
+            data.put("transactionId", transactionId);
+
+            return ResponseEntity.ok(ok(data));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(err(400, e.getMessage()));
+        }
+    }
+
     private TenantChannel getChannel(HttpServletRequest req) {
         return (TenantChannel) req.getAttribute("openApiChannel");
     }

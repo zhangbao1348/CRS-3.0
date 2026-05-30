@@ -33,6 +33,20 @@ import com.crs.entity.Reservation;
 public interface ReservationRepository extends JpaRepository<Reservation, Integer> {
 
         /**
+         * 基于悲观写锁查询订单实体（防止并发抢占与覆盖）。
+         */
+        @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT r FROM Reservation r WHERE r.id = :id")
+        Optional<Reservation> findByIdForUpdate(@Param("id") Integer id);
+
+        /**
+         * 在租户维度下基于悲观写锁查询订单实体（防止并发抢占与覆盖）。
+         */
+        @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT r FROM Reservation r WHERE r.tenantId = :tenantId AND r.reservationCode = :reservationCode")
+        Optional<Reservation> findByTenantIdAndReservationCodeForUpdate(@Param("tenantId") Integer tenantId, @Param("reservationCode") String reservationCode);
+
+        /**
          * 在租户维度下，根据预订码安全查询订单。
          */
         Optional<Reservation> findByReservationCodeAndTenantId(String reservationCode, Integer tenantId);
