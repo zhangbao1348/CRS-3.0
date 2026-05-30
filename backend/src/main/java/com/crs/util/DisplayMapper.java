@@ -104,6 +104,8 @@ public class DisplayMapper {
             Map.entry("pay_on_arrival", "到店付"),
             Map.entry("alipay", "支付宝"),
             Map.entry("wechat_pay", "微信支付"),
+            Map.entry("wechat_miniprogram", "微信支付"),
+            Map.entry("wechat", "微信支付"),
             Map.entry("bank_transfer", "银行转账")
     );
 
