@@ -713,6 +713,21 @@ public class OpenReservationController {
                 return ResponseEntity.badRequest().body(err(400, "缺少必填参数：paymentMethod, paymentAmount, transactionId"));
             }
 
+            // 1. 获取订单实体快照，用于前置业务规则及权限判定
+            Reservation reservation = reservationService.getReservationByCode(reservationCode);
+            if (reservation == null) {
+                return ResponseEntity.status(404).body(err(404, "订单不存在"));
+            }
+            if (!channel.getChannelCode().equals(reservation.getChannelCode())) {
+                return ResponseEntity.status(403).body(err(403, "无权操作该订单"));
+            }
+
+            // 2. 强类型熔断拦截：如果订单是预付模式，且所属渠道在配置中设定为免 API 支付核销（prepaidOrderRequiresPayment = false）
+            if (GuaranteePolicyTypeUtil.isPrepaidType(reservation.getGuaranteeType())
+                    && Boolean.FALSE.equals(channel.getPrepaidOrderRequiresPayment())) {
+                return ResponseEntity.status(409).body(unavailable("PAYMENT_NOT_REQUIRED", "该渠道的预付订单无需发起在线支付核销回调"));
+            }
+
             String operator = "channel:" + channel.getChannelCode();
 
             Reservation paidReservation;
