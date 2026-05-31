@@ -64,17 +64,20 @@ public class ReservationController {
     private final ApiLogRepository apiLogRepository;
     private final UserService userService;
     private final com.crs.repository.PackageRepository packageRepo;
+    private final com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     public ReservationController(
             ReservationService reservationService,
             ApiLogRepository apiLogRepository,
             UserService userService,
-            com.crs.repository.PackageRepository packageRepo) {
+            com.crs.repository.PackageRepository packageRepo,
+            com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo) {
         this.reservationService = reservationService;
         this.apiLogRepository = apiLogRepository;
         this.userService = userService;
         this.packageRepo = packageRepo;
+        this.reservationDailyPriceTaxRepo = reservationDailyPriceTaxRepo;
     }
 
     private Integer getCurrentTenantId() {
@@ -215,6 +218,19 @@ public class ReservationController {
             dpMap.put("breakfastIncluded", dp.getBreakfastIncluded());
             dpMap.put("breakfastCount", dp.getBreakfastCount());
             dpMap.put("packagesJson", dp.getPackagesJson());
+
+            // 动态关联税费细表回显
+            List<com.crs.entity.ReservationDailyPriceTax> taxes = reservationDailyPriceTaxRepo.findByReservationDailyPriceId(dp.getId());
+            List<Map<String, Object>> taxesList = taxes.stream().map(t -> {
+                Map<String, Object> tMap = new LinkedHashMap<>();
+                tMap.put("taxCode", t.getTaxCode());
+                tMap.put("taxName", t.getTaxName());
+                tMap.put("rateAmount", t.getRateAmount());
+                tMap.put("calculatedAmount", t.getCalculatedAmount());
+                return tMap;
+            }).collect(Collectors.toList());
+            dpMap.put("taxes", taxesList);
+
             return dpMap;
         }).collect(Collectors.toList());
         priceInfo.put("dailyPrices", dailyPriceList);

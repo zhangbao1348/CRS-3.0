@@ -132,6 +132,10 @@ public class Hotel {
     @Column(name = "support_person_price_diff", length = 10)
     private String supportPersonPriceDiff = "no";
     
+    /** 绑定的集团税率代码列表（以逗号分隔，如 "VAT-CN-001,SERVICE-CN-001"） */
+    @Column(name = "tax_rate_codes", length = 255)
+    private String taxRateCodes;
+    
     /** 酒店运营状态：active-营业中，inactive-停业/禁用 */
     @Column(name = "status", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
@@ -427,6 +431,14 @@ public class Hotel {
     
     public void setInventories(List<Inventory> inventories) {
         this.inventories = inventories;
+    }
+    
+    public String getTaxRateCodes() {
+        return taxRateCodes;
+    }
+    
+    public void setTaxRateCodes(String taxRateCodes) {
+        this.taxRateCodes = taxRateCodes;
     }
     
     @Override

@@ -39,6 +39,7 @@ import com.crs.entity.HotelRoomType;
 import com.crs.entity.RatePlan;
 import com.crs.entity.Reservation;
 import com.crs.entity.ReservationDailyPrice;
+import com.crs.entity.ReservationDailyPriceTax;
 import com.crs.entity.ReservationGuest;
 import com.crs.entity.ReservationPromotion;
 import com.crs.entity.TenantChannel;
@@ -93,6 +94,9 @@ public class OpenReservationController {
     private final ReservationRepository reservationRepo;
     private final BookingControlRepository bookingControlRepo;
     private final PackageRepository packageRepo;
+    private final com.crs.repository.PackageDailyPriceRepository packageDailyPriceRepo;
+    private final com.crs.repository.TaxSettingRepository taxSettingRepo;
+    private final com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OpenReservationController(
@@ -108,7 +112,10 @@ public class OpenReservationController {
             ChannelPublishRecordRepository channelPublishRecordRepo,
             ReservationRepository reservationRepo,
             BookingControlRepository bookingControlRepo,
-            PackageRepository packageRepo) {
+            PackageRepository packageRepo,
+            com.crs.repository.PackageDailyPriceRepository packageDailyPriceRepo,
+            com.crs.repository.TaxSettingRepository taxSettingRepo,
+            com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo) {
         this.reservationService = reservationService;
         this.hotelRepo = hotelRepo;
         this.roomTypeRepo = roomTypeRepo;
@@ -122,6 +129,9 @@ public class OpenReservationController {
         this.reservationRepo = reservationRepo;
         this.bookingControlRepo = bookingControlRepo;
         this.packageRepo = packageRepo;
+        this.packageDailyPriceRepo = packageDailyPriceRepo;
+        this.taxSettingRepo = taxSettingRepo;
+        this.reservationDailyPriceTaxRepo = reservationDailyPriceTaxRepo;
     }
 
     @PostMapping("/reservations")
@@ -341,21 +351,54 @@ public class OpenReservationController {
             }
 
             // 构建每日价格（自动解析包价详情快照与早餐翻译）
-            Map<String, Object> bfPkgInfo = resolvePackageDetailsAndBreakfast(hotel.getTenantId(), ratePlan.getPackages());
-            String snapshotJson = (String) bfPkgInfo.get("packagesJson");
-            boolean bfIncluded = (Boolean) bfPkgInfo.get("breakfastIncluded");
-            int bfCount = (Integer) bfPkgInfo.get("breakfastCount");
-
             List<ReservationDailyPrice> dailyPrices = new ArrayList<>();
             for (HotelPrice hp : effectivePrices) {
                 BigDecimal actualPrice = applyHotelMinimumPrice(hp.getPriceWithTax(), minimumPrice);
+                
+                Map<String, Object> bfPkgInfo = resolvePackageDetailsAndBreakfast(
+                        hotel.getTenantId(), hotelCode, ratePlan.getPackages(), hp.getPriceDate());
+                String snapshotJson = (String) bfPkgInfo.get("packagesJson");
+                boolean bfIncluded = (Boolean) bfPkgInfo.get("breakfastIncluded");
+                int bfCount = (Integer) bfPkgInfo.get("breakfastCount");
+
+                BigDecimal vatRateVal = BigDecimal.ZERO;
+                BigDecimal svcRateVal = BigDecimal.ZERO;
+                
+                String codesStr = hotel.getTaxRateCodes();
+                if (codesStr != null && !codesStr.isBlank()) {
+                    String[] codes = codesStr.split(",");
+                    List<com.crs.entity.TaxSetting> tenantTaxes = taxSettingRepo.findByTenantIdAndStatus(hotel.getTenantId(), "active");
+                    for (String code : codes) {
+                        if (code == null || code.isBlank()) continue;
+                        for (com.crs.entity.TaxSetting tax : tenantTaxes) {
+                            if (code.trim().equalsIgnoreCase(tax.getTaxCode())) {
+                                BigDecimal rate = tax.getRateAmount();
+                                if (rate != null) {
+                                    if (tax.getTaxCode().contains("VAT")) {
+                                        vatRateVal = rate;
+                                    } else if (tax.getTaxCode().contains("SERVICE")) {
+                                        svcRateVal = rate;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                BigDecimal basePrice = hp.getPriceWithoutTax();
+                BigDecimal calculatedVat = basePrice != null && vatRateVal.compareTo(BigDecimal.ZERO) > 0
+                        ? basePrice.multiply(vatRateVal.divide(BigDecimal.valueOf(100))).setScale(2, java.math.RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+                BigDecimal calculatedSvc = basePrice != null && svcRateVal.compareTo(BigDecimal.ZERO) > 0
+                        ? basePrice.multiply(svcRateVal.divide(BigDecimal.valueOf(100))).setScale(2, java.math.RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+
                 ReservationDailyPrice rdp = new ReservationDailyPrice();
                 rdp.setPriceDate(hp.getPriceDate());
                 rdp.setOriginalPrice(hp.getPriceWithoutTax());
                 rdp.setActualPrice(actualPrice);
-                rdp.setTaxAmount(actualPrice != null && hp.getPriceWithoutTax() != null
-                        ? actualPrice.subtract(hp.getPriceWithoutTax()) : BigDecimal.ZERO);
-                rdp.setServiceCharge(null);
+                rdp.setTaxAmount(calculatedVat);
+                rdp.setServiceCharge(calculatedSvc);
                 rdp.setBreakfastIncluded(bfIncluded);
                 rdp.setBreakfastCount(bfCount);
                 rdp.setPackagesJson(snapshotJson);
@@ -472,9 +515,10 @@ public class OpenReservationController {
             }
 
             // 3. 补充基础信息
-            reservation.setSpecialRequest(getString(body, "specialRequest"));
-            reservation.setGuestRemark(getString(body, "guestRemark"));
-            reservation.setNotes(getString(body, "notes"));
+            String specialReqVal = getString(body, "specialRequest");
+            reservation.setSpecialRequest(specialReqVal);
+            reservation.setGuestRemark(specialReqVal); // 用 specialRequest 作为客人备注
+            reservation.setNotes(null); // 系统内部备忘清空，不接受外部渠道越权写入
             reservation.setCommissionRate(getBigDecimal(body, "commissionRate"));
             reservation.setCommissionAmount(getBigDecimal(body, "commissionAmount"));
             reservation.setOrderSource("channel");
@@ -495,6 +539,43 @@ public class OpenReservationController {
 
             Reservation created = reservationService.createReservation(
                     reservation, dailyPrices, guests, promotions);
+
+            // 联动多税率拆分落库明细
+            List<com.crs.entity.TaxSetting> activeTaxes = new ArrayList<>();
+            String hotelTaxCodesStr = hotel.getTaxRateCodes();
+            if (hotelTaxCodesStr != null && !hotelTaxCodesStr.isBlank()) {
+                String[] codes = hotelTaxCodesStr.split(",");
+                List<com.crs.entity.TaxSetting> tenantTaxes = taxSettingRepo.findByTenantIdAndStatus(hotel.getTenantId(), "active");
+                for (String code : codes) {
+                    if (code == null || code.isBlank()) continue;
+                    for (com.crs.entity.TaxSetting tax : tenantTaxes) {
+                        if (code.trim().equalsIgnoreCase(tax.getTaxCode())) {
+                            activeTaxes.add(tax);
+                        }
+                    }
+                }
+            }
+
+            for (ReservationDailyPrice dp : dailyPrices) {
+                if (dp.getId() != null && dp.getOriginalPrice() != null) {
+                    BigDecimal basePrice = dp.getOriginalPrice();
+                    for (com.crs.entity.TaxSetting tax : activeTaxes) {
+                        BigDecimal rate = tax.getRateAmount();
+                        if (rate != null) {
+                            BigDecimal taxVal = basePrice.multiply(rate.divide(BigDecimal.valueOf(100))).setScale(2, java.math.RoundingMode.HALF_UP);
+                            
+                            ReservationDailyPriceTax dailyTax = new ReservationDailyPriceTax();
+                            dailyTax.setReservationDailyPriceId(dp.getId());
+                            dailyTax.setTaxCode(tax.getTaxCode());
+                            dailyTax.setTaxName(tax.getLegalName());
+                            dailyTax.setRateAmount(rate);
+                            dailyTax.setCalculatedAmount(taxVal);
+                            
+                            reservationDailyPriceTaxRepo.save(dailyTax);
+                        }
+                    }
+                }
+            }
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("reservationId", created.getId());
@@ -579,6 +660,7 @@ public class OpenReservationController {
             data.put("guaranteePolicyCode", reservation.getGuaranteePolicyCode());
             data.put("guaranteePolicyDesc", reservation.getGuaranteePolicyDesc());
             data.put("paymentStatus", reservation.getPaymentStatus());
+            data.put("specialRequest", reservation.getGuestRemark()); // 补充客人备注回显
             data.put("createdAt", formatDateTime(reservation.getCreatedAt()));
 
             List<Map<String, Object>> dpList = dailyPrices.stream().map(dp -> {
@@ -590,6 +672,18 @@ public class OpenReservationController {
                 dpMap.put("serviceCharge", dp.getServiceCharge());
                 dpMap.put("breakfastIncluded", dp.getBreakfastIncluded());
                 dpMap.put("breakfastCount", dp.getBreakfastCount());
+                
+                List<ReservationDailyPriceTax> taxDetails = reservationDailyPriceTaxRepo.findByReservationDailyPriceId(dp.getId());
+                List<Map<String, Object>> taxDetailsMap = taxDetails.stream().map(t -> {
+                    Map<String, Object> tMap = new LinkedHashMap<>();
+                    tMap.put("taxCode", t.getTaxCode());
+                    tMap.put("taxName", t.getTaxName());
+                    tMap.put("rateAmount", t.getRateAmount());
+                    tMap.put("calculatedAmount", t.getCalculatedAmount());
+                    return tMap;
+                }).collect(Collectors.toList());
+                dpMap.put("taxes", taxDetailsMap);
+                
                 return dpMap;
             }).collect(Collectors.toList());
             data.put("dailyPrices", dpList);
@@ -1061,7 +1155,7 @@ public class OpenReservationController {
         return bestRule;
     }
 
-    private Map<String, Object> resolvePackageDetailsAndBreakfast(Integer tenantId, String packagesJson) {
+    private Map<String, Object> resolvePackageDetailsAndBreakfast(Integer tenantId, String hotelCode, String packagesJson, Date priceDate) {
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("packagesJson", "[]");
         result.put("breakfastIncluded", false);
@@ -1099,10 +1193,24 @@ public class OpenReservationController {
             boolean hasBreakfast = false;
             int totalBreakfastCount = 0;
 
+            java.time.LocalDate localPriceDate = priceDate != null ? new java.sql.Date(priceDate.getTime()).toLocalDate() : null;
+
             for (com.crs.entity.Package ap : activePackages) {
                 int qty = ap.getFixedQuantity() != null ? ap.getFixedQuantity() : 1;
                 
-                BigDecimal price = ap.getFixedPrice() != null ? BigDecimal.valueOf(ap.getFixedPrice()) : BigDecimal.ZERO;
+                BigDecimal price = BigDecimal.ZERO;
+                if ("daily".equalsIgnoreCase(ap.getPriceType())) {
+                    if (hotelCode != null && localPriceDate != null) {
+                        Optional<com.crs.entity.PackageDailyPrice> pdpOpt = packageDailyPriceRepo
+                                .findByTenantIdAndHotelCodeAndPackageCodeAndPriceDate(tenantId, hotelCode, ap.getCode(), localPriceDate);
+                        if (pdpOpt.isPresent() && pdpOpt.get().getSalePrice() != null) {
+                            price = pdpOpt.get().getSalePrice();
+                        }
+                    }
+                } else {
+                    price = ap.getFixedPrice() != null ? BigDecimal.valueOf(ap.getFixedPrice()) : BigDecimal.ZERO;
+                }
+
                 Boolean taxIncluded = ap.getTaxIncluded() != null ? ap.getTaxIncluded() : false;
                 BigDecimal inclusivePrice;
                 BigDecimal exclusivePrice;

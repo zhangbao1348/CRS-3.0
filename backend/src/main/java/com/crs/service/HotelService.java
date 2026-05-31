@@ -10,6 +10,7 @@ import com.crs.entity.Hotel;
 import com.crs.entity.HotelPrice;
 import com.crs.repository.HotelPriceRepository;
 import com.crs.repository.HotelRepository;
+import com.crs.repository.TaxSettingRepository;
 import com.crs.util.TenantContext;
 
 /**
@@ -21,10 +22,12 @@ public class HotelService {
     
     private final HotelRepository hotelRepository;
     private final HotelPriceRepository hotelPriceRepository;
+    private final TaxSettingRepository taxSettingRepository;
     
-    public HotelService(HotelRepository hotelRepository, HotelPriceRepository hotelPriceRepository) {
+    public HotelService(HotelRepository hotelRepository, HotelPriceRepository hotelPriceRepository, TaxSettingRepository taxSettingRepository) {
         this.hotelRepository = hotelRepository;
         this.hotelPriceRepository = hotelPriceRepository;
+        this.taxSettingRepository = taxSettingRepository;
     }
     
     /**
@@ -150,8 +153,12 @@ public class HotelService {
             existingHotel.setSupportPersonPriceDiff(hotel.getSupportPersonPriceDiff());
         }
         
+        // 绑定集团税率代码
+        existingHotel.setTaxRateCodes(hotel.getTaxRateCodes());
+        
         Hotel savedHotel = hotelRepository.save(existingHotel);
         applyMinimumPriceToExistingPrices(savedHotel);
+        recalculateHotelPricesWithoutTax(savedHotel);
         return savedHotel;
     }
     
@@ -205,5 +212,43 @@ public class HotelService {
         if (!pricesToUpdate.isEmpty()) {
             hotelPriceRepository.saveAll(pricesToUpdate);
         }
+    }
+
+    private void recalculateHotelPricesWithoutTax(Hotel hotel) {
+        if (hotel == null || hotel.getTenantId() == null || hotel.getHotelCode() == null) {
+            return;
+        }
+
+        BigDecimal totalTaxRate = BigDecimal.ZERO;
+        String codesStr = hotel.getTaxRateCodes();
+        if (codesStr != null && !codesStr.isBlank()) {
+            String[] codes = codesStr.split(",");
+            List<com.crs.entity.TaxSetting> activeTaxes = taxSettingRepository.findByTenantIdAndStatus(hotel.getTenantId(), "active");
+            for (String code : codes) {
+                if (code == null || code.isBlank()) continue;
+                for (com.crs.entity.TaxSetting tax : activeTaxes) {
+                    if (code.trim().equalsIgnoreCase(tax.getTaxCode())) {
+                        BigDecimal rate = tax.getRateAmount();
+                        if (rate != null) {
+                            totalTaxRate = totalTaxRate.add(rate.divide(BigDecimal.valueOf(100)));
+                        }
+                    }
+                }
+            }
+        }
+
+        List<HotelPrice> prices = hotelPriceRepository.findByTenantIdAndHotelCode(hotel.getTenantId(), hotel.getHotelCode());
+        if (prices == null || prices.isEmpty()) {
+            return;
+        }
+
+        BigDecimal divisor = BigDecimal.ONE.add(totalTaxRate);
+        for (HotelPrice price : prices) {
+            if (price.getPriceWithTax() != null) {
+                BigDecimal priceWithoutTax = price.getPriceWithTax().divide(divisor, 2, java.math.RoundingMode.HALF_UP);
+                price.setPriceWithoutTax(priceWithoutTax);
+            }
+        }
+        hotelPriceRepository.saveAll(prices);
     }
 }

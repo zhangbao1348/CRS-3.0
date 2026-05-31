@@ -115,9 +115,17 @@ const ReservationDetail = () => {
   // 组装当前选中日期的各项 Tab 的数据源
   const getFeeDataSource = () => {
     if (!selectedDateDetail) return []
+    const actPrice = Number(selectedDateDetail.actualPrice || selectedDateDetail.price || 0)
+    let origPrice = selectedDateDetail.originalPrice !== null ? Number(selectedDateDetail.originalPrice) : actPrice
+    
+    // 如果折扣前原价被误存为了不含税裸房费，且在此处导致了折扣前价格小于折扣后售价的错误逻辑，则自动纠正为含税售价
+    if (origPrice < actPrice) {
+      origPrice = actPrice
+    }
+    
     return [
-      { key: '1', name: '折扣前房费', value: selectedDateDetail.originalPrice !== null ? `¥${Number(selectedDateDetail.originalPrice).toFixed(2)}` : '-' },
-      { key: '2', name: '折扣后房费', value: selectedDateDetail.actualPrice !== null ? `¥${Number(selectedDateDetail.actualPrice || selectedDateDetail.price || 0).toFixed(2)}` : '-' }
+      { key: '1', name: '折扣前房费', value: `¥${origPrice.toFixed(2)}` },
+      { key: '2', name: '折扣后房费', value: `¥${actPrice.toFixed(2)}` }
     ]
   }
 
@@ -138,6 +146,7 @@ const ReservationDetail = () => {
             return {
               key: String(idx + 1),
               typeDesc: typeDesc,
+              code: pkg.code || '-',
               name: pkg.name || pkg.code,
               quantityDesc: `${pkg.quantity || 1} 份`,
               priceDesc: pkg.price !== undefined && pkg.price !== null ? `¥${Number(pkg.price).toFixed(2)}` : '-',
@@ -151,17 +160,35 @@ const ReservationDetail = () => {
       }
     }
     if (list.length === 0) {
-      return [{ key: 'none', typeDesc: '-', name: '无包价信息', quantityDesc: '-', priceDesc: '-', exclusivePriceDesc: '-', inclusivePriceDesc: '-' }]
+      return [{ key: 'none', typeDesc: '-', code: '-', name: '无包价信息', quantityDesc: '-', priceDesc: '-', exclusivePriceDesc: '-', inclusivePriceDesc: '-' }]
     }
     return list
   }
 
   const getTaxDataSource = () => {
     if (!selectedDateDetail) return []
-    return [
-      { key: '1', name: '增值税', value: selectedDateDetail.taxAmount !== null && selectedDateDetail.taxAmount !== undefined ? `¥${Number(selectedDateDetail.taxAmount).toFixed(2)}` : '-' },
-      { key: '2', name: '服务费', value: selectedDateDetail.serviceCharge !== null && selectedDateDetail.serviceCharge !== undefined ? `¥${Number(selectedDateDetail.serviceCharge).toFixed(2)}` : '-' }
-    ]
+    // 优先使用后端动态返回的多税种细表
+    if (selectedDateDetail.taxes && selectedDateDetail.taxes.length > 0) {
+      return selectedDateDetail.taxes.map((t, idx) => ({
+        key: String(idx + 1),
+        code: t.taxCode || '-',
+        name: t.taxName || '-',
+        rate: t.rateAmount !== null && t.rateAmount !== undefined ? `${Number(t.rateAmount).toFixed(2)}%` : '-',
+        value: t.calculatedAmount !== null && t.calculatedAmount !== undefined ? `¥${Number(t.calculatedAmount).toFixed(2)}` : '-'
+      }))
+    }
+    // 向下兼容历史老订单
+    const fallbackList = []
+    if (selectedDateDetail.taxAmount !== null && selectedDateDetail.taxAmount !== undefined && Number(selectedDateDetail.taxAmount) > 0) {
+      fallbackList.push({ key: '1', code: 'ZENGZHISHUI', name: '增值税', rate: '6.00%', value: `¥${Number(selectedDateDetail.taxAmount).toFixed(2)}` })
+    }
+    if (selectedDateDetail.serviceCharge !== null && selectedDateDetail.serviceCharge !== undefined && Number(selectedDateDetail.serviceCharge) > 0) {
+      fallbackList.push({ key: '2', code: 'FUWUFEI', name: '服务费', rate: '10.00%', value: `¥${Number(selectedDateDetail.serviceCharge).toFixed(2)}` })
+    }
+    if (fallbackList.length === 0) {
+      return [{ key: 'none', code: '-', name: '无税费信息', rate: '-', value: '-' }]
+    }
+    return fallbackList
   }
 
   const getRoomTypeDisplay = () => {
@@ -288,9 +315,9 @@ const ReservationDetail = () => {
         
         <div style={{ marginTop: 16 }}>
           <Text strong style={{ marginBottom: 8, display: 'block' }}>订单备注信息</Text>
-          <Descriptions size="small" column={1} bordered>
+          <Descriptions size="small" column={1} bordered labelStyle={{ width: '150px' }}>
             <Descriptions.Item label="客人备注">
-              {remarkInfo.guestRemark || '-'}
+              {remarkInfo.guestRemark || remarkInfo.specialRequest || '-'}
             </Descriptions.Item>
             <Descriptions.Item label="门店备注">
               {remarkInfo.hotelRemark || '-'}
@@ -303,16 +330,65 @@ const ReservationDetail = () => {
 
       {/* 价格信息 */}
       <Card title="价格信息" style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', marginBottom: 16 }}>
-          <div style={{ marginRight: 48 }}>
-            <Text>订单原价: </Text>
-            <Text strong style={{ fontSize: 16, color: '#ff4d4f', textDecoration: 'line-through' }}>¥{priceInfo.originalPrice || 0}</Text>
-          </div>
-          <div>
-            <Text>订单金额: </Text>
-            <Text strong style={{ fontSize: 16, color: '#ff4d4f' }}>¥{(priceInfo.actualPrice || 0).toFixed(2)}</Text>
-          </div>
-        </div>
+        {(() => {
+          // 累加每日税费及服务费
+          let totalTax = 0;
+          let totalSvc = 0;
+          let dailyPrices = priceInfo.dailyPrices || [];
+          dailyPrices.forEach(dp => {
+            if (dp.taxes && dp.taxes.length > 0) {
+              dp.taxes.forEach(t => {
+                totalTax += Number(t.calculatedAmount || 0);
+              });
+            } else {
+              // 兼容老数据
+              totalTax += Number(dp.taxAmount || 0);
+              totalSvc += Number(dp.serviceCharge || 0);
+            }
+          });
+
+          const calculatedTotalTax = totalTax + totalSvc;
+          const actualPrice = priceInfo.actualPrice || 0;
+          const originalPrice = priceInfo.originalPrice || 0;
+          const exclusivePrice = Math.max(0, actualPrice - calculatedTotalTax);
+
+          const hasRealDiscount = originalPrice > actualPrice && Math.abs(originalPrice - exclusivePrice) > 1;
+          const displayOriginalPrice = hasRealDiscount ? originalPrice : actualPrice;
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 24 }}>
+                <div>
+                  <Text>订单原价: </Text>
+                  {hasRealDiscount ? (
+                    <Text strong style={{ fontSize: 16, color: '#999', textDecoration: 'line-through', marginRight: 16 }}>
+                      ¥{Number(displayOriginalPrice).toFixed(2)}
+                    </Text>
+                  ) : (
+                    <Text strong style={{ fontSize: 16, color: '#555', marginRight: 16 }}>
+                      ¥{Number(displayOriginalPrice).toFixed(2)}
+                    </Text>
+                  )}
+                </div>
+                <div>
+                  <Text>订单金额 (含税): </Text>
+                  <Text strong style={{ fontSize: 20, color: '#ff4d4f' }}>
+                    ¥{Number(actualPrice).toFixed(2)}
+                  </Text>
+                </div>
+                {calculatedTotalTax > 0 && (
+                  <div style={{ background: '#f5f5f5', padding: '4px 12px', borderRadius: '4px', fontSize: '13px' }}>
+                    <Text type="secondary">房费 (不含税): </Text>
+                    <Text strong style={{ color: '#555' }}>¥{exclusivePrice.toFixed(2)}</Text>
+                    <span style={{ margin: '0 8px', color: '#ccc' }}>|</span>
+                    <Text type="secondary">服务费及税费: </Text>
+                    <Text strong style={{ color: '#e28743' }}>¥{calculatedTotalTax.toFixed(2)}</Text>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         <Text strong style={{ marginBottom: 8, display: 'block' }}>每日价格信息</Text>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
           {(priceInfo.dailyPrices || []).map((item, index) => (
@@ -328,7 +404,11 @@ const ReservationDetail = () => {
               }
             }} onClick={() => handleDateClick(item)}>
               <div style={{ marginBottom: 8, fontWeight: 'bold' }}>{item.date}</div>
-              {item.originalPrice && <div style={{ marginBottom: 4, textDecoration: 'line-through', fontSize: '12px', color: '#999' }}>¥{Number(item.originalPrice).toFixed(2)}</div>}
+              {item.originalPrice && Number(item.originalPrice) > Number(item.actualPrice || item.price || 0) && (
+                <div style={{ marginBottom: 4, textDecoration: 'line-through', fontSize: '12px', color: '#999' }}>
+                  ¥{Number(item.originalPrice).toFixed(2)}
+                </div>
+              )}
               <div style={{ marginBottom: 4 }}>¥{Number(item.actualPrice || item.price || 0).toFixed(2)}</div>
               {item.breakfastIncluded && <div style={{ marginBottom: 4, fontSize: '12px', color: '#52c41a' }}>{item.breakfastCount ? `${item.breakfastCount}份早餐` : '含早餐'}</div>}
               {item.breakfast && <div style={{ marginBottom: 4, fontSize: '12px', color: '#52c41a' }}>{item.breakfast}</div>}
@@ -403,6 +483,7 @@ const ReservationDetail = () => {
           dataSource={getPackageDataSource()} 
           columns={[
             { title: '包价类型', dataIndex: 'typeDesc', width: 110 },
+            { title: '包价代码', dataIndex: 'code', width: 110 },
             { title: '包价名称', dataIndex: 'name' },
             { title: '包价份数', dataIndex: 'quantityDesc', width: 90 },
             { title: '包价价格', dataIndex: 'priceDesc', width: 100 },
@@ -418,8 +499,10 @@ const ReservationDetail = () => {
           pagination={false}
           dataSource={getTaxDataSource()} 
           columns={[
-            { title: '', dataIndex: 'name', width: 150 },
-            { title: '', dataIndex: 'value' }
+            { title: '税费CODE', dataIndex: 'code', width: 180 },
+            { title: '税费名称', dataIndex: 'name' },
+            { title: '税率 (%)', dataIndex: 'rate', width: 120 },
+            { title: '税费金额', dataIndex: 'value', width: 150 }
           ]}
         />
       </Tabs.TabPane>

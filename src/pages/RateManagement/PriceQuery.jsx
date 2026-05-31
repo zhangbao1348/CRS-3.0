@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Button, DatePicker, Card, Row, Col, Select, Spin, Empty, message } from 'antd'
+import { Button, DatePicker, Card, Row, Col, Select, Spin, Empty, Radio, message } from 'antd'
 import { SearchOutlined, ReloadOutlined, DollarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { ratePlanApi, hotelRoomTypeApi } from '../../utils/api'
@@ -16,6 +16,7 @@ const PriceQuery = () => {
   const [selectedMonth, setSelectedMonth] = useState(dayjs())
   const [dates, setDates] = useState([])
   const [prices, setPrices] = useState({}) // { roomTypeCode: { 'yyyy-MM-dd': value } }
+  const [priceType, setPriceType] = useState('withTax') // withTax - 含税价, withoutTax - 不含税价
   const [loading, setLoading] = useState(false)
   const [hasQueried, setHasQueried] = useState(false)
   const [hasPriceResults, setHasPriceResults] = useState(false)
@@ -95,7 +96,10 @@ const PriceQuery = () => {
         if (p.status === 'inactive') {
           map[p.roomTypeCode][d] = '-'
         } else {
-          map[p.roomTypeCode][d] = p.priceWithTax != null ? Number(p.priceWithTax) : null
+          map[p.roomTypeCode][d] = {
+            priceWithTax: p.priceWithTax != null ? Number(p.priceWithTax) : null,
+            priceWithoutTax: p.priceWithoutTax != null ? Number(p.priceWithoutTax) : null
+          }
         }
       })
       setPrices(map)
@@ -132,6 +136,7 @@ const PriceQuery = () => {
     if (ratePlans.length > 0) setSelectedRateCode(ratePlans[0].rateCode)
     setPrices({})
     setDates([])
+    setPriceType('withTax')
     setHasQueried(false)
     setHasPriceResults(false)
     if (tableScrollRef.current) {
@@ -180,6 +185,13 @@ const PriceQuery = () => {
             />
           </Col>
           <Col>
+            <span style={{ marginRight: 8 }}>价格显示:</span>
+            <Radio.Group value={priceType} onChange={e => setPriceType(e.target.value)} buttonStyle="solid">
+              <Radio.Button value="withTax">含税价</Radio.Button>
+              <Radio.Button value="withoutTax">不含税价</Radio.Button>
+            </Radio.Group>
+          </Col>
+          <Col>
             <Button type="primary" icon={<SearchOutlined />} onClick={fetchPrices} loading={loading} style={{ marginRight: 8 }}>
               查询
             </Button>
@@ -213,15 +225,18 @@ const PriceQuery = () => {
                         {rt.roomTypeName}（{rt.roomTypeCode}）
                       </td>
                       {dates.map(d => {
-                        const val = prices[rt.roomTypeCode]?.[d]
+                        const valObj = prices[rt.roomTypeCode]?.[d]
                         const isWeekend = dayjs(d).day() === 0 || dayjs(d).day() === 6
                         let display = ''
                         let color = '#333'
-                        if (val === '-') {
+                        if (valObj === '-') {
                           display = '-'
                           color = '#999'
-                        } else if (val != null && val !== '') {
-                          display = `¥${val}`
+                        } else if (valObj != null && typeof valObj === 'object') {
+                          const val = priceType === 'withTax' ? valObj.priceWithTax : valObj.priceWithoutTax
+                          if (val != null && val !== '') {
+                            display = `¥${Number(val).toFixed(2)}`
+                          }
                         }
                         return (
                           <td key={d} style={{ ...cellStyle, color, background: isWeekend ? '#fff7e6' : undefined }}>

@@ -3,7 +3,7 @@ import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbo
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
-import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateCodeAllocationApi, groupRateCodeApi, groupRoomTypeApi, groupRoomTypeHotelApi, dictionaryApi } from '../../utils/api'
+import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateCodeAllocationApi, groupRateCodeApi, groupRoomTypeApi, groupRoomTypeHotelApi, dictionaryApi, taxSettingApi } from '../../utils/api'
 
 const { Option } = Select
 
@@ -17,6 +17,7 @@ const EditHotel = () => {
   const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
   const [hotel, setHotel] = useState(null)
   const [regionOptions, setRegionOptions] = useState([])
+  const [taxSettings, setTaxSettings] = useState([])
   
   // 集团设施数据状态
   const [groupFacilities, setGroupFacilities] = useState([])
@@ -122,7 +123,20 @@ const EditHotel = () => {
       }
     }
 
+    const loadTaxSettings = async () => {
+      try {
+        const response = await taxSettingApi.getAllTaxSettings({
+          metadata: { skipAutoLogout: true }
+        })
+        const list = Array.isArray(response) ? response : (response.data || [])
+        setTaxSettings(list.filter(t => t.status === 'active'))
+      } catch (error) {
+        console.error('加载集团税率失败:', error)
+      }
+    }
+
     loadRegionOptions()
+    loadTaxSettings()
   }, [])
   
   // 当设施数据变化时，更新表单
@@ -207,7 +221,8 @@ const EditHotel = () => {
           supportRoomTypePriceDiff: hotel.supportRoomTypePriceDiff || 'no',
           supportPersonPriceDiff: hotel.supportPersonPriceDiff || 'no',
           allowCreateRateCode: hotel.allowCreateRateCode || 'allow',
-          allowCreateRoomType: hotel.allowCreateRoomType || 'allow'
+          allowCreateRoomType: hotel.allowCreateRoomType || 'allow',
+          taxRateCodes: hotel.taxRateCodes ? hotel.taxRateCodes.split(',') : []
         })
         
         // 设置支持多人价状态
@@ -545,7 +560,8 @@ const EditHotel = () => {
         supportRoomTypePriceDiff: values.supportRoomTypePriceDiff || 'no',
         supportPersonPriceDiff: values.supportPersonPriceDiff || 'no',
         allowCreateRateCode: values.allowCreateRateCode || 'allow',
-        allowCreateRoomType: values.allowCreateRoomType || 'allow'
+        allowCreateRoomType: values.allowCreateRoomType || 'allow',
+        taxRateCodes: values.taxRateCodes ? values.taxRateCodes.join(',') : ''
       }
       
       await hotelApi.updateHotelByCode(hotel.hotelCode, hotelData, {
@@ -1064,6 +1080,26 @@ const EditHotel = () => {
                   label="酒店最低价格（含税）"
                 >
                   <InputNumber placeholder="请输入酒店最低价格（含税）" style={{ width: '100%' }} min={0} precision={2} prefix="¥" />
+                </Form.Item>
+              </Col>
+              <Col span={24}>
+                <Form.Item
+                  name="taxRateCodes"
+                  label="应用集团税率"
+                  tooltip="选择将应用到该酒店的集团增值税/服务费模板。保存后将自动重算酒店下所有房价计划的不含税价。"
+                >
+                  <Select
+                    mode="multiple"
+                    allowClear
+                    placeholder="请选择应用到该酒店的集团税率"
+                    style={{ width: '100%' }}
+                  >
+                    {taxSettings.map(tax => (
+                      <Option key={tax.taxCode} value={tax.taxCode}>
+                        {tax.legalName} ({tax.taxCode} - {Number(tax.rateAmount).toFixed(2)}%)
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
               <Col span={24}>

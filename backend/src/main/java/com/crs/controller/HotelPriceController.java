@@ -60,6 +60,9 @@ public class HotelPriceController {
     @Autowired
     private RoomTypeRepository roomTypeRepository;
 
+    @Autowired
+    private com.crs.repository.TaxSettingRepository taxSettingRepository;
+
     private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(HotelPriceController.class);
 
     private Integer getCurrentTenantId() {
@@ -94,6 +97,37 @@ public class HotelPriceController {
             return priceWithTax;
         }
         return priceWithTax.compareTo(minimumPrice) < 0 ? minimumPrice : priceWithTax;
+    }
+
+    private BigDecimal calculatePriceWithoutTax(Integer tenantId, String hotelCode, BigDecimal priceWithTax) {
+        if (priceWithTax == null) {
+            return null;
+        }
+        
+        BigDecimal totalTaxRate = BigDecimal.ZERO;
+        java.util.Optional<com.crs.entity.Hotel> hotelOpt = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId);
+        if (hotelOpt.isPresent()) {
+            com.crs.entity.Hotel hotel = hotelOpt.get();
+            String codesStr = hotel.getTaxRateCodes();
+            if (codesStr != null && !codesStr.isBlank()) {
+                String[] codes = codesStr.split(",");
+                List<com.crs.entity.TaxSetting> activeTaxes = taxSettingRepository.findByTenantIdAndStatus(tenantId, "active");
+                for (String code : codes) {
+                    if (code == null || code.isBlank()) continue;
+                    for (com.crs.entity.TaxSetting tax : activeTaxes) {
+                        if (code.trim().equalsIgnoreCase(tax.getTaxCode())) {
+                            BigDecimal rate = tax.getRateAmount();
+                            if (rate != null) {
+                                totalTaxRate = totalTaxRate.add(rate.divide(BigDecimal.valueOf(100)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        BigDecimal divisor = BigDecimal.ONE.add(totalTaxRate);
+        return priceWithTax.divide(divisor, 2, RoundingMode.HALF_UP);
     }
 
     /**
@@ -145,6 +179,8 @@ public class HotelPriceController {
                     ? hotelPrice.getPriceWithTax()
                     : applyHotelMinimumPrice(hotelPrice.getPriceWithTax(), minimumPrice);
             hotelPrice.setPriceWithTax(effectivePriceWithTax);
+            BigDecimal priceWithoutTax = calculatePriceWithoutTax(tenantId, hotelPrice.getHotelCode(), effectivePriceWithTax);
+            hotelPrice.setPriceWithoutTax(priceWithoutTax);
 
             Optional<HotelPrice> existing = hotelPriceRepository
                     .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(
@@ -159,7 +195,7 @@ public class HotelPriceController {
                 HotelPrice existingPrice = existing.get();
                 oldPriceStr = existingPrice.getPriceWithTax() != null ? existingPrice.getPriceWithTax().toString() : null;
                 existingPrice.setPriceWithTax(effectivePriceWithTax);
-                existingPrice.setPriceWithoutTax(hotelPrice.getPriceWithoutTax());
+                existingPrice.setPriceWithoutTax(priceWithoutTax);
                 existingPrice.setStatus(hotelPrice.getStatus() != null ? hotelPrice.getStatus() : "active");
                 hotelPriceRepository.save(existingPrice);
                 opType = "inactive".equals(existingPrice.getStatus()) ? "delete" : "update";
@@ -245,6 +281,8 @@ public class HotelPriceController {
                         ? price.getPriceWithTax()
                         : applyHotelMinimumPrice(price.getPriceWithTax(), minimumPrice);
                 price.setPriceWithTax(effectivePriceWithTax);
+                BigDecimal priceWithoutTax = calculatePriceWithoutTax(tenantId, price.getHotelCode(), effectivePriceWithTax);
+                price.setPriceWithoutTax(priceWithoutTax);
 
                 Optional<HotelPrice> existing = hotelPriceRepository
                         .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(
@@ -258,9 +296,10 @@ public class HotelPriceController {
                     if (isDelete) {
                         existingPrice.setStatus("inactive");
                         existingPrice.setPriceWithTax(BigDecimal.ZERO);
+                        existingPrice.setPriceWithoutTax(BigDecimal.ZERO);
                     } else {
                         existingPrice.setPriceWithTax(effectivePriceWithTax);
-                        existingPrice.setPriceWithoutTax(price.getPriceWithoutTax());
+                        existingPrice.setPriceWithoutTax(priceWithoutTax);
                         existingPrice.setStatus("active");
                     }
                     hotelPriceRepository.save(existingPrice);
@@ -466,6 +505,7 @@ public class HotelPriceController {
                         HotelPrice childPrice = childPriceOpt.get();
                         childPrice.setStatus("inactive");
                         childPrice.setPriceWithTax(BigDecimal.ZERO);
+                        childPrice.setPriceWithoutTax(BigDecimal.ZERO);
                         hotelPriceRepository.save(childPrice);
                     }
                     // 继续级联到下一级
@@ -483,6 +523,7 @@ public class HotelPriceController {
                         derivativeAmount = derivativeAmount.setScale(2, RoundingMode.HALF_UP);
                     }
                     derivativeAmount = applyHotelMinimumPrice(derivativeAmount, minimumPrice);
+                    BigDecimal childPriceWithoutTax = calculatePriceWithoutTax(tenantId, hotelCode, derivativeAmount);
                     
                     Optional<HotelPrice> childPriceOpt = hotelPriceRepository
                             .findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDate(
@@ -492,6 +533,7 @@ public class HotelPriceController {
                     if (childPriceOpt.isPresent()) {
                         childPrice = childPriceOpt.get();
                         childPrice.setPriceWithTax(derivativeAmount);
+                        childPrice.setPriceWithoutTax(childPriceWithoutTax);
                         childPrice.setStatus("active");
                     } else {
                         childPrice = new HotelPrice();
@@ -501,12 +543,13 @@ public class HotelPriceController {
                         childPrice.setRoomTypeCode(roomTypeCode);
                         childPrice.setPriceDate(priceDate);
                         childPrice.setPriceWithTax(derivativeAmount);
+                        childPrice.setPriceWithoutTax(childPriceWithoutTax);
                         childPrice.setStatus("active");
                     }
                     hotelPriceRepository.save(childPrice);
                     
-                    logger.info("级联计算: {} -> {} 房型{} 日期{} 价格{}",
-                            rateCode, childRateCode, roomTypeCode, priceDate, derivativeAmount);
+                    logger.info("级联计算: {} -> {} 房型{} 日期{} 价格{} 不含税价{}",
+                            rateCode, childRateCode, roomTypeCode, priceDate, derivativeAmount, childPriceWithoutTax);
                     
                     // 继续级联到下一级（二级衍生码）
                     cascadeDerivativePrices(tenantId, hotelCode, childRateCode, roomTypeCode, priceDate, derivativeAmount);
