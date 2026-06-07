@@ -94,6 +94,7 @@ import CtripActivityRegistration from '../pages/GroupPromotionManagement/CtripAc
 import ReservationReports from '../pages/Reports/ReservationReports'
 import OccupancyReports from '../pages/Reports/OccupancyReports'
 import RevenueReports from '../pages/Reports/RevenueReports'
+import SystemTraceConsole from '../pages/Reports/SystemTraceConsole'
 import TestPage from '../pages/TestPage'
 import TestPageWithLayout from '../pages/TestPageWithLayout'
 
@@ -381,6 +382,10 @@ export const router = createBrowserRouter([
   {
     path: '/reports/revenue-reports',
     element: <ProtectedRoute><MainLayout><RevenueReports /></MainLayout></ProtectedRoute>
+  },
+  {
+    path: '/reports/system-trace',
+    element: <ProtectedRoute><MainLayout><SystemTraceConsole /></MainLayout></ProtectedRoute>
   },
   {
     path: '/reports/data-export',

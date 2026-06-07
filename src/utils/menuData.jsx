@@ -21,7 +21,8 @@ import {
   ExportOutlined,
   FolderOutlined,
   InboxOutlined,
-  SearchOutlined
+  SearchOutlined,
+  NodeIndexOutlined
 } from '@ant-design/icons'
 
 // CRS系统菜单
@@ -163,6 +164,12 @@ export const crsMenuData = [
         label: ' revenue报表',
         path: '/reports/revenue-reports',
         icon: <DollarOutlined />
+      },
+      {
+        key: 'system-trace',
+        label: '系统诊断追踪',
+        path: '/reports/system-trace',
+        icon: <NodeIndexOutlined />
       },
       {
         key: 'data-export',

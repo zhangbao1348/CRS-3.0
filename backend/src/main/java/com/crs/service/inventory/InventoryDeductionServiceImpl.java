@@ -22,6 +22,9 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
  * InventoryDeductionServiceImpl 服务实现类 (Service Implementation)
@@ -111,13 +114,29 @@ public class InventoryDeductionServiceImpl implements InventoryDeductionService 
             return AvailabilityResult.unavailable("无法获取库存数据");
         }
 
+        AvailabilityResult result;
         if (overallMin >= ctx.getRequestedRooms()) {
-            return AvailabilityResult.available(overallMin, dailyDetails);
+            result = AvailabilityResult.available(overallMin, dailyDetails);
         } else {
             String reason = firstRejectReason != null ? firstRejectReason
                     : "库存不足，可售" + overallMin + "间，需" + ctx.getRequestedRooms() + "间";
-            return AvailabilityResult.unavailable(reason);
+            result = AvailabilityResult.unavailable(reason);
         }
+
+        // [TRACE] 记录可用性检查决策快照
+        Map<String, Object> availabilitySnapshot = new java.util.LinkedHashMap<>();
+        availabilitySnapshot.put("requestedRooms", ctx.getRequestedRooms());
+        availabilitySnapshot.put("checkInDate", ctx.getCheckInDate().toString());
+        availabilitySnapshot.put("checkOutDate", ctx.getCheckOutDate().toString());
+        availabilitySnapshot.put("roomTypeCode", ctx.getRoomTypeCode());
+        availabilitySnapshot.put("rateCode", ctx.getRateCode());
+        availabilitySnapshot.put("channelCode", ctx.getChannelCode());
+        availabilitySnapshot.put("overallMin", overallMin);
+        availabilitySnapshot.put("firstRejectReason", firstRejectReason);
+        availabilitySnapshot.put("dailyDetails", dailyDetails);
+        com.crs.util.TraceContext.recordDecision("availabilityCheck", availabilitySnapshot);
+
+        return result;
     }
 
     @Override
@@ -361,6 +380,16 @@ public class InventoryDeductionServiceImpl implements InventoryDeductionService 
                 deductQuota(ctx.getTenantId(), ctx.getHotelCode(), dimType, dimCode, sqlDate, ctx.getRoomCount());
             }
         }
+
+        // [TRACE] 记录库存扣减决策快照
+        Map<String, Object> deductSnapshot = new java.util.LinkedHashMap<>();
+        deductSnapshot.put("tenantId", ctx.getTenantId());
+        deductSnapshot.put("hotelCode", ctx.getHotelCode());
+        deductSnapshot.put("roomTypeCode", ctx.getRoomTypeCode());
+        deductSnapshot.put("roomCount", ctx.getRoomCount());
+        deductSnapshot.put("checkInDate", ctx.getCheckInDate().toString());
+        deductSnapshot.put("checkOutDate", ctx.getCheckOutDate().toString());
+        com.crs.util.TraceContext.recordDecision("inventoryDeduct", deductSnapshot);
     }
 
     private void deductPmsInventory(InventoryDeductionContext ctx, java.sql.Date date) {

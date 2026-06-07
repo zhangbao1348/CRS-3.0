@@ -12,6 +12,8 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -50,6 +52,9 @@ import com.crs.util.DisplayMapper;
  */
 @Service
 public class ReservationService {
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     private final ReservationRepository reservationRepository;
     private final ReservationDailyPriceRepository dailyPriceRepository;
@@ -168,6 +173,7 @@ public class ReservationService {
         checkAndReserveInventory(reservation);
 
         Reservation saved = reservationRepository.save(reservation);
+        eventPublisher.publishEvent(new ReservationChangedEvent(this, saved, null, saved.getReservationStatus()));
 
         if (dailyPrices != null && !dailyPrices.isEmpty()) {
             dailyPrices.forEach(dp -> dp.setReservationId(saved.getId()));
@@ -208,6 +214,16 @@ public class ReservationService {
         Reservation reservation = reservationRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
 
+        // [TRACE] 记录悲观锁获取与取消判定决策快照
+        Map<String, Object> cancelSnapshot = new java.util.LinkedHashMap<>();
+        cancelSnapshot.put("reservationId", id);
+        cancelSnapshot.put("reservationCode", reservation.getReservationCode());
+        cancelSnapshot.put("reservationStatus", reservation.getReservationStatus());
+        cancelSnapshot.put("paymentStatus", reservation.getPaymentStatus());
+        cancelSnapshot.put("paymentDeadline", reservation.getPaymentDeadline());
+        com.crs.util.TraceContext.recordDecision("reservationCode", reservation.getReservationCode());
+        com.crs.util.TraceContext.recordDecision("cancelBySystemDecision", cancelSnapshot);
+
         if (!"pending_payment".equals(reservation.getReservationStatus())) {
             throw new RuntimeException("仅待支付订单允许执行支付超时自动取消");
         }
@@ -230,6 +246,19 @@ public class ReservationService {
         // 1. 使用悲观写锁获取该订单，防止与超时任务或人工干预并发抢占导致的状态覆盖
         Reservation reservation = reservationRepository.findByTenantIdAndReservationCodeForUpdate(getCurrentTenantId(), reservationCode)
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
+        String oldStatus = reservation.getReservationStatus();
+
+        // [TRACE] 记录支付核销前决策快照
+        Map<String, Object> paySnapshot = new java.util.LinkedHashMap<>();
+        paySnapshot.put("reservationCode", reservationCode);
+        paySnapshot.put("inputPaymentAmount", paymentAmount);
+        paySnapshot.put("transactionId", transactionId);
+        paySnapshot.put("orderTotalPrice", reservation.getTotalPrice());
+        paySnapshot.put("orderReservationStatus", reservation.getReservationStatus());
+        paySnapshot.put("orderPaymentStatus", reservation.getPaymentStatus());
+        paySnapshot.put("paymentDeadline", reservation.getPaymentDeadline());
+        com.crs.util.TraceContext.recordDecision("reservationCode", reservationCode);
+        com.crs.util.TraceContext.recordDecision("payReservationDecision", paySnapshot);
 
         // 2. 状态拦截判断 (订单一旦被系统自动超时取消或渠道主动取消，不可再执行支付)
         if ("cancelled".equals(reservation.getReservationStatus())) {
@@ -280,6 +309,7 @@ public class ReservationService {
         reservation.setModifiedBy(operator);
 
         Reservation saved = reservationRepository.save(reservation);
+        eventPublisher.publishEvent(new ReservationChangedEvent(this, saved, oldStatus, saved.getReservationStatus()));
 
         // 8. 归档操作历史
         ReservationHistory history = new ReservationHistory();
@@ -318,6 +348,7 @@ public class ReservationService {
             throw new RuntimeException("返还库存失败: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()), e);
         }
 
+        String oldStatus = reservation.getReservationStatus();
         reservation.setReservationStatus("cancelled");
         reservation.setStatus(Reservation.Status.cancelled);
         reservation.setCancelledBy(cancelledBy);
@@ -326,6 +357,7 @@ public class ReservationService {
         reservation.setModifiedBy(cancelledBy);
 
         Reservation saved = reservationRepository.save(reservation);
+        eventPublisher.publishEvent(new ReservationChangedEvent(this, saved, oldStatus, "cancelled"));
 
         ReservationHistory history = new ReservationHistory();
         history.setReservationId(saved.getId());
@@ -356,6 +388,7 @@ public class ReservationService {
         }
 
         Reservation saved = reservationRepository.save(reservation);
+        eventPublisher.publishEvent(new ReservationChangedEvent(this, saved, oldStatus, newStatus));
 
         String action = DisplayMapper.historyAction(newStatus);
         String content = DisplayMapper.historyContent(newStatus);

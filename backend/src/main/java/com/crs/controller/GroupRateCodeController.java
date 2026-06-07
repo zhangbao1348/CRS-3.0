@@ -286,31 +286,31 @@ public class GroupRateCodeController {
             final List<String> finalHotelCodes = hotelCodes;
             Integer tenantId = getCurrentTenantId();
 
-            List<RatePlan> distributedPlans = ratePlanRepository.findByTenantIdAndSourceGroupRateCode(tenantId, groupRateCode.getRateCode());
             int syncCount = 0;
 
             // 检查是否是衍生码且折扣/取整方式发生了变化
             String derivativeLevel = groupRateCode.getDerivativeLevel();
             boolean isDerivative = "level1".equals(derivativeLevel) || "level2".equals(derivativeLevel);
 
-            for (RatePlan plan : distributedPlans) {
-                // 使用 hotelCode 匹配，符合CODE关联规范
-                if (plan.getHotelCode() != null && finalHotelCodes.contains(plan.getHotelCode())
-                        && "active".equals(plan.getStatus())) {
-                    // 记录同步前的折扣和取整方式
-                    Double oldDiscount = plan.getDiscount();
-                    String oldRounding = plan.getRounding();
+            for (String hotelCode : finalHotelCodes) {
+                // 优先使用联合属性定位价格计划，确保各酒店下对应房价码能正确匹配，即使历史同步数据缺少关联标识
+                Optional<RatePlan> planOpt = ratePlanRepository
+                        .findByTenantIdAndHotelCodeAndRateCode(tenantId, hotelCode, groupRateCode.getRateCode());
+                if (planOpt.isPresent()) {
+                    RatePlan plan = planOpt.get();
+                    if ("active".equals(plan.getStatus())) {
+                        // 记录同步前的折扣和取整方式
+                        Double oldDiscount = plan.getDiscount();
+                        String oldRounding = plan.getRounding();
 
-                    syncRatePlanFromGroupRateCode(plan, groupRateCode);
-                    ratePlanRepository.save(plan);
-                    syncCount++;
+                        syncRatePlanFromGroupRateCode(plan, groupRateCode);
+                        ratePlanRepository.save(plan);
+                        syncCount++;
 
-                    // 如果是衍生码且折扣或取整方式变了，重新计算该酒店的衍生价格
-                    if (isDerivative && groupRateCode.getParentRateCode() != null
-                            && (!Objects.equals(oldDiscount, plan.getDiscount())
-                                    || !Objects.equals(oldRounding, plan.getRounding()))) {
-                        String hotelCode = plan.getHotelCode();
-                        if (hotelCode != null) {
+                        // 如果是衍生码且折扣或取整方式变了，重新计算该酒店的衍生价格
+                        if (isDerivative && groupRateCode.getParentRateCode() != null
+                                && (!Objects.equals(oldDiscount, plan.getDiscount())
+                                        || !Objects.equals(oldRounding, plan.getRounding()))) {
                             recalculateDerivativePricesForHotel(tenantId, hotelCode, groupRateCode);
                             logger.info("同步时重新计算衍生价格: 酒店={}, 房价码={}, 折扣 {}->{}",
                                     hotelCode, groupRateCode.getRateCode(), oldDiscount, plan.getDiscount());
@@ -906,13 +906,9 @@ public class GroupRateCodeController {
                     // 下发：创建或更新酒店价格计划和分配记录
                     RatePlan ratePlan;
 
-                    // 查找该酒店已有的价格计划（通过 sourceGroupRateCode 和 hotelCode，符合CODE关联规范）
-                    List<RatePlan> existingList = ratePlanRepository
-                            .findByTenantIdAndSourceGroupRateCode(tenantId, groupRateCode.getRateCode());
-                    final String finalHotelCode = hotelCode;
-                    Optional<RatePlan> existingOpt = existingList.stream()
-                            .filter(rp -> finalHotelCode.equals(rp.getHotelCode()))
-                            .findFirst();
+                    // 查找该酒店已有的价格计划（优先通过租户ID+酒店Code+价格计划Code进行唯一匹配，防止重复插入引发异常）
+                    Optional<RatePlan> existingOpt = ratePlanRepository
+                            .findByTenantIdAndHotelCodeAndRateCode(tenantId, hotelCode, groupRateCode.getRateCode());
 
                     if (existingOpt.isPresent()) {
                         ratePlan = existingOpt.get();

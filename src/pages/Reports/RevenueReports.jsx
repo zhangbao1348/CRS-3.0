@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
-import { Select, Button, DatePicker, Table } from 'antd'
-import { SearchOutlined, ExportOutlined } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Select, Button, DatePicker, Table, Card, message, Alert, Radio, Row, Col } from 'antd'
+import { SearchOutlined, ExportOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { Line } from '@ant-design/plots'
+import { hotelApi, reportApi } from '../../utils/api'
 
 const { Option } = Select
 
@@ -9,179 +11,61 @@ const RevenueReports = () => {
   const [selectedMonth, setSelectedMonth] = useState(dayjs())
   const [selectedHotel, setSelectedHotel] = useState('全集团')
   const [selectedStatisticMethod, setSelectedStatisticMethod] = useState('按酒店纬度')
+  const [hotels, setHotels] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [reportData, setReportData] = useState([])
+  const [viewMode, setViewMode] = useState('table') // 'table' | 'chart'
 
-  const hotels = ['全集团', '上海宝丽嘉', '杭州钓美', '北京王府井', '深圳南山']
-
-  const roomTypes = {
-    '上海宝丽嘉': ['豪华大床房', '行政套房', '标准双床房', '总统套房'],
-    '杭州钓美': ['湖景房', '山景房', '豪华套房', '标准间'],
-    '北京王府井': ['城景房', '豪华间', '套房', '标准房'],
-    '深圳南山': ['海景房', '行政房', '豪华套房', '标准间']
-  }
-
-  const generateDailyOrders = (baseOrders, variance = 0) => {
-    const orders = {}
-    for (let i = 1; i <= 31; i++) {
-      const randomVariance = Math.floor(Math.random() * (variance * 2 + 1)) - variance
-      const orderCount = Math.max(0, baseOrders + randomVariance)
-      orders[`day${i}`] = orderCount
-    }
-    return orders
-  }
-
-  const generateDailyRates = (baseRate, variance = 50) => {
-    const rates = {}
-    for (let i = 1; i <= 31; i++) {
-      const randomVariance = (Math.random() * variance * 2) - variance
-      const rate = Math.max(100, baseRate + randomVariance)
-      rates[`day${i}`] = rate.toFixed(0)
-    }
-    return rates
-  }
-
-  const generateGroupDailyOrders = () => {
-    const data = {}
-    for (let i = 1; i <= 31; i++) {
-      data[`day${i}`] = Math.floor(Math.random() * 30) + 150
-    }
-    return data
-  }
-
-  const generateGroupDailyRates = () => {
-    const data = {}
-    for (let i = 1; i <= 31; i++) {
-      data[`day${i}`] = (Math.random() * 200 + 800).toFixed(0)
-    }
-    return data
-  }
-
-  const getHotelDataSource = () => {
-    return [
-      {
-        key: 'g1',
-        hotel: '全集团',
-        inventoryType: '总订单数',
-        ...generateGroupDailyOrders()
-      },
-      {
-        key: 'g2',
-        hotel: '全集团',
-        inventoryType: '平均房价',
-        ...generateGroupDailyRates()
-      },
-      {
-        key: '1',
-        hotel: '上海宝丽嘉',
-        inventoryType: '总订单数',
-        ...generateDailyOrders(95, 5)
-      },
-      {
-        key: '2',
-        hotel: '上海宝丽嘉',
-        inventoryType: '平均房价',
-        ...generateDailyRates(1200, 100)
-      },
-      {
-        key: '3',
-        hotel: '杭州钓美',
-        inventoryType: '总订单数',
-        ...generateDailyOrders(58, 5)
-      },
-      {
-        key: '4',
-        hotel: '杭州钓美',
-        inventoryType: '平均房价',
-        ...generateDailyRates(980, 80)
-      },
-      {
-        key: '5',
-        hotel: '北京王府井',
-        inventoryType: '总订单数',
-        ...generateDailyOrders(120, 5)
-      },
-      {
-        key: '6',
-        hotel: '北京王府井',
-        inventoryType: '平均房价',
-        ...generateDailyRates(1350, 120)
-      },
-      {
-        key: '7',
-        hotel: '深圳南山',
-        inventoryType: '总订单数',
-        ...generateDailyOrders(72, 5)
-      },
-      {
-        key: '8',
-        hotel: '深圳南山',
-        inventoryType: '平均房价',
-        ...generateDailyRates(1100, 90)
-      }
-    ]
-  }
-
-  const getRoomTypeDataSource = () => {
-    const data = []
-    let keyIndex = 0
-
-    data.push({
-      key: `rt_g1`,
-      hotel: '全集团',
-      roomType: '全房型',
-      inventoryType: '总订单数',
-      ...generateGroupDailyOrders()
-    })
-    data.push({
-      key: `rt_g2`,
-      hotel: '全集团',
-      roomType: '全房型',
-      inventoryType: '平均房价',
-      ...generateGroupDailyRates()
-    })
-
-    const addHotelRoomTypes = (hotelName, baseOrders, baseRate) => {
-      const types = roomTypes[hotelName] || []
-      types.forEach((roomType, rtIndex) => {
-        const rtBaseOrders = Math.floor(baseOrders / types.length) + (rtIndex === 0 ? baseOrders % types.length : 0)
-        const rtBaseRate = baseRate + (rtIndex * 150)
-        data.push({
-          key: `rt_${keyIndex++}`,
-          hotel: hotelName,
-          roomType: roomType,
-          inventoryType: '总订单数',
-          ...generateDailyOrders(rtBaseOrders, 3)
-        })
-        data.push({
-          key: `rt_${keyIndex++}`,
-          hotel: hotelName,
-          roomType: roomType,
-          inventoryType: '平均房价',
-          ...generateDailyRates(rtBaseRate, 50)
-        })
+  // 1. 初始化动态加载酒店列表
+  useEffect(() => {
+    hotelApi.getAllHotels()
+      .then(res => {
+        const hotelList = res?.data || res || []
+        setHotels([{ hotelCode: '全集团', chineseName: '全集团' }, ...hotelList])
       })
+      .catch(err => {
+        console.error('加载酒店列表失败:', err)
+        message.error('加载酒店列表失败')
+      })
+  }, [])
+
+  // 2. 发起真实 API 营收查询
+  const handleSearch = () => {
+    setLoading(true)
+    const params = {
+      hotelCode: selectedHotel === '全集团' ? undefined : selectedHotel,
+      month: selectedMonth.format('YYYY-MM-DD'),
+      statisticMethod: selectedStatisticMethod
     }
 
-    addHotelRoomTypes('上海宝丽嘉', 95, 1000)
-    addHotelRoomTypes('杭州钓美', 58, 850)
-    addHotelRoomTypes('北京王府井', 120, 1150)
-    addHotelRoomTypes('深圳南山', 72, 950)
-
-    return data
+    reportApi.getRevenueReport(params)
+      .then(res => {
+        if (res && res.length > 0) {
+          setReportData(res)
+        } else {
+          setReportData([])
+          message.info('未查询到当前查询月份的营收数据')
+        }
+      })
+      .catch(err => {
+        setReportData([])
+        message.error(`加载营收数据失败：${err?.message || '网络连接失败'}`)
+      })
+      .finally(() => {
+        setLoading(false)
+      })
   }
 
-  const getFilteredData = () => {
-    let data
-    if (selectedStatisticMethod === '按酒店纬度') {
-      data = getHotelDataSource()
-    } else {
-      data = getRoomTypeDataSource()
-    }
+  // 参数改变时联动自动刷新
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [selectedHotel, selectedStatisticMethod, selectedMonth])
 
-    if (selectedHotel === '全集团') {
-      return data
-    }
-
-    return data.filter(item => item.hotel === selectedHotel)
+  const handleExport = () => {
+    message.success('已触发导出营收报表')
   }
 
   const generateDateTitle = (day) => {
@@ -189,63 +73,96 @@ const RevenueReports = () => {
     const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.day()]
     return (
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 12 }}>{date.format('MM-DD')}</div>
-        <div style={{ fontSize: 12, color: '#999' }}>{weekDay}</div>
+        <div style={{ fontSize: 11 }}>{date.format('MM-DD')}</div>
+        <div style={{ fontSize: 11, color: '#999' }}>{weekDay}</div>
       </div>
     )
   }
 
+  // 动态计算合并行 rowSpan 属性
+  const calculateRowSpan = (field, record, index) => {
+    if (index === 0 || reportData[index][field] !== reportData[index - 1][field]) {
+      let span = 1
+      for (let i = index + 1; i < reportData.length; i++) {
+        if (reportData[i][field] === record[field]) {
+          span++
+        } else {
+          break
+        }
+      }
+      return span
+    }
+    return 0
+  }
+
+  // 3. 桥接图表天级数据至折线趋势图数据结构
+  const prepareChartData = () => {
+    const orderData = []
+    const adrData = []
+    const daysInMonth = selectedMonth.daysInMonth()
+
+    reportData.forEach(row => {
+      let seriesName = row.hotel
+      if (selectedStatisticMethod === '按房型纬度') {
+        seriesName = `${row.hotel} - ${row.roomType || '全房型'}`
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayVal = row[`day${d}`]
+        const val = dayVal !== undefined && dayVal !== null ? Number(dayVal) : 0
+        const dateStr = selectedMonth.date(d).format('MM-DD')
+
+        const dataPoint = {
+          date: dateStr,
+          value: val,
+          series: seriesName
+        }
+
+        if (row.inventoryType === '总订单数') {
+          orderData.push(dataPoint)
+        } else if (row.inventoryType === '平均房价') {
+          adrData.push(dataPoint)
+        }
+      }
+    })
+
+    return { orderData, adrData }
+  }
+
+  const getChartConfig = (data, title, yUnit) => ({
+    data,
+    xField: 'date',
+    yField: 'value',
+    colorField: 'series',
+    interaction: {
+      tooltip: {
+        shared: true,
+        showMarkers: true,
+      },
+    },
+    style: {
+      lineWidth: 2,
+    },
+    axis: {
+      y: {
+        title: `${title} (${yUnit})`,
+      }
+    }
+  })
+
   const getColumns = () => {
     const columns = []
-
-    const filteredData = getFilteredData()
+    const daysInMonth = selectedMonth.daysInMonth()
 
     columns.push({
       title: '酒店',
       dataIndex: 'hotel',
       key: 'hotel',
-      width: 120,
+      width: 140,
       align: 'center',
-      onCell: (record, index) => {
-        if (selectedStatisticMethod === '按酒店纬度') {
-          if (index === 0 || record.hotel !== filteredData[index - 1].hotel) {
-            return { rowSpan: 2 }
-          }
-          return { rowSpan: 0 }
-        } else {
-          if (record.hotel === '全集团') {
-            if (index === 0) {
-              return { rowSpan: 2 }
-            }
-            return { rowSpan: 0 }
-          } else {
-            if (index === 0 || record.hotel !== filteredData[index - 1].hotel) {
-              return { rowSpan: 8 }
-            }
-            return { rowSpan: 0 }
-          }
-        }
-      },
-      render: (text, record, index) => {
-        if (selectedStatisticMethod === '按酒店纬度') {
-          if (index === 0 || !filteredData[index - 1] || record.hotel !== filteredData[index - 1].hotel) {
-            return text
-          }
-          return null
-        } else {
-          if (record.hotel === '全集团') {
-            if (index === 0) {
-              return text
-            }
-            return null
-          } else {
-            if (index === 0 || !filteredData[index - 1] || record.hotel !== filteredData[index - 1].hotel) {
-              return text
-            }
-            return null
-          }
-        }
-      }
+      onCell: (record, index) => ({
+        rowSpan: calculateRowSpan('hotel', record, index)
+      })
     })
 
     if (selectedStatisticMethod === '按房型纬度') {
@@ -253,19 +170,21 @@ const RevenueReports = () => {
         title: '房型',
         dataIndex: 'roomType',
         key: 'roomType',
-        width: 120,
+        width: 140,
         align: 'center',
         onCell: (record, index) => {
-          if (index === 0 || record.roomType !== filteredData[index - 1].roomType || record.hotel !== filteredData[index - 1].hotel) {
-            return { rowSpan: 2 }
+          if (index === 0 || record.roomType !== reportData[index - 1].roomType || record.hotel !== reportData[index - 1].hotel) {
+            let span = 1
+            for (let i = index + 1; i < reportData.length; i++) {
+              if (reportData[i].roomType === record.roomType && reportData[i].hotel === record.hotel) {
+                span++
+              } else {
+                break
+              }
+            }
+            return { rowSpan: span }
           }
           return { rowSpan: 0 }
-        },
-        render: (text, record, index) => {
-          if (index === 0 || !filteredData[index - 1] || record.roomType !== filteredData[index - 1].roomType || record.hotel !== filteredData[index - 1].hotel) {
-            return text
-          }
-          return null
         }
       })
     }
@@ -275,7 +194,11 @@ const RevenueReports = () => {
       dataIndex: 'inventoryType',
       key: 'inventoryType',
       width: 120,
-      align: 'center'
+      align: 'center',
+      render: (text) => {
+        if (text === '平均房价') return <strong style={{ color: '#1890ff' }}>{text}</strong>
+        return text
+      }
     })
 
     for (let i = 1; i <= 31; i++) {
@@ -286,9 +209,10 @@ const RevenueReports = () => {
         width: 80,
         align: 'center',
         render: (text, record) => {
-          if (text !== undefined) {
+          if (i > daysInMonth) return <span style={{ color: '#d9d9d9' }}>—</span>
+          if (text !== undefined && text !== null) {
             if (record.inventoryType === '平均房价') {
-              return <span>¥{text}</span>
+              return <span style={{ fontFamily: 'Consolas, monospace' }}>¥{text}</span>
             }
             return <span>{text}</span>
           }
@@ -300,57 +224,102 @@ const RevenueReports = () => {
     return columns
   }
 
-  const filteredData = getFilteredData()
-  const columns = getColumns()
-
   return (
     <div className="fade-in">
       <h1 className="page-title">
-        <span>营收报表</span>
+        <span>营收分析报表</span>
       </h1>
 
       <div style={{ marginBottom: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <label style={{ marginRight: 8 }}>酒店:</label>
-            <Select value={selectedHotel} style={{ width: 140 }} onChange={setSelectedHotel}>
-              {hotels.map(hotel => (
-                <Option key={hotel} value={hotel}>{hotel}</Option>
+            <label style={{ marginRight: 8, fontWeight: '500' }}>选择酒店:</label>
+            <Select value={selectedHotel} style={{ width: 180 }} onChange={setSelectedHotel}>
+              {hotels.map(h => (
+                <Option key={h.hotelCode} value={h.hotelCode}>{h.chineseName}</Option>
               ))}
             </Select>
           </div>
           <div>
-            <label style={{ marginRight: 8 }}>统计方式:</label>
+            <label style={{ marginRight: 8, fontWeight: '500' }}>统计维度:</label>
             <Select value={selectedStatisticMethod} style={{ width: 140 }} onChange={setSelectedStatisticMethod}>
               <Option value="按酒店纬度">按酒店纬度</Option>
               <Option value="按房型纬度">按房型纬度</Option>
             </Select>
           </div>
           <div>
-            <label style={{ marginRight: 8 }}>月份:</label>
+            <label style={{ marginRight: 8, fontWeight: '500' }}>统计月份:</label>
             <DatePicker 
               picker="month"
               value={selectedMonth} 
               onChange={setSelectedMonth}
               style={{ width: 150 }}
+              allowClear={false}
             />
           </div>
-          <div style={{ marginLeft: 'auto' }}>
-            <Button type="primary" icon={<SearchOutlined />}>搜索</Button>
-            <Button icon={<ExportOutlined />} style={{ marginLeft: 8 }}>导出</Button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)} buttonStyle="solid" style={{ marginRight: 12 }}>
+              <Radio.Button value="table">表格模式</Radio.Button>
+              <Radio.Button value="chart">图形模式</Radio.Button>
+            </Radio.Group>
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
+              执行查询
+            </Button>
+            <Button icon={<ExportOutlined />} onClick={handleExport} style={{ marginLeft: 8 }}>
+              导出报表
+            </Button>
           </div>
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        pagination={false}
-        scroll={{ x: 3000 }}
-        bordered
-        size="small"
-        style={{ backgroundColor: '#fff' }}
-      />
+      {viewMode === 'table' ? (
+        <Card bordered={false} bodyStyle={{ padding: 0 }} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8, overflow: 'hidden' }}>
+          <Table
+            columns={getColumns()}
+            dataSource={reportData}
+            pagination={false}
+            loading={loading}
+            scroll={{ x: 3200, y: 600 }}
+            bordered
+            size="small"
+            className="business-table"
+            rowKey="key"
+          />
+        </Card>
+      ) : (
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
+            <Card 
+              title={<span style={{ fontWeight: 600 }}>每日订单量趋势</span>} 
+              bordered={false} 
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
+            >
+              <div style={{ height: 350 }}>
+                {prepareChartData().orderData.length > 0 ? (
+                  <Line {...getChartConfig(prepareChartData().orderData, '订单量', '单')} />
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>暂无订单趋势数据</div>
+                )}
+              </div>
+            </Card>
+          </Col>
+          <Col span={24}>
+            <Card 
+              title={<span style={{ fontWeight: 600 }}>客房平均房价 (ADR) 走势</span>} 
+              bordered={false} 
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
+            >
+              <div style={{ height: 350 }}>
+                {prepareChartData().adrData.length > 0 ? (
+                  <Line {...getChartConfig(prepareChartData().adrData, '平均房价', '元')} />
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>暂无房价走势数据</div>
+                )}
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
     </div>
   )
 }

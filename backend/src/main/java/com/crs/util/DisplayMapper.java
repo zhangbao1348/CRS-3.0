@@ -186,6 +186,9 @@ public class DisplayMapper {
     /** 映射担保类型文字 */
     public static String guaranteeType(String type) {
         String normalizedType = GuaranteePolicyTypeUtil.normalizeType(type);
+        if (normalizedType == null) {
+            return "-";
+        }
         if (GUARANTEE_TYPE.containsKey(normalizedType)) {
             return GUARANTEE_TYPE.get(normalizedType);
         }

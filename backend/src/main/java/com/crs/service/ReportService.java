@@ -1,50 +1,57 @@
 package com.crs.service;
 
-import org.springframework.stereotype.Service;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
-import java.util.*;
+public interface ReportService {
 
-/**
- * 报表服务
- * 提供预订报表、入住率报表、收入报表的查询功能
- */
-@Service
-public class ReportService {
-    
     /**
-     * 查询预订报表
-     * @param params 查询参数（hotel, bookingDateStart, bookingDateEnd, orderStatus, marketCode, channelCode, ratePlan, groupBy1, groupBy2, paymentMethod）
-     * @return 报表数据列表
+     * 初始化/重构特定租户在特定时间段内的每日预订聚合汇总数据
      */
-    public List<Map<String, Object>> getReservationReport(Map<String, Object> params) {
-        // TODO: 实现真实的预订报表查询逻辑
-        // 当前返回空列表，前端在DEMO_MODE下使用Mock数据
-        return new ArrayList<>();
-    }
-    
+    void initializeSummaryData(Integer tenantId, LocalDate startDate, LocalDate endDate);
+
     /**
-     * 查询入住率报表
-     * @param hotelId 酒店ID
-     * @param month 月份（格式：YYYY-MM）
-     * @param groupBy 分组方式
-     * @return 每日入住率数据列表
+     * 查询多维嵌套订单报表（支持同环比计算、灵活维度组合过滤与分组）
      */
-    public List<Map<String, Object>> getOccupancyReport(Integer hotelId, String month, String groupBy) {
-        // TODO: 实现真实的入住率报表查询逻辑
-        // 当前返回空列表，前端在DEMO_MODE下使用Mock数据
-        return new ArrayList<>();
-    }
-    
+    Map<String, Object> queryReservationReport(
+        Integer tenantId,
+        LocalDate startDate,
+        LocalDate endDate,
+        String hotelCode,
+        String channelCode,
+        String marketCode,
+        String rateCategoryCode,
+        String ratePlanCode,
+        String orderStatus,
+        String groupBy1,
+        String groupBy2,
+        String paymentMethod,
+        Boolean memberBooking,
+        Boolean canEarnPoints,
+        Boolean onlineBooking,
+        Boolean enableCompare,
+        LocalDate compareStartDate,
+        LocalDate compareEndDate
+    );
+
     /**
-     * 查询收入报表
-     * @param hotelId 酒店ID
-     * @param month 月份（格式：YYYY-MM）
-     * @param groupBy 分组方式
-     * @return 每日收入数据列表
+     * 查询出租率报表 (按天呈现, 支持按酒店/按房型维度)
      */
-    public List<Map<String, Object>> getRevenueReport(Integer hotelId, String month, String groupBy) {
-        // TODO: 实现真实的收入报表查询逻辑
-        // 当前返回空列表，前端在DEMO_MODE下使用Mock数据
-        return new ArrayList<>();
-    }
+    List<Map<String, Object>> queryOccupancyReport(
+        Integer tenantId,
+        String hotelCode,
+        LocalDate monthDate,
+        String statisticMethod
+    );
+
+    /**
+     * 查询营收分析报表 (按天呈现, 支持按酒店/按房型维度)
+     */
+    List<Map<String, Object>> queryRevenueReport(
+        Integer tenantId,
+        String hotelCode,
+        LocalDate monthDate,
+        String statisticMethod
+    );
 }

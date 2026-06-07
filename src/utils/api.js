@@ -19,6 +19,14 @@ const api = axios.create({
   }
 })
 
+const generateUuid = () => {
+  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0,
+      v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('crs_token')
@@ -31,6 +39,11 @@ api.interceptors.request.use(
     if (tenantId) {
       config.headers['X-Tenant-Id'] = tenantId
     }
+
+    // 生成唯一 Trace ID 并存入请求头及 SessionStorage，以便错误日志关联
+    const traceId = generateUuid()
+    config.headers['X-Trace-Id'] = traceId
+    sessionStorage.setItem('crs_last_trace_id', traceId)
     
     // 添加初始化状态到请求配置中
     config.metadata = {
@@ -493,6 +506,21 @@ export const dashboardApi = {
   /** 获取门店首页数据 */
   getHotelDashboard: (hotelCode, options = {}) =>
     api.get('/dashboard/hotel', { params: { hotelCode }, ...options })
+}
+
+export const reportApi = {
+  getReservationReport: (params = {}, options = {}) =>
+    api.get('/reports/reservation', { params, ...options }),
+  initialize: (params = {}, options = {}) =>
+    api.post('/reports/reservation/initialize', null, { params, ...options }),
+  getOccupancyReport: (params) => api.get('/reports/occupancy', { params }),
+  getRevenueReport: (params) => api.get('/reports/revenue', { params })
+}
+
+export const traceApi = {
+  reportError: (data) => api.post('/trace/report', data),
+  getTraceLogs: (params) => api.get('/trace/logs', { params }),
+  getTraceDetail: (traceId) => api.get(`/trace/logs/${traceId}`)
 }
 
 export default api

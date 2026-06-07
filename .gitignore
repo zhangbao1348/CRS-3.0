@@ -160,3 +160,6 @@ nginx.conf
 # "CRS项目SOW.xlsx"
 # "需求分析/"
 # "项目内部规范.md"
+
+# Local SQLite database
+backend/crs.db

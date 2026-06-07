@@ -465,4 +465,6 @@ public class Reservation {
     public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
     public Date getPaymentDeadline() { return paymentDeadline; }
     public void setPaymentDeadline(Date paymentDeadline) { this.paymentDeadline = paymentDeadline; }
+    public String getMarketCode() { return marketCode; }
+    public void setMarketCode(String marketCode) { this.marketCode = marketCode; }
 }

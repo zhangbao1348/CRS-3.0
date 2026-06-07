@@ -3,6 +3,8 @@ package com.crs.filter;
 import com.crs.util.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -11,33 +13,25 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * 
  * <p>本类负责在请求到达 Controller 之前，识别并提取当前请求所属的租户 ID。
  * 它是实现 SAAS 多租户数据隔离的第一道防线。</p>
- * 
- * <p>识别优先级：</p>
- * <ol>
- *     <li>HTTP 请求头 `X-Tenant-Id`：通常由前端租户切换控件主动传递。</li>
- *     <li>JwtFilter 提取值：若请求头不存在，则尝试使用从 JWT Token 中解析出的租户 ID（由安全层设置）。</li>
- *     <li>默认租户 (ID=1)：若以上均不存在，则降级为系统默认租户。</li>
- * </ol>
  */
 @Component
 public class TenantInterceptor implements HandlerInterceptor {
     
-    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TenantInterceptor.class);
-    
-    /**
-     * 在请求处理之前执行。
-     * 负责将租户 ID 注入到 {@link TenantContext} 线程上下文中。
-     * 
-     * @return 返回 true 继续处理请求，返回 false 则中断请求并向客户端报错。
-     */
+    private static final Logger logger = LoggerFactory.getLogger(TenantInterceptor.class);
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 从请求头获取 traceId
+        String traceId = request.getHeader("X-Trace-Id");
+        com.crs.util.TraceContext.setTraceId(traceId);
+
         // 尝试从 HTTP Header 获取租户 ID
         String tenantIdStr = request.getHeader("X-Tenant-Id");
         
         logger.info("=== TenantInterceptor preHandle 开始 ===");
         logger.info("请求路径: {}", request.getRequestURI());
         logger.info("X-Tenant-Id 请求头: {}", tenantIdStr);
+        logger.info("X-Trace-Id 追踪ID: {}", com.crs.util.TraceContext.getTraceId());
         
         if (tenantIdStr != null && !tenantIdStr.isEmpty()) {
             try {
@@ -52,7 +46,7 @@ public class TenantInterceptor implements HandlerInterceptor {
                     return false;
                 }
                 
-                // 将租户 ID 绑定到当前线程
+                // 将租户 ID 绑定 to 当前线程
                 TenantContext.setTenantId(tenantId);
                 // 同时存入 Request Attribute 方便后续在视图层或其它拦截器中使用
                 request.setAttribute("tenantId", tenantId);
@@ -112,9 +106,9 @@ public class TenantInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         // 必须清理 TenantContext，防止在 Tomcat 等使用了线程池的容器中出现数据污染或内存泄漏
         logger.info("=== TenantInterceptor afterCompletion 开始 ===");
-        logger.info("清理 TenantContext 线程变量");
+        logger.info("清理 TenantContext 与 TraceContext 线程变量");
         TenantContext.clear();
+        com.crs.util.TraceContext.clear();
         logger.info("=== TenantInterceptor afterCompletion 结束 ===");
     }
 }
-

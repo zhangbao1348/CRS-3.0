@@ -276,6 +276,18 @@ public class OpenReservationController {
 
             List<HotelPrice> prices = priceRepo.findByTenantIdAndHotelCodeAndRateCodeAndRoomTypeCodeAndPriceDateBetween(
                     hotel.getTenantId(), hotelCode, ratePlanCode, roomTypeCode, checkIn, lastNight);
+            
+            // [TRACE] 记录原始价格查询决策快照
+            com.crs.util.TraceContext.recordDecision("dbOriginalPrices", prices.stream().map(p -> {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("priceDate", formatDate(p.getPriceDate()));
+                m.put("priceWithTax", p.getPriceWithTax());
+                m.put("priceWithoutTax", p.getPriceWithoutTax());
+                m.put("isEffective", isEffectiveHotelPrice(p));
+                return m;
+            }).collect(Collectors.toList()));
+            com.crs.util.TraceContext.recordDecision("hotelMinimumPrice", minimumPrice);
+
             Map<String, HotelPrice> validPriceMap = prices.stream()
                     .filter(this::isEffectiveHotelPrice)
                     .collect(Collectors.toMap(
@@ -301,6 +313,9 @@ public class OpenReservationController {
                     p -> formatDate(p.getPriceDate()),
                     p -> applyHotelMinimumPrice(p.getPriceWithTax(), minimumPrice)));
 
+            // [TRACE] 记录保底价覆盖后的价格 Map
+            com.crs.util.TraceContext.recordDecision("dbPriceMapAfterMinPrice", dbPriceMap);
+
             BigDecimal totalPriceFromDb = effectivePrices.stream()
                     .map(HotelPrice::getPriceWithTax)
                     .map(price -> applyHotelMinimumPrice(price, minimumPrice))
@@ -311,6 +326,14 @@ public class OpenReservationController {
             BigDecimal inputTotal = getBigDecimal(body, "totalPrice");
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> inputDailyPrices = (List<Map<String, Object>>) body.get("dailyPrices");
+
+            // [TRACE] 记录对账前价格比对快照
+            Map<String, Object> reconLog = new java.util.LinkedHashMap<>();
+            reconLog.put("inputTotalPrice", inputTotal);
+            reconLog.put("inputDailyPrices", inputDailyPrices);
+            reconLog.put("calculatedTotalPriceFromDb", totalPriceFromDb);
+            reconLog.put("calculatedDailyPricesFromDb", dbPriceMap);
+            com.crs.util.TraceContext.recordDecision("priceReconciliation", reconLog);
 
             if (inputDailyPrices != null && !inputDailyPrices.isEmpty()) {
                 BigDecimal sumInputDaily = BigDecimal.ZERO;
@@ -352,6 +375,11 @@ public class OpenReservationController {
 
             // 构建每日价格（自动解析包价详情快照与早餐翻译）
             List<ReservationDailyPrice> dailyPrices = new ArrayList<>();
+            List<Map<String, Object>> dailyTaxBreakdown = new ArrayList<>();
+            
+            // [TRACE] 记录税率配置
+            com.crs.util.TraceContext.recordDecision("hotelTaxRateCodes", hotel.getTaxRateCodes());
+
             for (HotelPrice hp : effectivePrices) {
                 BigDecimal actualPrice = applyHotelMinimumPrice(hp.getPriceWithTax(), minimumPrice);
                 
@@ -393,6 +421,17 @@ public class OpenReservationController {
                         ? basePrice.multiply(svcRateVal.divide(BigDecimal.valueOf(100))).setScale(2, java.math.RoundingMode.HALF_UP)
                         : BigDecimal.ZERO;
 
+                // [TRACE] 收集每日价格与税金快照
+                Map<String, Object> dailyTaxLog = new java.util.LinkedHashMap<>();
+                dailyTaxLog.put("date", formatDate(hp.getPriceDate()));
+                dailyTaxLog.put("originalPrice", basePrice);
+                dailyTaxLog.put("actualPriceWithTax", actualPrice);
+                dailyTaxLog.put("calculatedVat", calculatedVat);
+                dailyTaxLog.put("calculatedSvc", calculatedSvc);
+                dailyTaxLog.put("vatRate", vatRateVal);
+                dailyTaxLog.put("svcRate", svcRateVal);
+                dailyTaxBreakdown.add(dailyTaxLog);
+
                 ReservationDailyPrice rdp = new ReservationDailyPrice();
                 rdp.setPriceDate(hp.getPriceDate());
                 rdp.setOriginalPrice(hp.getPriceWithoutTax());
@@ -404,6 +443,9 @@ public class OpenReservationController {
                 rdp.setPackagesJson(snapshotJson);
                 dailyPrices.add(rdp);
             }
+            
+            // [TRACE] 保存每日计算快照
+            com.crs.util.TraceContext.recordDecision("dailyTaxBreakdown", dailyTaxBreakdown);
 
             // ========== 构建订单 ==========
 
@@ -580,6 +622,9 @@ public class OpenReservationController {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("reservationId", created.getId());
             data.put("reservationCode", created.getReservationCode());
+            
+            // [TRACE] 记录最终生成的 reservationCode
+            com.crs.util.TraceContext.recordDecision("reservationCode", created.getReservationCode());
             data.put("reservationStatus", created.getReservationStatus());
             data.put("paymentType", paymentType);
             data.put("paymentDeadline", created.getPaymentDeadline() != null ? formatDateTime(created.getPaymentDeadline()) : null);
