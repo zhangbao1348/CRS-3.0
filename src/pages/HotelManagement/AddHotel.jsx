@@ -11,7 +11,6 @@ const { Option } = Select
 const AddHotel = () => {
   const [form] = Form.useForm()
   const [htmlContent, setHtmlContent] = useState('')
-  const [supportMultiPrice, setSupportMultiPrice] = useState('no')
   const [tenants, setTenants] = useState([])
   const { selectedTenant } = useTenantContext()
   const [currentTenantName, setCurrentTenantName] = useState('')
@@ -1250,71 +1249,6 @@ const AddHotel = () => {
               </Col>
             </Row>
             
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={12}>
-                <Form.Item
-                  name="supportMultiPrice"
-                  label="酒店支持多人价"
-                  initialValue="no"
-                >
-                  <Radio.Group 
-                    onChange={(e) => setSupportMultiPrice(e.target.value)}
-                  >
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-            </Row>
-            {supportMultiPrice === 'yes' && (
-              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={24}>
-                  <Form.Item
-                    name="multiPriceOptions"
-                    label="支持的多人价格"
-                  >
-                    <Checkbox.Group>
-                      <Space wrap>
-                        <Checkbox value="1P">1人价</Checkbox>
-                        <Checkbox value="2P">2人价</Checkbox>
-                        <Checkbox value="3P">3人价</Checkbox>
-                        <Checkbox value="4P">4人价</Checkbox>
-                        <Checkbox value="5P">5人价</Checkbox>
-                        <Checkbox value="1C">1儿童价</Checkbox>
-                        <Checkbox value="2C">2儿童价</Checkbox>
-                      </Space>
-                    </Checkbox.Group>
-                  </Form.Item>
-                </Col>
-              </Row>
-            )}
-            
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={12}>
-                <Form.Item
-                  name="supportRoomTypePriceDiff"
-                  label="支持房型价差"
-                  initialValue="no"
-                >
-                  <Radio.Group>
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="supportPersonPriceDiff"
-                  label="支持人数价差"
-                  initialValue="no"
-                >
-                  <Radio.Group>
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-            </Row>
             
             <Form.Item style={{ marginTop: 32, textAlign: 'center' }}>
               <Space>

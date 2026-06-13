@@ -12,7 +12,6 @@ const EditHotel = () => {
   const [htmlContent, setHtmlContent] = useState('')
   const [hotelId, setHotelId] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [supportMultiPrice, setSupportMultiPrice] = useState('no')
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
   const [hotel, setHotel] = useState(null)
@@ -224,9 +223,6 @@ const EditHotel = () => {
           allowCreateRoomType: hotel.allowCreateRoomType || 'allow',
           taxRateCodes: hotel.taxRateCodes ? hotel.taxRateCodes.split(',') : []
         })
-        
-        // 设置支持多人价状态
-        setSupportMultiPrice(hotel.supportMultiPrice || 'no')
       
       setLoading(false)
     } catch (error) {
@@ -1675,71 +1671,6 @@ const EditHotel = () => {
               </Col>
             </Row>
             
-            {/* 多人价配置 */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={12}>
-                <Form.Item
-                  name="supportMultiPrice"
-                  label="酒店支持多人价"
-                >
-                  <Radio.Group 
-                    defaultValue="no" 
-                    onChange={(e) => setSupportMultiPrice(e.target.value)}
-                  >
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-            </Row>
-            {supportMultiPrice === 'yes' && (
-              <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={24}>
-                  <Form.Item
-                    name="multiPriceOptions"
-                    label="支持的多人价格"
-                  >
-                    <Checkbox.Group>
-                      <Space wrap>
-                        <Checkbox value="1P">1人价</Checkbox>
-                        <Checkbox value="2P">2人价</Checkbox>
-                        <Checkbox value="3P">3人价</Checkbox>
-                        <Checkbox value="4P">4人价</Checkbox>
-                        <Checkbox value="5P">5人价</Checkbox>
-                        <Checkbox value="1C">1儿童价</Checkbox>
-                        <Checkbox value="2C">2儿童价</Checkbox>
-                      </Space>
-                    </Checkbox.Group>
-                  </Form.Item>
-                </Col>
-              </Row>
-            )}
-            
-            {/* 价差配置 */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-              <Col span={12}>
-                <Form.Item
-                  name="supportRoomTypePriceDiff"
-                  label="支持房型价差"
-                >
-                  <Radio.Group defaultValue="no">
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="supportPersonPriceDiff"
-                  label="支持人数价差"
-                >
-                  <Radio.Group defaultValue="no">
-                    <Radio value="yes">是</Radio>
-                    <Radio value="no">否</Radio>
-                  </Radio.Group>
-                </Form.Item>
-              </Col>
-            </Row>
             
             {/* 保存按钮 */}
             <Form.Item style={{ marginTop: 32 }}>

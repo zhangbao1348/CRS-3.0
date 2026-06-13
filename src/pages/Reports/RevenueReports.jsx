@@ -65,7 +65,75 @@ const RevenueReports = () => {
   }, [selectedHotel, selectedStatisticMethod, selectedMonth])
 
   const handleExport = () => {
-    message.success('已触发导出营收报表')
+    if (!reportData || reportData.length === 0) {
+      message.warning('当前暂无数据可供导出，请先执行查询')
+      return
+    }
+
+    const daysInMonth = selectedMonth.daysInMonth()
+    const headers = ['酒店']
+    if (selectedStatisticMethod === '按房型纬度') {
+      headers.push('房型')
+    }
+    headers.push('指标类型')
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = selectedMonth.date(i)
+      const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.day()]
+      headers.push(`${date.format('MM-DD')}(${weekDay})`)
+    }
+
+    const csvRows = []
+    
+    // 转义单元格内容
+    const escapeCsvCell = (val) => {
+      if (val === undefined || val === null) return ''
+      let str = String(val)
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        str = '"' + str.replace(/"/g, '""') + '"'
+      }
+      return str
+    }
+
+    // 表头行
+    csvRows.push(headers.map(escapeCsvCell).join(','))
+
+    // 数据行
+    reportData.forEach(row => {
+      const csvRow = [row.hotel]
+      if (selectedStatisticMethod === '按房型纬度') {
+        csvRow.push(row.roomType || '-')
+      }
+      csvRow.push(row.inventoryType)
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        const val = row[`day${i}`]
+        if (val !== undefined && val !== null) {
+          if (row.inventoryType === '平均房价') {
+            csvRow.push(`¥${val}`)
+          } else {
+            csvRow.push(val)
+          }
+        } else {
+          csvRow.push('-')
+        }
+      }
+      csvRows.push(csvRow.map(escapeCsvCell).join(','))
+    })
+
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    
+    const fileName = `营收分析报表_${selectedHotel}_${selectedStatisticMethod}_${selectedMonth.format('YYYYMM')}.csv`
+    link.setAttribute('download', fileName)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    message.success('营收报表导出成功！')
   }
 
   const generateDateTitle = (day) => {

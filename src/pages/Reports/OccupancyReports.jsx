@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Select, Button, DatePicker, Table, Card, message, Alert } from 'antd'
+import { Select, Button, DatePicker, Table, Card, message, Alert, Radio, Row, Col } from 'antd'
 import { SearchOutlined, ExportOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { Line } from '@ant-design/plots'
 import { hotelApi, reportApi } from '../../utils/api'
 
 const { Option } = Select
@@ -13,6 +14,7 @@ const OccupancyReports = () => {
   const [hotels, setHotels] = useState([])
   const [loading, setLoading] = useState(false)
   const [reportData, setReportData] = useState([])
+  const [viewMode, setViewMode] = useState('table') // 'table' | 'chart'
 
   // 1. 初始化动态加载酒店数据源
   useEffect(() => {
@@ -62,8 +64,131 @@ const OccupancyReports = () => {
     return () => clearTimeout(timer)
   }, [selectedHotel, selectedStatisticMethod, selectedMonth])
 
+  // 3. 桥接图表数据
+  const prepareChartData = () => {
+    const occData = []
+    const soldData = []
+    const daysInMonth = selectedMonth.daysInMonth()
+
+    reportData.forEach(row => {
+      let seriesName = row.hotel
+      if (selectedStatisticMethod === '按房型纬度') {
+        seriesName = `${row.hotel} - ${row.roomType || '全房型'}`
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayVal = row[`day${d}`]
+        const val = dayVal !== undefined && dayVal !== null ? Number(dayVal) : 0
+        const dateStr = selectedMonth.date(d).format('MM-DD')
+
+        const dataPoint = {
+          date: dateStr,
+          value: val,
+          series: seriesName
+        }
+
+        if (row.inventoryType === '出租率') {
+          occData.push(dataPoint)
+        } else if (row.inventoryType === '已卖房') {
+          soldData.push(dataPoint)
+        }
+      }
+    })
+
+    return { occData, soldData }
+  }
+
+  const getChartConfig = (data, title, yUnit) => ({
+    data,
+    xField: 'date',
+    yField: 'value',
+    colorField: 'series',
+    interaction: {
+      tooltip: {
+        shared: true,
+        showMarkers: true,
+      },
+    },
+    style: {
+      lineWidth: 2,
+    },
+    axis: {
+      y: {
+        title: `${title} (${yUnit})`,
+      }
+    }
+  })
+
   const handleExport = () => {
-    message.success('已触发导出出租率报表，数据处理中...')
+    if (!reportData || reportData.length === 0) {
+      message.warning('当前暂无数据可供导出，请先执行查询')
+      return
+    }
+
+    const daysInMonth = selectedMonth.daysInMonth()
+    const headers = ['酒店']
+    if (selectedStatisticMethod === '按房型纬度') {
+      headers.push('房型')
+    }
+    headers.push('指标类型')
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = selectedMonth.date(i)
+      const weekDay = ['日', '一', '二', '三', '四', '五', '六'][date.day()]
+      headers.push(`${date.format('MM-DD')}(${weekDay})`)
+    }
+
+    const csvRows = []
+    
+    // 转义单元格内容
+    const escapeCsvCell = (val) => {
+      if (val === undefined || val === null) return ''
+      let str = String(val)
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        str = '"' + str.replace(/"/g, '""') + '"'
+      }
+      return str
+    }
+
+    // 表头行
+    csvRows.push(headers.map(escapeCsvCell).join(','))
+
+    // 数据行
+    reportData.forEach(row => {
+      const csvRow = [row.hotel]
+      if (selectedStatisticMethod === '按房型纬度') {
+        csvRow.push(row.roomType || '-')
+      }
+      csvRow.push(row.inventoryType)
+
+      for (let i = 1; i <= daysInMonth; i++) {
+        const val = row[`day${i}`]
+        if (val !== undefined && val !== null) {
+          if (row.inventoryType === '出租率') {
+            csvRow.push(`${val}%`)
+          } else {
+            csvRow.push(val)
+          }
+        } else {
+          csvRow.push('-')
+        }
+      }
+      csvRows.push(csvRow.map(escapeCsvCell).join(','))
+    })
+
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    
+    const fileName = `出租率分析报表_${selectedHotel}_${selectedStatisticMethod}_${selectedMonth.format('YYYYMM')}.csv`
+    link.setAttribute('download', fileName)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    message.success('出租率报表导出成功！')
   }
 
   const generateDateTitle = (day) => {
@@ -201,7 +326,11 @@ const OccupancyReports = () => {
               allowClear={false}
             />
           </div>
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)} buttonStyle="solid" style={{ marginRight: 12 }}>
+              <Radio.Button value="table">表格模式</Radio.Button>
+              <Radio.Button value="chart">图形模式</Radio.Button>
+            </Radio.Group>
             <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
               执行查询
             </Button>
@@ -212,19 +341,54 @@ const OccupancyReports = () => {
         </div>
       </div>
 
-      <Card bordered={false} bodyStyle={{ padding: 0 }} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8, overflow: 'hidden' }}>
-        <Table
-          columns={getColumns()}
-          dataSource={reportData}
-          pagination={false}
-          loading={loading}
-          scroll={{ x: 3200, y: 600 }}
-          bordered
-          size="small"
-          className="business-table"
-          rowKey="key"
-        />
-      </Card>
+      {viewMode === 'table' ? (
+        <Card bordered={false} bodyStyle={{ padding: 0 }} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8, overflow: 'hidden' }}>
+          <Table
+            columns={getColumns()}
+            dataSource={reportData}
+            pagination={false}
+            loading={loading}
+            scroll={{ x: 3200, y: 600 }}
+            bordered
+            size="small"
+            className="business-table"
+            rowKey="key"
+          />
+        </Card>
+      ) : (
+        <Row gutter={[16, 16]}>
+          <Col span={24}>
+            <Card 
+              title={<span style={{ fontWeight: 600 }}>每日出租率趋势</span>} 
+              bordered={false} 
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
+            >
+              <div style={{ height: 350 }}>
+                {prepareChartData().occData.length > 0 ? (
+                  <Line {...getChartConfig(prepareChartData().occData, '出租率', '%')} />
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>暂无出租率趋势数据</div>
+                )}
+              </div>
+            </Card>
+          </Col>
+          <Col span={24}>
+            <Card 
+              title={<span style={{ fontWeight: 600 }}>每日已卖房间数走势</span>} 
+              bordered={false} 
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
+            >
+              <div style={{ height: 350 }}>
+                {prepareChartData().soldData.length > 0 ? (
+                  <Line {...getChartConfig(prepareChartData().soldData, '已卖房数', '间')} />
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#999' }}>暂无已卖房数走势数据</div>
+                )}
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
     </div>
   )
 }

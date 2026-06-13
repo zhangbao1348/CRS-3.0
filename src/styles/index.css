@@ -155,7 +155,10 @@ body {
 }
 
 /* 响应式调整 */
-.ant-layout-sider-collapsed + .ant-layout-header,
+.ant-layout-sider-collapsed + .ant-layout .ant-layout-header {
+  left: 80px;
+}
+
 .ant-layout-sider-collapsed + .ant-layout .ant-layout-content {
   margin-left: 80px;
 }

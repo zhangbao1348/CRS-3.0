@@ -194,6 +194,7 @@ const ReservationReports = () => {
             groupBy1: params.groupBy1,
             groupBy2: params.groupBy2
           })
+          setFormValues({ ...values })
           message.success('查询成功')
 
           // 检测对比期是否全为0（汇总表缺历史数据场景）
@@ -214,6 +215,7 @@ const ReservationReports = () => {
             groupBy1: params.groupBy1,
             groupBy2: params.groupBy2
           })
+          setFormValues({ ...values })
           setShowInitHint(false)
           message.info('未查询到相关订单统计记录')
         }
@@ -231,7 +233,176 @@ const ReservationReports = () => {
 
   // 处理导出
   const handleExport = () => {
-    message.info('导出报表功能开发中')
+    if (!reportData || reportData.length === 0) {
+      message.warning('当前暂无数据可供导出，请先执行查询')
+      return
+    }
+
+    const getDimensionLabel = (val, defaultLabel) => {
+      if (!val) return defaultLabel;
+      switch (val) {
+        case 'channel': return '渠道';
+        case 'hotel': return '酒店';
+        case 'market': return '市场';
+        case 'roomType': return '房型';
+        case 'ratePlan': return '价格计划';
+        case 'rateCategory': return '价格大类';
+        default: return val;
+      }
+    };
+
+    const hasCompare = formValues.dataComparison;
+    const headers = []
+    
+    // 维度表头
+    if (activeGroupBys.groupBy1) {
+      headers.push(getDimensionLabel(activeGroupBys.groupBy1, '维度一'))
+    }
+    if (activeGroupBys.groupBy2) {
+      headers.push(getDimensionLabel(activeGroupBys.groupBy2, '维度二'))
+    }
+
+    // 本期数据表头
+    const curLabel = getPeriodLabel(formValues.bookingDate)
+    headers.push(
+      `本期-订单数(${curLabel})`,
+      `本期-总金额(${curLabel})`,
+      `本期-支付积分(${curLabel})`,
+      `本期-间夜数(${curLabel})`,
+      `本期-平均房价(${curLabel})`
+    )
+
+    // 对比期和增减率表头
+    if (hasCompare) {
+      const prevLabel = getPeriodLabel(formValues.orderDate)
+      headers.push(
+        `对比期-订单数(${prevLabel})`,
+        `对比期-总金额(${prevLabel})`,
+        `对比期-支付积分(${prevLabel})`,
+        `对比期-间夜数(${prevLabel})`,
+        `对比期-平均房价(${prevLabel})`,
+        '增长率-订单数',
+        '增长率-总金额',
+        '增长率-支付积分',
+        '增长率-间夜数',
+        '增长率-平均房价'
+      )
+    }
+
+    const csvRows = []
+    
+    // 转义单元格
+    const escapeCsvCell = (val) => {
+      if (val === undefined || val === null) return ''
+      let str = String(val)
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+        str = '"' + str.replace(/"/g, '""') + '"'
+      }
+      return str
+    }
+
+    csvRows.push(headers.map(escapeCsvCell).join(','))
+
+    // 采用与 Table 组件完全一致的 flatMap 扁平化数据源进行迭代，确保数据行对齐
+    const flattenedData = reportData.flatMap(channel => 
+      channel.hotels.map((hotel, index) => ({
+        ...hotel,
+        channel: channel.channel,
+        isFirst: index === 0,
+        channelKey: channel.key,
+        hotelCount: channel.hotels.length
+      }))
+    )
+
+    // 填充数据行
+    flattenedData.forEach(row => {
+      const csvRow = []
+      if (activeGroupBys.groupBy1) {
+        csvRow.push(row.channel || '-')
+      }
+      if (activeGroupBys.groupBy2) {
+        csvRow.push(row.hotel || '-')
+      }
+
+      // 本期指标
+      csvRow.push(
+        row.currentPeriod.orderCount || 0,
+        row.currentPeriod.orderAmount || 0,
+        row.currentPeriod.orderPoints || 0,
+        row.currentPeriod.roomNights || 0,
+        row.currentPeriod.avgRate || 0
+      )
+
+      // 对比与增长率指标
+      if (hasCompare) {
+        csvRow.push(
+          row.previousPeriod.orderCount || 0,
+          row.previousPeriod.orderAmount || 0,
+          row.previousPeriod.orderPoints || 0,
+          row.previousPeriod.roomNights || 0,
+          row.previousPeriod.avgRate || 0,
+          row.currentPeriod.orderCountChange || '—',
+          row.currentPeriod.orderAmountChange || '—',
+          row.currentPeriod.orderPointsChange || '—',
+          row.currentPeriod.roomNightsChange || '—',
+          row.currentPeriod.avgRateChange || '—'
+        )
+      }
+
+      csvRows.push(csvRow.map(escapeCsvCell).join(','))
+    })
+
+    // 填充总计行
+    if (totalData) {
+      const totalRow = ['总计']
+      if (activeGroupBys.groupBy1 && activeGroupBys.groupBy2) {
+        totalRow.push('') // 第二维度占位
+      }
+      
+      const curTotal = totalData.currentPeriod
+      totalRow.push(
+        curTotal.orderCount || 0,
+        curTotal.orderAmount || 0,
+        curTotal.orderPoints || 0,
+        curTotal.roomNights || 0,
+        curTotal.avgRate || 0
+      )
+
+      if (hasCompare) {
+        const prevTotal = totalData.previousPeriod
+        totalRow.push(
+          prevTotal.orderCount || 0,
+          prevTotal.orderAmount || 0,
+          prevTotal.orderPoints || 0,
+          prevTotal.roomNights || 0,
+          prevTotal.avgRate || 0,
+          curTotal.orderCountChange || '—',
+          curTotal.orderAmountChange || '—',
+          curTotal.orderPointsChange || '—',
+          curTotal.roomNightsChange || '—',
+          curTotal.avgRateChange || '—'
+        )
+      }
+      csvRows.push(totalRow.map(escapeCsvCell).join(','))
+    }
+
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    
+    // 生成精美文件名
+    const hotelSuffix = formValues.hotel ? `_${formValues.hotel}` : '_全酒店'
+    const fileName = `订单分析报表${hotelSuffix}_${getPeriodLabel(formValues.bookingDate).replace(/\s/g, '')}.csv`
+    
+    link.setAttribute('download', fileName)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    message.success('订单分析报表导出成功！')
   }
 
   /**
