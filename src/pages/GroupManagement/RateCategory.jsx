@@ -1,52 +1,18 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-import axios from 'axios'
+import api from '../../utils/api'
 
 const RateCategory = () => {
-  // 模拟房价大类数据（只有一级）
-  const mockRateCategories = [
-    {
-      key: '1',
-      title: '最佳可用房价',
-      code: 'BAR'
-    },
-    {
-      key: '2',
-      title: '企业协议价',
-      code: 'CORP'
-    },
-    {
-      key: '3',
-      title: '促销价',
-      code: 'PROMO'
-    },
-    {
-      key: '4',
-      title: '团队价',
-      code: 'GROUP'
-    },
-    {
-      key: '5',
-      title: '包价',
-      code: 'PACKAGE'
-    },
-    {
-      key: '6',
-      title: '长住价',
-      code: 'LONGSTAY'
-    }
-  ]
-
-  const [initialData, setInitialData] = useState(mockRateCategories)
+  const [initialData, setInitialData] = useState([])
   const [loading, setLoading] = useState(true)
 
   // 从API获取房价大类数据
   useEffect(() => {
     const fetchRateTypes = async () => {
       try {
-        const response = await axios.get('/api/rate-types')
-        if (response.data.success && response.data.data) {
-          const data = response.data.data.map(item => ({
+        const response = await api.get('/rate-types')
+        if (response.success && response.data) {
+          const data = response.data.map(item => ({
             key: item.id.toString(),
             title: item.name,
             code: item.code,
@@ -58,8 +24,8 @@ const RateCategory = () => {
           setInitialData(data)
         }
       } catch (error) {
-        console.error('加载房价大类数据失败，使用模拟数据:', error)
-        setInitialData(mockRateCategories)
+        console.error('加载房价大类数据失败:', error)
+        setInitialData([])
       } finally {
         setLoading(false)
       }
@@ -80,15 +46,14 @@ const RateCategory = () => {
           sortOrder: nodeData.sortOrder || 0,
           status: 'active'
         }
-        const response = await axios.post('/api/rate-types', rateTypeData)
+        const response = await api.post('/rate-types', rateTypeData)
         return {
-          key: response.data.id.toString(),
-          title: response.data.name,
-          code: response.data.code,
-          id: response.data.id
+          key: response.id.toString(),
+          title: response.name,
+          code: response.code,
+          id: response.id
         }
       } catch (error) {
-        console.error('新增房价大类失败:', error)
         throw new Error(error.response?.data?.error || '新增房价大类失败，请稍后重试')
       }
     },
@@ -102,10 +67,9 @@ const RateCategory = () => {
           description: nodeData.description || '',
           sortOrder: nodeData.sortOrder || 0
         }
-        const response = await axios.put(`/api/rate-types/${nodeKey}`, rateTypeData)
+        await api.put(`/rate-types/${nodeKey}`, rateTypeData)
         return true
       } catch (error) {
-        console.error('更新房价大类失败:', error)
         throw new Error(error.response?.data?.error || '更新房价大类失败，请稍后重试')
       }
     },
@@ -113,11 +77,10 @@ const RateCategory = () => {
     // 删除房价大类
     deleteNode: async (nodeKey) => {
       try {
-        await axios.delete(`/api/rate-types/${nodeKey}`)
+        await api.delete(`/rate-types/${nodeKey}`)
         return true
       } catch (error) {
-        console.error('删除房价大类失败:', error)
-        return true
+        throw new Error(error.response?.data?.error || error.response?.data?.message || '删除房价大类失败')
       }
     },
 
@@ -125,17 +88,16 @@ const RateCategory = () => {
     checkCodeUnique: async (code, excludeKey) => {
       try {
         const excludeId = excludeKey ? parseInt(excludeKey) : null
-        const response = await axios.get('/api/rate-types')
-        if (response.data.success && response.data.data) {
-          const existing = response.data.data.find(item => 
+        const response = await api.get('/rate-types')
+        if (response.success && response.data) {
+          const existing = response.data.find(item =>
             item.code === code && (excludeId === null || item.id !== excludeId)
           )
           return !existing
         }
         return true
       } catch (error) {
-        console.error('检查房价大类CODE失败:', error)
-        return true
+        throw new Error(error.response?.data?.error || error.response?.data?.message || '无法校验房价大类唯一性')
       }
     }
   }

@@ -1,235 +1,21 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message, Spin, Popconfirm, Tag } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Spin, Tag } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined,
   HomeOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-
-// 演示模式标志
-const DEMO_MODE = false
-
-// 模拟房型大类数据
-const mockCategories = [
-  { id: 1, categoryName: '标准间' },
-  { id: 2, categoryName: '大床房' },
-  { id: 3, categoryName: '套房' },
-  { id: 4, categoryName: '总统套房' }
-]
-
-// 模拟集团房型数据
-const mockRoomTypes = [
-  {
-    id: 1,
-    name: '标准单人间',
-    code: 'STD_SINGLE',
-    categoryId: 1,
-    maxOccupancy: 1,
-    sortOrder: 1,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 2,
-    name: '标准双人间',
-    code: 'STD_DOUBLE',
-    categoryId: 1,
-    maxOccupancy: 2,
-    sortOrder: 2,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 3,
-    name: '豪华单人间',
-    code: 'DLX_SINGLE',
-    categoryId: 2,
-    maxOccupancy: 1,
-    sortOrder: 3,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 4,
-    name: '豪华双人间',
-    code: 'DLX_DOUBLE',
-    categoryId: 2,
-    maxOccupancy: 2,
-    sortOrder: 4,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 5,
-    name: '商务套房',
-    code: 'BUSINESS_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 5,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 6,
-    name: '行政套房',
-    code: 'EXECUTIVE_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 6,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 7,
-    name: '总统套房',
-    code: 'PRESIDENTIAL_SUITE',
-    categoryId: 4,
-    maxOccupancy: 4,
-    sortOrder: 7,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 8,
-    name: '家庭套房',
-    code: 'FAMILY_SUITE',
-    categoryId: 3,
-    maxOccupancy: 4,
-    sortOrder: 8,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 9,
-    name: '无障碍房间',
-    code: 'ACCESSIBLE',
-    categoryId: 1,
-    maxOccupancy: 2,
-    sortOrder: 9,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 10,
-    name: '连通房',
-    code: 'CONNECTING',
-    categoryId: 2,
-    maxOccupancy: 4,
-    sortOrder: 10,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 11,
-    name: '蜜月套房',
-    code: 'HONEYMOON_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 11,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 12,
-    name: '海景套房',
-    code: 'OCEAN_VIEW_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 12,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 13,
-    name: '山景套房',
-    code: 'MOUNTAIN_VIEW_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 13,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 14,
-    name: '花园套房',
-    code: 'GARDEN_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 14,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 15,
-    name: '阁楼套房',
-    code: 'PENTHOUSE_SUITE',
-    categoryId: 4,
-    maxOccupancy: 4,
-    sortOrder: 15,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 16,
-    name: '豪华大床房',
-    code: 'DLX_KING',
-    categoryId: 2,
-    maxOccupancy: 2,
-    sortOrder: 16,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 17,
-    name: '豪华双床房',
-    code: 'DLX_TWIN',
-    categoryId: 2,
-    maxOccupancy: 2,
-    sortOrder: 17,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 18,
-    name: '标准大床房',
-    code: 'STD_KING',
-    categoryId: 2,
-    maxOccupancy: 2,
-    sortOrder: 18,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 19,
-    name: '标准双床房',
-    code: 'STD_TWIN',
-    categoryId: 2,
-    maxOccupancy: 2,
-    sortOrder: 19,
-    status: '启用',
-    statusValue: 'active'
-  },
-  {
-    id: 20,
-    name: '迷你套房',
-    code: 'MINI_SUITE',
-    categoryId: 3,
-    maxOccupancy: 2,
-    sortOrder: 20,
-    status: '启用',
-    statusValue: 'active'
-  }
-]
+import { getCurrentTenantId } from '../../utils/tenantUtils'
 
 const { Option } = Select
 
 const GroupRoomType = () => {
   const navigate = useNavigate()
+  const { message, modal } = App.useApp()
 
   const [roomTypes, setRoomTypes] = useState([])
   const [categories, setCategories] = useState([])
@@ -249,30 +35,39 @@ const GroupRoomType = () => {
     navigate('/group-management/add-group-room-type', { state: { record } })
   }
 
-  const handleDeleteRoomType = async (record) => {
+  const handleChangeStatus = async (record, status) => {
     try {
       setLoading(true)
-      await axios.delete(`/api/group-room-types/${record.id}`)
-      message.success('删除成功')
+      await axios.put(`/api/group-room-types/${record.id}/${status === 'active' ? 'enable' : 'disable'}`)
+      message.success(status === 'active' ? '启用成功' : '停用成功')
       fetchRoomTypes()
     } catch (error) {
-      console.error('删除失败:', error)
-      message.error('删除失败: ' + (error.response?.data?.error || '未知错误'))
+      console.error('状态修改失败:', error)
+      message.error('状态修改失败: ' + (error.response?.data?.error || '未知错误'))
     } finally {
       setLoading(false)
     }
   }
 
+  const confirmChangeStatus = (record, status) => {
+    const action = status === 'active' ? '启用' : '停用'
+    modal.confirm({
+      title: `确认${action}`,
+      content: status === 'active'
+        ? `确定要启用房型“${record.name}”吗？`
+        : `停用房型“${record.name}”后，已下发酒店的对应房型也将停用。确定继续吗？`,
+      okText: action,
+      cancelText: '取消',
+      onOk: () => handleChangeStatus(record, status)
+    })
+  }
+
   const fetchCategories = async () => {
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setCategories(mockCategories)
-      } else {
-        // 非演示模式下从后端获取数据
-        const response = await axios.get('/api/room-type-categories/group/1')
-        setCategories(response.data)
-      }
+      const groupId = getCurrentTenantId()
+      if (!groupId) throw new Error('缺少当前集团上下文')
+      const response = await axios.get(`/api/room-type-categories/group/${groupId}`)
+      setCategories(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('获取房型大类失败:', error)
     }
@@ -283,39 +78,23 @@ const GroupRoomType = () => {
       setLoading(true)
       setError(null)
       
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        const formattedRoomTypes = mockRoomTypes.map(item => {
-          const category = mockCategories.find(c => c.id === item.categoryId)
-          return {
-            ...item,
-            category: category?.categoryName || '未分类'
-          }
-        })
-        
-        const filteredRoomTypes = formattedRoomTypes.filter(item => {
-          if (searchParams.name && !item.name.includes(searchParams.name)) return false
-          if (searchParams.code && !item.code.includes(searchParams.code)) return false
-          if (searchParams.categoryId && item.categoryId !== searchParams.categoryId) return false
-          return true
-        })
-        
-        setRoomTypes(filteredRoomTypes)
-      } else {
-        // 非演示模式下从后端获取数据
+      {
+        const groupId = getCurrentTenantId()
+        if (!groupId) throw new Error('缺少当前集团上下文')
         const params = {}
         if (searchParams.categoryId) params.categoryId = searchParams.categoryId
         
         // 同时获取房型大类和房型数据
         const [categoriesResponse, roomTypesResponse] = await Promise.all([
-          axios.get('/api/room-type-categories/group/1'),
-          axios.get('/api/group-room-types/group/1', { params })
+          axios.get(`/api/room-type-categories/group/${groupId}`),
+          axios.get(`/api/group-room-types/group/${groupId}`, { params })
         ])
         
-        const currentCategories = categoriesResponse.data
+        const currentCategories = Array.isArray(categoriesResponse.data) ? categoriesResponse.data : []
+        const currentRoomTypes = Array.isArray(roomTypesResponse.data) ? roomTypesResponse.data : []
         setCategories(currentCategories)
         
-        const formattedRoomTypes = roomTypesResponse.data.map(item => {
+        const formattedRoomTypes = currentRoomTypes.map(item => {
           const category = currentCategories.find(c => Number(c.id) === Number(item.roomTypeCategoryId))
           return {
             id: item.id,
@@ -349,6 +128,8 @@ const GroupRoomType = () => {
   useEffect(() => {
     // 直接调用 fetchRoomTypes，它会同时获取房型大类和房型数据
     fetchRoomTypes()
+    // 页面初次进入时加载；后续查询由显式查询动作触发。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   
   const handleSearchParamChange = (key, value) => {
@@ -429,15 +210,11 @@ const GroupRoomType = () => {
       render: (_, record) => (
         <Space size="small">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditRoomType(record)}>编辑</Button>
-          <Popconfirm
-            title="确定要删除这个房型吗？"
-            description="删除后不可恢复"
-            onConfirm={() => handleDeleteRoomType(record)}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>删除</Button>
-          </Popconfirm>
+          {record.statusValue === 'active' ? (
+            <Button type="link" size="small" danger onClick={() => confirmChangeStatus(record, 'inactive')}>停用</Button>
+          ) : (
+            <Button type="link" size="small" onClick={() => confirmChangeStatus(record, 'active')}>启用</Button>
+          )}
         </Space>
       )
     }
@@ -524,7 +301,7 @@ const GroupRoomType = () => {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <Spin size="large" tip="加载中..." />
+          <Spin size="large"><span>加载中...</span></Spin>
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#ff4d4f' }}>

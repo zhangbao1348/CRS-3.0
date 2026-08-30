@@ -42,9 +42,7 @@ public class RoomTypeCategoryService {
     }
     
     public RoomTypeCategory getRoomTypeCategoryById(Integer id) {
-        Integer currentTenantId = getCurrentTenantId();
-        return roomTypeCategoryRepository.findById(id)
-                .filter(c -> c.getTenantId() != null && c.getTenantId().equals(currentTenantId))
+        return roomTypeCategoryRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElse(null);
     }
     
@@ -65,7 +63,9 @@ public class RoomTypeCategoryService {
         if (roomTypeCategoryRepository.existsByTenantIdAndCategoryCode(currentTenantId, roomTypeCategory.getCategoryCode())) {
             throw new RuntimeException("Category code already exists");
         }
+        roomTypeCategory.setId(null);
         roomTypeCategory.setTenantId(currentTenantId);
+        roomTypeCategory.setGroupId(currentTenantId);
         return roomTypeCategoryRepository.save(roomTypeCategory);
     }
     
@@ -77,8 +77,15 @@ public class RoomTypeCategoryService {
                     roomTypeCategoryRepository.existsByTenantIdAndCategoryCode(currentTenantId, roomTypeCategory.getCategoryCode())) {
                 throw new RuntimeException("Category code already exists");
             }
-            roomTypeCategory.setTenantId(currentTenantId);
-            return roomTypeCategoryRepository.save(roomTypeCategory);
+            existing.setCategoryCode(roomTypeCategory.getCategoryCode());
+            existing.setCategoryName(roomTypeCategory.getCategoryName());
+            if (roomTypeCategory.getSortOrder() != null) {
+                existing.setSortOrder(roomTypeCategory.getSortOrder());
+            }
+            if (roomTypeCategory.getStatus() != null) {
+                existing.setStatus(roomTypeCategory.getStatus());
+            }
+            return roomTypeCategoryRepository.save(existing);
         }
         return null;
     }

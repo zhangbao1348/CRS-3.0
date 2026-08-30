@@ -1,28 +1,14 @@
-import React, { createContext, useState, useEffect, useMemo } from 'react'
+import { createContext, useState, useEffect, useMemo } from 'react'
 import { authApi } from '../utils/api'
 import { crsMenuData } from '../utils/menuData'
 
 const TOKEN_KEY = 'crs_token'
 const USER_KEY = 'crs_user'
-const MENUS_KEY = 'crs_menus'
-// 演示模式标志
-const DEMO_MODE = false
-
 export const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(() => {
-    if (DEMO_MODE) return 'demo-token'
-    return localStorage.getItem(TOKEN_KEY)
-  })
+  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY))
   const [user, setUser] = useState(() => {
-    if (DEMO_MODE) return {
-      id: 1,
-      username: 'demo',
-      name: '演示用户',
-      email: 'demo@example.com',
-      roles: ['admin']
-    }
     const savedUser = localStorage.getItem(USER_KEY)
     return savedUser ? JSON.parse(savedUser) : null
   })
@@ -33,9 +19,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false)
   
   const isAuthenticated = useMemo(() => {
-    if (DEMO_MODE) {
-      return true
-    }
     return !!token && !!user
   }, [token, user])
   
@@ -103,15 +86,12 @@ export const AuthProvider = ({ children }) => {
     }
   }
   
-  const login = async (username, password, rememberMe) => {
+  const login = async (username, password) => {
     setLoading(true)
     try {
       const response = await authApi.login({ username, password })
-      console.log('Login response:', response)
       if (response.success) {
         const { token: newToken, user: newUser, menus: newMenus } = response.data
-        console.log('User data:', newUser)
-        console.log('Menus from login:', newMenus)
         setToken(newToken)
         setUser(newUser)
         // 如果登录响应中包含菜单数据，直接使用

@@ -23,6 +23,9 @@ public interface CancellationPolicyService {
      * @return 取消政策
      */
     Optional<CancellationPolicy> getById(Integer id);
+
+    /** 在当前租户内按政策代码查询。 */
+    Optional<CancellationPolicy> getByCode(String code);
     
     /**
      * 创建取消政策

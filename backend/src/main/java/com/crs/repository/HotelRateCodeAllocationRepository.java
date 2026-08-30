@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 酒店房价码分配数据访问接口 (HotelRateCodeAllocationRepository)
@@ -20,6 +21,9 @@ import java.util.List;
  * </ul>
  */
 public interface HotelRateCodeAllocationRepository extends JpaRepository<HotelRateCodeAllocation, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<HotelRateCodeAllocation> findByIdAndTenantId(Integer id, Integer tenantId);
 
     // =====================================================================
     // 合规方法：必须包含 tenantId（符合多租户隔离规范）

@@ -43,6 +43,8 @@ import com.crs.entity.ReservationDailyPriceTax;
 import com.crs.entity.ReservationGuest;
 import com.crs.entity.ReservationPromotion;
 import com.crs.entity.TenantChannel;
+import com.crs.entity.Archive;
+import com.crs.repository.ArchiveRepository;
 import com.crs.repository.BookingControlRepository;
 import com.crs.repository.PackageRepository;
 import com.crs.repository.CancellationPolicyRepository;
@@ -97,6 +99,7 @@ public class OpenReservationController {
     private final com.crs.repository.PackageDailyPriceRepository packageDailyPriceRepo;
     private final com.crs.repository.TaxSettingRepository taxSettingRepo;
     private final com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo;
+    private final ArchiveRepository archiveRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public OpenReservationController(
@@ -115,7 +118,8 @@ public class OpenReservationController {
             PackageRepository packageRepo,
             com.crs.repository.PackageDailyPriceRepository packageDailyPriceRepo,
             com.crs.repository.TaxSettingRepository taxSettingRepo,
-            com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo) {
+            com.crs.repository.ReservationDailyPriceTaxRepository reservationDailyPriceTaxRepo,
+            ArchiveRepository archiveRepo) {
         this.reservationService = reservationService;
         this.hotelRepo = hotelRepo;
         this.roomTypeRepo = roomTypeRepo;
@@ -132,6 +136,7 @@ public class OpenReservationController {
         this.packageDailyPriceRepo = packageDailyPriceRepo;
         this.taxSettingRepo = taxSettingRepo;
         this.reservationDailyPriceTaxRepo = reservationDailyPriceTaxRepo;
+        this.archiveRepo = archiveRepo;
     }
 
     @PostMapping("/reservations")
@@ -184,9 +189,40 @@ public class OpenReservationController {
             }
 
             // 新增：渠道发布校验
+            String bookingCode = getString(body, "bookingCode");
             boolean isPublished = channelPublishRecordRepo.existsByTenantIdAndHotelCodeAndChannelCodeAndRateCodeAndRoomTypeCode(
                     hotel.getTenantId(), hotelCode, channel.getChannelCode(), ratePlanCode, roomTypeCode);
-            if (!isPublished) {
+
+            boolean isArchiveAuthorized = false;
+            if (bookingCode != null && !bookingCode.isBlank()) {
+                Optional<Archive> archiveOpt = archiveRepo.findByGroupIdAndBookingCode(channel.getTenantId(), bookingCode);
+                if (archiveOpt.isPresent() && "启用".equals(archiveOpt.get().getStatus())) {
+                    Archive archive = archiveOpt.get();
+                    String rcJson = archive.getRateCodes();
+                    if (rcJson != null && !rcJson.isBlank()) {
+                        try {
+                            List<Map<String, Object>> rcList = objectMapper.readValue(rcJson, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+                            for (Map<String, Object> map : rcList) {
+                                String hCode = (String) map.get("hotel");
+                                if (hotelCode.equals(hCode)) {
+                                    Object rcObj = map.get("rateCode");
+                                    if (rcObj instanceof List) {
+                                        for (Object o : (List<?>) rcObj) {
+                                            if (ratePlanCode.equals(String.valueOf(o))) {
+                                                isArchiveAuthorized = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isArchiveAuthorized) break;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            if (!isPublished && !isArchiveAuthorized) {
                 return ResponseEntity.status(409).body(unavailable("RATE_PLAN_NOT_PUBLISHED", "该房型+价格计划未发布至该渠道"));
             }
 
@@ -457,6 +493,7 @@ public class OpenReservationController {
             reservation.setRoomTypeName(roomType.getRoomTypeName());
             reservation.setRatePlanCode(ratePlanCode);
             reservation.setRatePlanName(ratePlan.getRateName());
+            reservation.setBookingCode(bookingCode);
             reservation.setChannelCode(channel.getChannelCode());
             reservation.setChannelName(channel.getChannelName());
             reservation.setChannelOrderNumber(getString(body, "channelOrderNumber"));

@@ -35,6 +35,14 @@ public class GroupRoomTypeHotelService {
         this.groupRoomTypeRepository = groupRoomTypeRepository;
         this.hotelRepository = hotelRepository;
     }
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
     
     /**
      * 获取集团房型的酒店分配列表
@@ -42,7 +50,7 @@ public class GroupRoomTypeHotelService {
      * @return 分配列表
      */
     public List<GroupRoomTypeHotel> getGroupRoomTypeHotelsByCode(String groupRoomTypeCode) {
-        Integer tenantId = TenantContext.getTenantId();
+        Integer tenantId = getCurrentTenantId();
         return groupRoomTypeHotelRepository.findByTenantIdAndGroupRoomTypeCode(tenantId, groupRoomTypeCode);
     }
     
@@ -52,7 +60,7 @@ public class GroupRoomTypeHotelService {
      * @return 分配列表
      */
     public List<GroupRoomTypeHotel> getHotelRoomTypeAllocationsByCode(String hotelCode) {
-        Integer tenantId = TenantContext.getTenantId();
+        Integer tenantId = getCurrentTenantId();
         return groupRoomTypeHotelRepository.findByTenantIdAndHotelCode(tenantId, hotelCode);
     }
     
@@ -71,7 +79,12 @@ public class GroupRoomTypeHotelService {
             Boolean allocated, 
             Boolean roomInfoEditable) {
         
-        Integer tenantId = TenantContext.getTenantId();
+        Integer tenantId = getCurrentTenantId();
+
+        groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(tenantId, groupRoomTypeCode)
+                .orElseThrow(() -> new RuntimeException("Group room type not found or access denied: " + groupRoomTypeCode));
+        hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel not found or access denied: " + hotelCode));
         
         // 查找或创建关联
         Optional<GroupRoomTypeHotel> existingAllocation = 
@@ -110,10 +123,10 @@ public class GroupRoomTypeHotelService {
      * @param hotelCode 酒店编码
      */
     public void createOrUpdateHotelRoomTypeByCode(String groupRoomTypeCode, String hotelCode) {
-        Integer tenantId = TenantContext.getTenantId();
+        Integer tenantId = getCurrentTenantId();
         
         // 获取集团房型信息
-        var groupRoomType = groupRoomTypeRepository.findByRoomTypeCode(groupRoomTypeCode)
+        var groupRoomType = groupRoomTypeRepository.findByGroupIdAndRoomTypeCode(tenantId, groupRoomTypeCode)
                 .orElseThrow(() -> new RuntimeException("Group room type not found: " + groupRoomTypeCode));
         
         // 获取酒店信息以获取 tenantId
@@ -152,8 +165,9 @@ public class GroupRoomTypeHotelService {
      * @param hotelCode 酒店编码
      */
     public void deleteHotelRoomTypeByCode(String groupRoomTypeCode, String hotelCode) {
+        Integer tenantId = getCurrentTenantId();
         Optional<HotelRoomType> existingHotelRoomType = 
-                hotelRoomTypeRepository.findByHotelCodeAndRoomTypeCode(hotelCode, groupRoomTypeCode);
+                hotelRoomTypeRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, groupRoomTypeCode);
         
         existingHotelRoomType.ifPresent(roomType -> {
             roomType.setStatus("inactive");
@@ -167,21 +181,21 @@ public class GroupRoomTypeHotelService {
 
     @Deprecated
     public List<GroupRoomTypeHotel> getGroupRoomTypeHotels(Integer groupRoomTypeId) {
-        var grt = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
+        var grt = groupRoomTypeRepository.findByIdAndGroupId(groupRoomTypeId, getCurrentTenantId()).orElse(null);
         if (grt != null) return getGroupRoomTypeHotelsByCode(grt.getRoomTypeCode());
         return List.of();
     }
 
     @Deprecated
     public List<GroupRoomTypeHotel> getHotelRoomTypeAllocations(Integer hotelId) {
-        var hotel = hotelRepository.findById(hotelId).orElse(null);
+        var hotel = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId()).orElse(null);
         if (hotel != null) return getHotelRoomTypeAllocationsByCode(hotel.getHotelCode());
         return List.of();
     }
 
     @Deprecated
     public void batchUpdateRoomTypeAllocations(Integer groupRoomTypeId, List<GroupRoomTypeHotel> allocations) {
-        var grt = groupRoomTypeRepository.findById(groupRoomTypeId).orElse(null);
+        var grt = groupRoomTypeRepository.findByIdAndGroupId(groupRoomTypeId, getCurrentTenantId()).orElse(null);
         if (grt == null) return;
         
         for (GroupRoomTypeHotel allocation : allocations) {

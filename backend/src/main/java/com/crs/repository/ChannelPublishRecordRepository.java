@@ -29,6 +29,10 @@ public interface ChannelPublishRecordRepository extends JpaRepository<ChannelPub
     List<ChannelPublishRecord> findByTenantIdAndHotelCodeAndChannelCodeAndStatus(
             Integer tenantId, String hotelCode, String channelCode, String status);
 
+    List<ChannelPublishRecord> findByTenantIdAndRateCode(Integer tenantId, String rateCode);
+
+    long countByTenantIdAndChannelCode(Integer tenantId, String channelCode);
+
     boolean existsByTenantIdAndHotelCodeAndChannelCodeAndRateCodeAndRoomTypeCode(
             Integer tenantId, String hotelCode, String channelCode, String rateCode, String roomTypeCode);
 

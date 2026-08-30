@@ -19,6 +19,10 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
     @EntityGraph(attributePaths = {"roomTypeCategory"})
     Optional<GroupRoomType> findById(Integer id);
 
+    /** 按主键与集团双重约束查询，防止裸 ID 跨集团访问。 */
+    @EntityGraph(attributePaths = {"roomTypeCategory"})
+    Optional<GroupRoomType> findByIdAndGroupId(Integer id, Integer groupId);
+
     /**
      * 获取指定集团下的所有房型模板。
      * 
@@ -131,6 +135,8 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      */
     long countByRoomTypeCategoryId(Integer roomTypeCategoryId);
 
+    long countByGroupIdAndRoomTypeCategoryId(Integer groupId, Integer roomTypeCategoryId);
+
     /**
      * 根据集团外部编码获取房型列表。
      * 
@@ -198,4 +204,3 @@ public interface GroupRoomTypeRepository extends JpaRepository<GroupRoomType, In
      */
     long countByRoomTypeCategoryCode(String roomTypeCategoryCode);
 }
-

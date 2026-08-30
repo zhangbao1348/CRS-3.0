@@ -1,4 +1,3 @@
-import React from 'react'
 import { Card, Row, Col, Statistic } from 'antd'
 import { UserOutlined, MessageOutlined, GiftOutlined, BarChartOutlined } from '@ant-design/icons'
 

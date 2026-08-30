@@ -42,23 +42,18 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
 
     @Override
     public List<Map<String, Object>> getAllChannelCodesAsTree() {
-        try {
-            List<ChannelCode> allChannelCodes = channelCodeRepository.findByTenantId(getCurrentTenantId());
-            List<Map<String, Object>> treeData = new ArrayList<>();
+        List<ChannelCode> allChannelCodes = channelCodeRepository.findByTenantId(getCurrentTenantId());
+        List<Map<String, Object>> treeData = new ArrayList<>();
 
-            for (ChannelCode channelCode : allChannelCodes) {
-                if (channelCode.getParentId() == null) {
-                    Map<String, Object> rootNode = buildTreeNode(channelCode);
-                    rootNode.put("children", buildChildNodes(channelCode.getId(), allChannelCodes));
-                    treeData.add(rootNode);
-                }
+        for (ChannelCode channelCode : allChannelCodes) {
+            if (channelCode.getParentId() == null) {
+                Map<String, Object> rootNode = buildTreeNode(channelCode);
+                rootNode.put("children", buildChildNodes(channelCode.getId(), allChannelCodes));
+                treeData.add(rootNode);
             }
-
-            return treeData;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new ArrayList<>();
         }
+
+        return treeData;
     }
 
     @Override
@@ -75,17 +70,22 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Transactional
     public ChannelCode createChannelCode(ChannelCode channelCode) {
         Integer tenantId = getCurrentTenantId();
+        channelCode.setId(null);
         channelCode.setTenantId(tenantId);
         
         if (channelCode.getParentId() != null) {
             ChannelCode parent = channelCodeRepository.findByTenantIdAndId(tenantId, channelCode.getParentId());
-            if (parent != null) {
-                channelCode.setLevel(parent.getLevel() + 1);
-            } else {
-                channelCode.setLevel(1);
+            if (parent == null) {
+                throw new IllegalArgumentException("父节点不存在或无权访问");
             }
+            if (parent.getLevel() == null || parent.getLevel() >= 3) {
+                throw new IllegalArgumentException("渠道码最多支持三级结构");
+            }
+            channelCode.setLevel(parent.getLevel() + 1);
+            channelCode.setParentCode(parent.getCode());
         } else {
             channelCode.setLevel(1);
+            channelCode.setParentCode(null);
         }
         
         return channelCodeRepository.save(channelCode);
@@ -110,45 +110,31 @@ public class ChannelCodeServiceImpl implements ChannelCodeService {
     @Transactional
     public void deleteChannelCode(Integer id) {
         Integer tenantId = getCurrentTenantId();
-        try {
-            ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(tenantId, id);
-            if (channelCode != null) {
-                deleteRecursive(id, tenantId);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(tenantId, id);
+        if (channelCode != null) {
+            deleteRecursive(id, tenantId);
         }
     }
 
     @Override
     public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
         Integer currentTenantId = getCurrentTenantId();
-        try {
-            if (excludeId != null) {
-                return !channelCodeRepository.existsByTenantIdAndCodeAndIdNot(currentTenantId, code, excludeId);
-            } else {
-                ChannelCode existing = channelCodeRepository.findByTenantIdAndCode(currentTenantId, code);
-                return existing == null;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            return true;
+        if (excludeId != null) {
+            return !channelCodeRepository.existsByTenantIdAndCodeAndIdNot(currentTenantId, code, excludeId);
         }
+        ChannelCode existing = channelCodeRepository.findByTenantIdAndCode(currentTenantId, code);
+        return existing == null;
     }
 
     private void deleteRecursive(Integer parentId, Integer tenantId) {
-        try {
-            List<ChannelCode> children = channelCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
-            for (ChannelCode child : children) {
-                deleteRecursive(child.getId(), tenantId);
-            }
-            // 确保删除操作携带租户过滤
-            ChannelCode cc = channelCodeRepository.findByTenantIdAndId(tenantId, parentId);
-            if (cc != null) {
-                channelCodeRepository.delete(cc);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        List<ChannelCode> children = channelCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
+        for (ChannelCode child : children) {
+            deleteRecursive(child.getId(), tenantId);
+        }
+        // 确保删除操作携带租户过滤
+        ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(tenantId, parentId);
+        if (channelCode != null) {
+            channelCodeRepository.delete(channelCode);
         }
     }
 

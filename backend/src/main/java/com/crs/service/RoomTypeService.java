@@ -43,8 +43,7 @@ public class RoomTypeService {
      * @return 酒店房型信息
      */
     public Optional<RoomType> getRoomTypeById(Integer id) {
-        return roomTypeRepository.findById(id)
-                .filter(rt -> rt.getTenantId() != null && rt.getTenantId().equals(getCurrentTenantId()));
+        return roomTypeRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     /**

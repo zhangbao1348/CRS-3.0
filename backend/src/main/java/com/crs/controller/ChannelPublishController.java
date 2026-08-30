@@ -47,8 +47,7 @@ public class ChannelPublishController {
             String resolvedHotelCode = hotelCode;
             if (resolvedHotelCode == null || resolvedHotelCode.trim().isEmpty()) {
                 if (hotelId != null) {
-                    Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
-                            .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+                    Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, currentTenantId);
                     if (hotelOpt.isPresent()) {
                         resolvedHotelCode = hotelOpt.get().getHotelCode();
                     } else {
@@ -99,6 +98,56 @@ public class ChannelPublishController {
 
             int count = channelPublishService.batchPublish(hotelCode, channelCode, rateCodeRoomTypesMap);
             return ResponseEntity.ok(Map.of("success", true, "count", count));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 获取指定集团房价码的已发布渠道记录
+     * 关联PRD文档：.kiro/specs/prd/08-集团管理.md
+     */
+    @GetMapping("/group-rate-code/records")
+    public ResponseEntity<List<ChannelPublishRecord>> getPublishedRecordsByRateCode(@RequestParam String rateCode) {
+        try {
+            List<ChannelPublishRecord> records = channelPublishService.getPublishedRecordsByRateCode(rateCode);
+            return ResponseEntity.ok(records);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    /**
+     * 批量保存/更新集团房价码渠道发布配置
+     * 关联PRD文档：.kiro/specs/prd/08-集团管理.md
+     */
+    @PostMapping("/group-rate-code/save")
+    public ResponseEntity<Map<String, Object>> saveGroupRateCodePublish(@RequestBody Map<String, Object> request) {
+        try {
+            String rateCode = (String) request.get("rateCode");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> configs = (List<Map<String, Object>>) request.get("configs");
+            int count = channelPublishService.saveGroupRateCodePublish(rateCode, configs);
+            return ResponseEntity.ok(Map.of("success", true, "count", count));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    /**
+     * 取消房价码在特定酒店与渠道的发布
+     * 关联PRD文档：.kiro/specs/prd/08-集团管理.md
+     */
+    @PostMapping("/group-rate-code/cancel")
+    public ResponseEntity<Map<String, Object>> cancelGroupRateCodePublish(@RequestBody Map<String, String> request) {
+        try {
+            String rateCode = request.get("rateCode");
+            String hotelCode = request.get("hotelCode");
+            String channelCode = request.get("channelCode");
+            channelPublishService.cancelGroupRateCodePublish(rateCode, hotelCode, channelCode);
+            return ResponseEntity.ok(Map.of("success", true));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("success", false, "error", e.getMessage()));

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 市场码数据访问接口 (MarketCodeRepository)
@@ -13,6 +14,9 @@ import java.util.List;
  */
 @Repository
 public interface MarketCodeRepository extends JpaRepository<MarketCode, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<MarketCode> findByIdAndTenantId(Integer id, Integer tenantId);
 
     /**
      * 获取指定租户下的所有市场码定义。
@@ -60,4 +64,3 @@ public interface MarketCodeRepository extends JpaRepository<MarketCode, Integer>
      */
     MarketCode findByTenantIdAndCodeAndParentCode(Integer tenantId, String code, String parentCode);
 }
-

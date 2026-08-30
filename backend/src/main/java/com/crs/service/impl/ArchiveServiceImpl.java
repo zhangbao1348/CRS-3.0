@@ -3,6 +3,8 @@ package com.crs.service.impl;
 import com.crs.entity.Archive;
 import com.crs.repository.ArchiveRepository;
 import com.crs.service.ArchiveService;
+import com.crs.util.TenantContext;
+import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,37 +22,86 @@ public class ArchiveServiceImpl implements ArchiveService {
     
     @Autowired
     private ArchiveRepository archiveRepository;
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("Tenant context missing");
+        }
+        return tenantId;
+    }
     
     @Override
     public List<Archive> getAllArchives() {
-        return archiveRepository.findAll();
+        return archiveRepository.findByGroupId(getCurrentTenantId());
     }
     
     @Override
     public Optional<Archive> getById(Integer id) {
-        return archiveRepository.findById(id);
+        return archiveRepository.findByIdAndGroupId(id, getCurrentTenantId());
     }
     
     @Override
     public Archive create(Archive archive) {
+        Integer tenantId = getCurrentTenantId();
+        validateArchive(archive);
+        if (archiveRepository.existsByGroupIdAndArchiveId(tenantId, archive.getArchiveId())) {
+            throw new IllegalArgumentException("该档案 ID 已存在");
+        }
+        archive.setId(null);
+        archive.setGroupId(tenantId);
         return archiveRepository.save(archive);
     }
     
     @Override
     public Archive update(Integer id, Archive archive) {
-        // 检查档案是否存在
-        if (!archiveRepository.existsById(id)) {
-            throw new IllegalArgumentException("档案不存在");
+        Integer tenantId = getCurrentTenantId();
+        Archive existing = archiveRepository.findByIdAndGroupId(id, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("档案不存在或无权访问"));
+        if (archive.getArchiveId() != null && !existing.getArchiveId().equals(archive.getArchiveId())) {
+            throw new IllegalArgumentException("档案 ID 保存后不可修改");
         }
-        archive.setId(id);
-        return archiveRepository.save(archive);
+        archive.setArchiveId(existing.getArchiveId());
+        validateArchive(archive);
+        existing.setName(archive.getName());
+        existing.setType(archive.getType());
+        existing.setBookingCode(archive.getBookingCode());
+        existing.setContactName(archive.getContactName());
+        existing.setContactPhone(archive.getContactPhone());
+        existing.setAddress(archive.getAddress());
+        existing.setRateCodes(archive.getRateCodes());
+        existing.setStatus(archive.getStatus());
+        return archiveRepository.save(existing);
     }
     
     @Override
     public void delete(Integer id) {
-        if (!archiveRepository.existsById(id)) {
-            throw new IllegalArgumentException("档案不存在");
+        Archive archive = archiveRepository.findByIdAndGroupId(id, getCurrentTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("档案不存在或无权访问"));
+        archiveRepository.delete(archive);
+    }
+
+    /** 实施档案必填、编码与枚举规则，防止绕过页面提交无效数据。 */
+    private void validateArchive(Archive archive) {
+        if (!CodeValidator.isValid(archive.getArchiveId())) {
+            throw new IllegalArgumentException("档案 ID 仅允许输入英文字母、数字和下划线");
         }
-        archiveRepository.deleteById(id);
+        if (archive.getName() == null || archive.getName().isBlank()) {
+            throw new IllegalArgumentException("档案名称不能为空");
+        }
+        if (!("公司".equals(archive.getType()) || "旅行社".equals(archive.getType()))) {
+            throw new IllegalArgumentException("档案类型无效");
+        }
+        if (archive.getStatus() == null || archive.getStatus().isBlank()) {
+            archive.setStatus("启用");
+        }
+        if ("active".equals(archive.getStatus())) {
+            archive.setStatus("启用");
+        } else if ("inactive".equals(archive.getStatus())) {
+            archive.setStatus("停用");
+        }
+        if (!("启用".equals(archive.getStatus()) || "停用".equals(archive.getStatus()))) {
+            throw new IllegalArgumentException("档案状态无效");
+        }
     }
 }

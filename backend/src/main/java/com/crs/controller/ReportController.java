@@ -1,10 +1,12 @@
 package com.crs.controller;
 
 import com.crs.service.ReportService;
+import com.crs.modules.report.domain.ReportQueryPolicy;
 import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -55,6 +57,10 @@ public class ReportController {
 
         try {
             Integer tenantId = getCurrentTenantId();
+            ReportQueryPolicy.validateRange(startDate, endDate, "本期");
+            if (Boolean.TRUE.equals(enableCompare)) {
+                ReportQueryPolicy.validateRange(compareStartDate, compareEndDate, "对比期");
+            }
             
             // 前后端订单状态映射转换
             String mappedStatus = null;
@@ -96,11 +102,13 @@ public class ReportController {
      * 手动触发指定时间段内汇总数据的同步与初始化
      */
     @PostMapping("/reservation/initialize")
+    @PreAuthorize("hasAnyRole('super_admin', 'group_admin')")
     public ResponseEntity<?> initializeSummaryData(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         try {
             Integer tenantId = getCurrentTenantId();
+            ReportQueryPolicy.validateRange(startDate, endDate, "汇总同步");
             reportService.initializeSummaryData(tenantId, startDate, endDate);
             return ResponseEntity.ok(Map.of("success", true, "message", "Summary aggregation initialized successfully"));
         } catch (Exception e) {

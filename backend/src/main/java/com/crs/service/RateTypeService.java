@@ -41,12 +41,7 @@ public class RateTypeService {
     }
     
     public RateType getRateTypeById(Integer tenantId, Integer id) {
-        Integer currentTenantId = getCurrentTenantId();
-        RateType rateType = rateTypeRepository.findById(id).orElse(null);
-        if (rateType != null && rateType.getTenantId() != null && rateType.getTenantId().equals(currentTenantId)) {
-            return rateType;
-        }
-        return null;
+        return rateTypeRepository.findByIdAndTenantId(id, getCurrentTenantId()).orElse(null);
     }
     
     public RateType getRateTypeByCode(Integer tenantId, String code) {
@@ -94,13 +89,8 @@ public class RateTypeService {
     }
     
     public boolean isCodeUnique(Integer tenantId, String code, Integer excludeId) {
-        try {
-            RateType existing = rateTypeRepository.findByTenantIdAndCode(getCurrentTenantId(), code);
-            return existing == null || (excludeId != null && existing.getId().equals(excludeId));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return true;
-        }
+        RateType existing = rateTypeRepository.findByTenantIdAndCode(getCurrentTenantId(), code);
+        return existing == null || (excludeId != null && existing.getId().equals(excludeId));
     }
 
     @Transactional

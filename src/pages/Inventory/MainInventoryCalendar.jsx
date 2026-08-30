@@ -3,7 +3,7 @@ import { Table, Select, Button, Space, Modal, Form, Input, message, Spin, Timeli
 import {
   LeftOutlined, RightOutlined, FilterOutlined, ReloadOutlined,
   CheckCircleOutlined, CloseCircleOutlined, InfoCircleOutlined,
-  SafetyCertificateOutlined, DashboardOutlined
+  SafetyCertificateOutlined, DashboardOutlined, HomeOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { hotelRoomTypeApi, ratePlanApi, hotelPriceApi } from '../../utils/api'
@@ -122,7 +122,6 @@ const MainInventoryCalendar = () => {
           api.get('/pms-inventory', { params: { hotelCode, channelCode: filterChannel, rateCode: rateCodeParam, ...dateRange } })
             .then(res => {
               const data = res?.data || []
-              console.log('[Major Calendar] PMS 库存加载成功, 条数:', data.length)
               setPmsData(data)
             })
             .catch(err => {
@@ -139,7 +138,6 @@ const MainInventoryCalendar = () => {
           hotelPriceApi.getPriceQueryData(hotelCode, null, dateRange.startDate, dateRange.endDate)
             .then(res => {
               const data = res?.data?.prices || res?.prices || []
-              console.log('[Major Calendar] 房价数据加载成功, 条数:', data.length)
               setPriceData(data)
             })
             .catch(err => {
@@ -161,7 +159,6 @@ const MainInventoryCalendar = () => {
                 .catch(() => ({ code: rt.roomTypeCode, data: [] }))
             )
           ).then(results => {
-            console.log('[Major Calendar] 房态数据加载完成')
             setRoomStatusData(results)
           }).catch(err => {
             console.error('[Major Calendar] 房态合并处理失败:', err)
@@ -387,25 +384,6 @@ const MainInventoryCalendar = () => {
     return rows
   }, [viewTypes, pmsData, priceData, roomStatusData, filteredRoomTypes, ratePlans, filterRatePlan, monthDays])
 
-  // 房态切换
-  const handleToggleStatus = async (record, dateStr) => {
-    const currentVal = record[dateStr]
-    const newIsOpen = currentVal !== '开'
-    try {
-      await api.post('/room-status', {
-        hotelCode,
-        dimensionType: 'room_type',
-        dimensionCode: record.roomTypeCode,
-        statusDate: dateStr,
-        isOpen: newIsOpen,
-      }, { headers: { 'X-Operator-Name': getOp() } })
-      message.success(`${record.roomTypeName} ${dateStr} 已${newIsOpen ? '开房' : '关房'}`)
-      fetchData()
-    } catch (err) {
-      message.error('操作失败')
-    }
-  }
-
   // 房价编辑
   const handlePriceClick = (record, dateStr) => {
     setEditRecord({ ...record, dateStr, editType: 'price' })
@@ -478,16 +456,14 @@ const MainInventoryCalendar = () => {
         key: 'roomType',
         width: 170,
         fixed: 'left',
-        render: (_, record) => ({
-          children: (
-            <div style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
-              <span style={{ marginRight: 4, fontSize: 14 }}>🛏</span>
-              <span style={{ fontWeight: 600 }}>{record.roomTypeCode}</span>
-              <span style={{ marginLeft: 4 }}>{record.roomTypeName}</span>
-            </div>
-          ),
-          props: { rowSpan: record._isFirstInGroup ? record._groupSize : 0 },
-        }),
+        onCell: (record) => ({ rowSpan: record._isFirstInGroup ? record._groupSize : 0 }),
+        render: (_, record) => (
+          <div style={{ fontSize: 12, display: 'flex', alignItems: 'center' }}>
+            <HomeOutlined style={{ marginRight: 4, fontSize: 14 }} />
+            <span style={{ fontWeight: 600 }}>{record.roomTypeCode}</span>
+            <span style={{ marginLeft: 4 }}>{record.roomTypeName}</span>
+          </div>
+        ),
       },
       {
         title: '类型/房价码',
@@ -645,7 +621,7 @@ const MainInventoryCalendar = () => {
           </Button>
         ]}
         width={580}
-        destroyOnClose
+        destroyOnHidden
       >
         {calcDetailData && (() => {
           const { roomTypeCode, roomTypeName, dateStr, channelCode, pmsItem, detail, cellValue, isStatusType, rateCode, rateName } = calcDetailData
@@ -842,10 +818,6 @@ const MainInventoryCalendar = () => {
           }
 
           // 有算力明细时，展示完整三步推导路径
-          const pmsAvail = detail.pmsAvailable ?? 0
-          const hotelAvail = detail.hotelAvailable ?? 0
-          const physicalBase = Math.min(pmsAvail, hotelAvail)
-
           // 引入多命名（驼峰、全小写、蛇形）安全网提取方案，确保百分百捕获配额数值，解决渠道加房型等配额规则未成功引入的问题
           const channelQuota = detail.channelQuotaRemaining ?? detail.channel_quota_remaining ?? detail.channelQuota ?? detail.channelquota;
           const channelRoomTypeQuota = detail.channelRoomTypeQuotaRemaining ?? detail.channelRoomtypeQuotaRemaining ?? detail.channel_room_type_quota_remaining ?? detail.channelRoomtype ?? detail.channelroomtype;

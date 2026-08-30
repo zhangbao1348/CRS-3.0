@@ -15,6 +15,9 @@ import java.util.Optional;
 @Repository
 public interface HotelRepository extends JpaRepository<Hotel, Integer> {
 
+    /** 在租户维度下根据主键查询酒店。 */
+    Optional<Hotel> findByIdAndTenantId(Integer id, Integer tenantId);
+
     /**
      * 在指定租户下根据酒店编码查找酒店。
      * 
@@ -84,4 +87,3 @@ public interface HotelRepository extends JpaRepository<Hotel, Integer> {
             @org.springframework.data.repository.query.Param("hotelCodes") java.util.Collection<String> hotelCodes,
             org.springframework.data.domain.Pageable pageable);
 }
-

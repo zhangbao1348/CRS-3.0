@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import com.crs.entity.TenantChannel;
 import com.crs.repository.TenantChannelRepository;
+import com.crs.util.TenantContext;
 
 /**
  * 租户可对接渠道服务
@@ -19,6 +20,14 @@ public class TenantChannelService {
 
     @Autowired
     private TenantChannelRepository tenantChannelRepository;
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("Tenant context missing");
+        }
+        return tenantId;
+    }
 
     /**
      * 获取租户的所有渠道，按已连接/可连接分组
@@ -46,14 +55,14 @@ public class TenantChannelService {
      * 根据ID获取渠道
      */
     public TenantChannel getChannelById(Integer id) {
-        return tenantChannelRepository.findById(id).orElse(null);
+        return tenantChannelRepository.findByIdAndTenantId(id, getCurrentTenantId()).orElse(null);
     }
 
     /**
      * 更新渠道对接信息
      */
     public TenantChannel updateChannel(Integer id, TenantChannel channelData) {
-        TenantChannel existing = tenantChannelRepository.findById(id).orElse(null);
+        TenantChannel existing = tenantChannelRepository.findByIdAndTenantId(id, getCurrentTenantId()).orElse(null);
         if (existing == null) {
             return null;
         }
@@ -62,7 +71,7 @@ public class TenantChannelService {
     }
 
     public TenantChannel updateChannel(Integer id, Map<String, Object> payload) {
-        TenantChannel existing = tenantChannelRepository.findById(id).orElse(null);
+        TenantChannel existing = tenantChannelRepository.findByIdAndTenantId(id, getCurrentTenantId()).orElse(null);
         if (existing == null) {
             return null;
         }

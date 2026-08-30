@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Checkbox } from 'antd'
+import { App, Form, Tabs, Input, Select, Radio, Button, Row, Col, InputNumber, Checkbox } from 'antd'
 import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
 
-const { TabPane } = Tabs
 const { Option } = Select
 const { Group: RadioGroup } = Radio
 
@@ -51,6 +50,7 @@ const getErrorMessage = (error, fallbackMessage) => {
 }
 
 const AddPackage = () => {
+  const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [quantityType, setQuantityType] = useState('')
@@ -102,7 +102,6 @@ const AddPackage = () => {
         navigate('/rate-management/package-setting')
       }
     } catch (error) {
-      console.error('保存包价失败:', error)
       message.error(getErrorMessage(error, '保存失败，请稍后重试'))
     } finally {
       setLoading(false)
@@ -139,8 +138,11 @@ const AddPackage = () => {
             taxIncluded: false
           }}
         >
-          <Tabs defaultActiveKey="1">
-            <TabPane tab="基础信息" key="1">
+          <Tabs defaultActiveKey="1" items={[{
+            key: '1',
+            label: '基础信息',
+            children: (
+              <>
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Form.Item
@@ -244,13 +246,7 @@ const AddPackage = () => {
                     <Form.Item
                       name="fixedPrice"
                       label="价格"
-                      dependencies={['priceType']}
-                      rules={[
-                        ({ getFieldValue }) => ({
-                          required: getFieldValue('priceType') === 'fixed',
-                          message: '请输入价格'
-                        })
-                      ]}
+                      rules={[{ required: true, message: '请输入价格' }]}
                     >
                       <InputNumber
                         style={{ width: '100%' }}
@@ -278,8 +274,9 @@ const AddPackage = () => {
               >
                 <Input.TextArea rows={4} placeholder="请输入包价描述" />
               </Form.Item>
-            </TabPane>
-          </Tabs>
+              </>
+            )
+          }]} />
           
           <div style={{ marginTop: 32, padding: '20px', backgroundColor: '#f5f5f5', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

@@ -3,6 +3,7 @@ package com.crs.repository;
 import com.crs.entity.HotelImage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 酒店图片数据访问接口 (HotelImageRepository)
@@ -16,6 +17,9 @@ import java.util.List;
  * </ul>
  */
 public interface HotelImageRepository extends JpaRepository<HotelImage, Integer> {
+
+    /** 在租户维度下根据主键查询酒店图片。 */
+    Optional<HotelImage> findByIdAndTenantId(Integer id, Integer tenantId);
     
     // =====================================================================
     // 合规方法：必须包含 tenantId（符合多租户隔离规范）

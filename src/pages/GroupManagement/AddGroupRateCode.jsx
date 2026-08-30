@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tabs, Tag, Radio, Table, Switch, message, Spin, Modal, DatePicker } from 'antd'
-import axios from 'axios'
+import { useState, useEffect, useRef } from 'react'
+import { App, Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tabs, Radio, Table, Switch, Spin, Modal, DatePicker } from 'antd'
 import dayjs from 'dayjs'
-import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { groupRateCodeApi, hotelApi, marketCodeApi, sourceCodeApi, packageApi, roomTypeCategoryApi, groupRoomTypeApi, guaranteePolicyApi, cancellationPolicyApi, rateTypeApi, dictionaryApi } from '../../utils/api'
+import { groupRateCodeApi, hotelApi, marketCodeApi, sourceCodeApi, packageApi, groupRoomTypeApi, guaranteePolicyApi, cancellationPolicyApi, rateTypeApi, dictionaryApi, channelPublishApi, tenantChannelApi } from '../../utils/api'
 import { getCurrentTenantId } from '../../utils/tenantUtils'
 
 const { Option } = Select
@@ -38,54 +37,67 @@ const AddGroupRateCode = () => {
   // 路由管理
   const navigate = useNavigate()
   const location = useLocation()
+  const { message, modal } = App.useApp()
   
   // 状态管理
   const [form] = Form.useForm()
-  const [includedPackages, setIncludedPackages] = useState([])
   const [selectedPackages, setSelectedPackages] = useState([])
   
   // 适用房型选中状态
   const [selectedApplicableRoomTypes, setSelectedApplicableRoomTypes] = useState([])
   
-  // 适用房型全选状态
-  const [selectAllRoomTypes, setSelectAllRoomTypes] = useState({
-    standard: false,
-    king: false,
-    twin: false,
-    suite: false,
-    executive: false,
-    family: false
-  })
-  
-  // 房型大类与房型的映射关系
-  const roomTypeMap = {
-    standard: ['standard'],
-    king: ['king', 'city-view-king', 'sea-view-king'],
-    twin: ['twin', 'city-view-twin', 'sea-view-twin'],
-    suite: ['suite', 'deluxe-suite', 'presidential-suite'],
-    executive: ['executive', 'executive-suite'],
-    family: ['family', 'family-suite']
-  }
   const [hotelData, setHotelData] = useState([])
   const [regionDictionaryItems, setRegionDictionaryItems] = useState([])
-  const [channelPublishData, setChannelPublishData] = useState([
-    {
-      key: '1',
-      channel: ['携程'],
-      hotel: ['南风酒店'],
-      rateCode: 'OTA双早价',
-      roomTypes: ['大床房', '双床房', '高级房'],
-      published: true
-    },
-    {
-      key: Date.now(),
-      channel: [],
-      hotel: [],
-      rateCode: 'OTA双早价',
-      roomTypes: [],
-      published: false
+  const [channelPublishData, setChannelPublishData] = useState([])
+  const [channels, setChannels] = useState([])
+  const [loadingChannels, setLoadingChannels] = useState(false)
+  const [channelTabLoading, setChannelTabLoading] = useState(false)
+
+  // 获取渠道数据
+  const fetchChannels = async () => {
+    try {
+      setLoadingChannels(true)
+      const tenantId = getCurrentTenantId()
+      if (!tenantId) return
+      const response = await tenantChannelApi.getAllChannels(tenantId)
+      if (response) {
+        setChannels(response.filter(c => c.status === 'active'))
+      }
+    } catch (error) {
+      console.error('获取渠道数据失败:', error)
+    } finally {
+      setLoadingChannels(false)
     }
-  ])
+  }
+
+  // 获取已发布渠道配置
+  const fetchPublishRecords = async (rateCode) => {
+    if (!rateCode) return
+    try {
+      const records = await channelPublishApi.getGroupRateCodeRecords(rateCode)
+      if (Array.isArray(records)) {
+        const groupMap = {}
+        records.forEach(r => {
+          const key = `${r.channelCode}_${r.hotelCode}`
+          if (!groupMap[key]) {
+            groupMap[key] = {
+              key: key,
+              channel: [r.channelCode],
+              hotel: [r.hotelCode],
+              rateCode: rateCode,
+              roomTypes: [],
+              published: r.status === 'published'
+            }
+          }
+          groupMap[key].roomTypes.push(r.roomTypeCode)
+        })
+        setChannelPublishData(Object.values(groupMap))
+      }
+    } catch (error) {
+      console.error('获取渠道发布记录失败:', error)
+    }
+  }
+
   // 优惠券和促销规则状态
   const [couponRule, setCouponRule] = useState('unlimited')
   const [promotionRule, setPromotionRule] = useState('unlimited')
@@ -96,6 +108,9 @@ const AddGroupRateCode = () => {
   const [rateType, setRateType] = useState('basic')
   // API 调用状态
   const [loading, setLoading] = useState(false)
+  const [allocationLoading, setAllocationLoading] = useState(false)
+  const [recordLoading, setRecordLoading] = useState(Boolean(location.state?.record))
+  const recordRequestRef = useRef(0)
   const [isEditing, setIsEditing] = useState(false)
   const [currentId, setCurrentId] = useState(null)
   const [currentStatus, setCurrentStatus] = useState('active') // 保存当前的状态
@@ -155,9 +170,7 @@ const AddGroupRateCode = () => {
       
       const excludeId = isEditing && currentId ? currentId : null
       
-      console.log('fetchParentRateCodes: rateType =', rateType, ', targetDerivativeLevel =', targetDerivativeLevel)
       const response = await groupRateCodeApi.getSelectableParentRateCodes(targetDerivativeLevel, excludeId)
-      console.log('fetchParentRateCodes: response =', response)
       setParentRateCodes(response || [])
     } catch (error) {
       console.error('获取父级房价码失败:', error)
@@ -223,18 +236,7 @@ const AddGroupRateCode = () => {
         throw new Error('无法获取当前租户信息')
       }
       
-      // 并行获取房型大类和集团房型
-      const [categoriesData, roomTypesData] = await Promise.all([
-        roomTypeCategoryApi.getCategoriesByGroupId(groupId),
-        groupRoomTypeApi.getGroupRoomTypesByGroupId(groupId)
-      ])
-      
-      // 获取房型大类映射
-      const categoryList = categoriesData || []
-      const categoryMap = categoryList.reduce((map, cat) => {
-        map[cat.id] = cat.categoryName
-        return map
-      }, {})
+      const roomTypesData = await groupRoomTypeApi.getGroupRoomTypesByGroupId(groupId)
       
       // 直接获取当前租户的集团房型
       const filteredRoomTypes = roomTypesData || []
@@ -306,7 +308,9 @@ const AddGroupRateCode = () => {
   // 获取路由参数中的编辑数据
   useEffect(() => {
     const record = location.state?.record
+    const requestId = ++recordRequestRef.current
     if (record) {
+      setRecordLoading(true)
       setIsEditing(true)
       setCurrentId(record.id)
       
@@ -314,7 +318,7 @@ const AddGroupRateCode = () => {
       const fetchFullRateCode = async () => {
         try {
           const fullRecord = await groupRateCodeApi.getGroupRateCodeById(record.id)
-          console.log('完整数据:', fullRecord)
+          if (requestId !== recordRequestRef.current) return
           
           // 设置状态
           if (fullRecord.rateType) {
@@ -376,11 +380,6 @@ const AddGroupRateCode = () => {
             cancellationRule: fullRecord.cancellationRule
           })
           
-          // 处理父级房价码的类型转换
-          if (fullRecord.parentRateCode) {
-            setParentRateCode(fullRecord.parentRateCode)
-          }
-          
           // 处理预订限制数据
           if (fullRecord.personalMembership) {
             try {
@@ -422,6 +421,7 @@ const AddGroupRateCode = () => {
             setCheckinEndTime(dayjs(fullRecord.checkinEndTime))
           }
         } catch (error) {
+          if (requestId !== recordRequestRef.current) return
           console.error('获取完整房价码数据失败:', error)
           // 如果获取失败，使用列表传来的基本数据
           const status = record.status === '启用' ? 'active' : 'inactive'
@@ -430,10 +430,22 @@ const AddGroupRateCode = () => {
             rateName: record.name,
             rateCode: record.code
           })
+        } finally {
+          if (requestId === recordRequestRef.current) {
+            setRecordLoading(false)
+          }
         }
       }
       
       fetchFullRateCode()
+    } else {
+      setRecordLoading(false)
+    }
+
+    return () => {
+      if (recordRequestRef.current === requestId) {
+        recordRequestRef.current += 1
+      }
     }
   }, [location.state, form])
   
@@ -510,96 +522,11 @@ const AddGroupRateCode = () => {
     loadData()
   }, [])
   
-  // 当编辑模式和currentId设置完成后，加载分配数据
-  useEffect(() => {
-    console.log('编辑模式或currentId变化，isEditing:', isEditing, 'currentId:', currentId)
-    if (isEditing && currentId) {
-      console.log('开始加载分配数据...')
-      // 如果hotelData还没有加载，先加载酒店数据
-      if (hotelData.length === 0) {
-        fetchHotels().then(hotelBaseData => {
-          if (hotelBaseData.length > 0) {
-            fetchAllocations(currentId, hotelBaseData)
-          }
-        })
-      } else {
-        fetchAllocations(currentId, hotelData)
-      }
-    }
-  }, [isEditing, currentId])
-
   // 处理包价选择
   const handlePackageChange = (value) => {
     setSelectedPackages(value)
   }
   
-  // 处理房型大类全选
-  const handleRoomTypeSelectAll = (category, checked) => {
-    let newSelected = [...selectedApplicableRoomTypes]
-    
-    if (checked) {
-      // 全选：添加该大类下的所有房型
-      roomTypeMap[category].forEach(roomType => {
-        if (!newSelected.includes(roomType)) {
-          newSelected.push(roomType)
-        }
-      })
-    } else {
-      // 取消全选：移除该大类下的所有房型
-      newSelected = newSelected.filter(roomType => !roomTypeMap[category].includes(roomType))
-    }
-    
-    setSelectedApplicableRoomTypes(newSelected)
-    
-    // 更新所有分类的全选状态
-    const newSelectAll = {}
-    Object.keys(roomTypeMap).forEach(cat => {
-      const allSelected = roomTypeMap[cat].every(roomType => 
-        newSelected.includes(roomType)
-      )
-      newSelectAll[cat] = allSelected
-    })
-    setSelectAllRoomTypes(newSelectAll)
-  }
-  
-  // 处理单个房型选择
-  const handleSingleRoomTypeChange = (roomType, checked) => {
-    let newSelected = [...selectedApplicableRoomTypes]
-    
-    if (checked) {
-      if (!newSelected.includes(roomType)) {
-        newSelected.push(roomType)
-      }
-    } else {
-      newSelected = newSelected.filter(rt => rt !== roomType)
-    }
-    
-    setSelectedApplicableRoomTypes(newSelected)
-    
-    // 更新全选状态
-    updateSelectAllStatus()
-  }
-  
-  // 更新全选状态
-  const updateSelectAllStatus = () => {
-    const newSelectAll = { ...selectAllRoomTypes }
-    
-    Object.keys(roomTypeMap).forEach(category => {
-      const allSelected = roomTypeMap[category].every(roomType => 
-        selectedApplicableRoomTypes.includes(roomType)
-      )
-      newSelectAll[category] = allSelected
-    })
-    
-    setSelectAllRoomTypes(newSelectAll)
-  }
-
-  // 添加包价
-  const handleAddPackage = () => {
-    // 模拟添加包价逻辑
-    console.log('添加包价')
-  }
-
   // 字段名中英文映射
   const fieldNameMap = {
     rateName: '房价名称',
@@ -637,7 +564,6 @@ const AddGroupRateCode = () => {
     try {
       setLoading(true)
       const values = await form.validateFields()
-      console.log('表单数据:', values)
       
       // 衍生码必填校验
       if (values.rateType === 'level1' || values.rateType === 'level2') {
@@ -654,7 +580,6 @@ const AddGroupRateCode = () => {
       }
       
       // 适用房型必选校验
-      console.log('适用房型校验:', selectedApplicableRoomTypes)
       if (!selectedApplicableRoomTypes || !Array.isArray(selectedApplicableRoomTypes) || selectedApplicableRoomTypes.length === 0) {
         message.error('请至少选择一个适用房型')
         setLoading(false)
@@ -700,7 +625,6 @@ const AddGroupRateCode = () => {
         checkinEndTime: checkinEndTime ? formatDate(checkinEndTime) : null
       }
       
-      console.log('提交数据:', submitData)
       
       // 调用后端API
       if (isEditing && currentId) {
@@ -712,7 +636,7 @@ const AddGroupRateCode = () => {
         if (result && result.syncRequired && result.affectedHotels && result.affectedHotels.length > 0) {
           // 关联查询原则：使用 hotelCode 而非 hotelId
           const selectedHotelCodes = result.affectedHotels.map(h => h.hotelCode)
-          Modal.confirm({
+          modal.confirm({
             title: '同步确认',
             content: (
               <div>
@@ -756,6 +680,9 @@ const AddGroupRateCode = () => {
         navigate('/group-management/group-rate-code')
       }, 1000)
     } catch (error) {
+      if (error?.errorFields) {
+        return
+      }
       console.error('保存失败:', error)
       message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
     } finally {
@@ -796,32 +723,6 @@ const AddGroupRateCode = () => {
       })
       
       setHotelData(updatedData)
-      
-      // 更新全选状态
-      if (field === 'allocated') {
-        const allChecked = updatedData.every(item => item.allocated)
-        setSelectAll(allChecked)
-      } else if (field === 'basicInfoEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.basicInfoEditable)
-        setSelectAllBasicInfo(allChecked)
-      } else if (field === 'priceInfoEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.priceInfoEditable)
-        setSelectAllPriceInfo(allChecked)
-      } else if (field === 'bookingLimitEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.bookingLimitEditable)
-        setSelectAllBookingLimit(allChecked)
-      } else if (field === 'guaranteeRuleEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.guaranteeRuleEditable)
-        setSelectAllGuaranteeRule(allChecked)
-      } else if (field === 'promotionEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.promotionEditable)
-        setSelectAllPromotion(allChecked)
-      }
     }
   }
 
@@ -846,7 +747,7 @@ const AddGroupRateCode = () => {
       
       // Task 9: 检查重新分配时的差异
       if (result && result.reallocationDiffs && result.reallocationDiffs.length > 0) {
-        Modal.info({
+        modal.info({
           title: '重新下发差异提示',
           content: (
             <div>
@@ -874,7 +775,7 @@ const AddGroupRateCode = () => {
       // Task 10: 显示衍生码链检查错误
       const errorMsg = error?.error || error?.response?.data?.error || error?.message || '未知错误'
       if (typeof errorMsg === 'string' && errorMsg !== '未知错误') {
-        Modal.error({
+        modal.error({
           title: '下发失败',
           content: errorMsg
         })
@@ -891,26 +792,14 @@ const AddGroupRateCode = () => {
   const fetchAllocations = async (rateCodeId, baseData) => {
     if (!rateCodeId) return
     try {
-      console.log('=== 开始获取分配状态 ===')
-      console.log('rateCodeId:', rateCodeId)
-      console.log('API地址:', `/api/group-rate-codes/${rateCodeId}/allocations`)
       const allocations = await groupRateCodeApi.getAllocations(rateCodeId)
-      console.log('API响应:', allocations)
-      console.log('获取到的分配数据:', allocations)
-      console.log('分配数据类型:', typeof allocations)
-      console.log('是否是数组:', Array.isArray(allocations))
       
       if (Array.isArray(allocations)) {
-        console.log('分配数据长度:', allocations.length)
         // 如果传入了 baseData，直接用它合并；否则用 prev state
         if (baseData) {
-          console.log('使用baseData合并，baseData长度:', baseData.length)
-          console.log('baseData内容:', baseData)
           const merged = baseData.map(item => {
-            console.log('处理酒店:', item.hotelCode, item.hotel)
             // 关联查询原则：使用 hotelCode 匹配，而非 hotelId
             const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
-            console.log('匹配结果:', alloc ? '找到' : '未找到', '分配数据:', alloc)
             if (alloc) {
               const result = {
                 ...item,
@@ -921,22 +810,17 @@ const AddGroupRateCode = () => {
                 guaranteeRuleEditable: alloc.guaranteeRuleEditable || false,
                 promotionEditable: alloc.promotionEditable || false
               }
-              console.log('合并后:', result)
               return result
             }
             return item
           })
-          console.log('=== 最终合并后的数据 ===')
-          console.log(merged)
           setHotelData(merged)
         } else {
           setHotelData(prev => {
-            console.log('使用prev state合并:', prev)
             return prev.map(item => {
               // 关联查询原则：使用 hotelCode 匹配，而非 hotelId
               const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
               if (alloc) {
-                console.log('找到分配:', item.hotelCode, alloc)
                 return {
                   ...item,
                   allocated: alloc.allocated || false,
@@ -961,23 +845,12 @@ const AddGroupRateCode = () => {
     }
   }
 
-  // 全选/取消全选
-  const [selectAll, setSelectAll] = useState(false)
   const [batchModalVisible, setBatchModalVisible] = useState(false)
   const [selectedHotels, setSelectedHotels] = useState([])
   const [selectedLimits, setSelectedLimits] = useState([])
   
   // 渠道发布房型全选
   const [selectAllPublishRoomTypes, setSelectAllPublishRoomTypes] = useState(false)
-  // 渠道发布房价全选
-  const [selectAllPublishRateCode, setSelectAllPublishRateCode] = useState(false)
-  
-  // 各可修改列的全选状态
-  const [selectAllBasicInfo, setSelectAllBasicInfo] = useState(false)
-  const [selectAllPriceInfo, setSelectAllPriceInfo] = useState(false)
-  const [selectAllBookingLimit, setSelectAllBookingLimit] = useState(false)
-  const [selectAllGuaranteeRule, setSelectAllGuaranteeRule] = useState(false)
-  const [selectAllPromotion, setSelectAllPromotion] = useState(false)
   
   // 区域筛选状态
   const [filterRegion, setFilterRegion] = useState('')
@@ -1004,75 +877,6 @@ const AddGroupRateCode = () => {
       setFilterCity('')
     }
   }, [filterRegion, filterCity, cityOptions])
-
-  const handleSelectAll = (checked) => {
-    setSelectAll(checked)
-    const newData = hotelData.map(item => ({
-      ...item,
-      allocated: checked
-    }))
-    setHotelData(newData)
-  }
-  
-  // 全选基础信息是否可修改
-  const handleSelectAllBasicInfo = (checked) => {
-    setSelectAllBasicInfo(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, basicInfoEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
-  }
-  
-  // 全选价格信息是否可修改
-  const handleSelectAllPriceInfo = (checked) => {
-    setSelectAllPriceInfo(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, priceInfoEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
-  }
-  
-  // 全选预订限制是否可修改
-  const handleSelectAllBookingLimit = (checked) => {
-    setSelectAllBookingLimit(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, bookingLimitEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
-  }
-  
-  // 全选担保/取消规则是否可修改
-  const handleSelectAllGuaranteeRule = (checked) => {
-    setSelectAllGuaranteeRule(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, guaranteeRuleEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
-  }
-  
-  // 全选促销优惠是否可修改
-  const handleSelectAllPromotion = (checked) => {
-    setSelectAllPromotion(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, promotionEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
-  }
 
   // 批量分配
   const handleBatchAllocate = () => {
@@ -1109,38 +913,32 @@ const AddGroupRateCode = () => {
   // 渠道发布房型全选处理函数
   const handleSelectAllPublishRoomTypes = (checked) => {
     setSelectAllPublishRoomTypes(checked)
+    const applicableRoomTypesMetadata = groupRoomTypes.filter(rt => selectedApplicableRoomTypes.includes(rt.roomTypeCode))
+    const allCodes = applicableRoomTypesMetadata.map(rt => rt.roomTypeCode)
     setChannelPublishData(channelPublishData.map(item => {
       if (!item.published) {
         return {
           ...item,
-          roomTypes: checked ? ['大床房', '双床房', '高级房'] : []
+          roomTypes: checked ? allCodes : []
         }
       }
       return item
     }))
   }
 
-  // 渠道发布房价全选处理函数
-  const handleSelectAllPublishRateCode = (checked) => {
-    setSelectAllPublishRateCode(checked)
-    setChannelPublishData(channelPublishData.map(item => {
-      if (!item.published) {
-        return {
-          ...item,
-          rateCode: checked ? 'OTA双早价' : ''
-        }
-      }
-      return item
-    }))
-  }
 
   // 处理渠道发布数据操作
   const handleAddChannelPublish = () => {
+    const currentRateCode = form.getFieldValue('rateCode')
+    if (!currentRateCode) {
+      message.warning('请先在“房价码维护”中输入房价代码')
+      return
+    }
     const newItem = {
       key: Date.now(),
       channel: [],
       hotel: [],
-      rateCode: 'OTA双早价',
+      rateCode: currentRateCode,
       roomTypes: [],
       published: false
     }
@@ -1151,30 +949,81 @@ const AddGroupRateCode = () => {
     setChannelPublishData(channelPublishData.filter(item => item.key !== key))
   }
 
-  const handleSaveChannelPublish = (record) => {
-    setChannelPublishData(channelPublishData.map(item => {
-      if (item.key === record.key) {
-        return {
-          ...item,
-          published: true
-        }
+  // 批量保存所有发布配置（包含修改已发布的和新增的）
+  const handleSaveAllPublishConfigs = async () => {
+    const currentRateCode = form.getFieldValue('rateCode')
+    if (!currentRateCode) {
+      message.warning('无法保存，未获取到有效的房价代码')
+      return
+    }
+
+    if (channelPublishData.length === 0) {
+      message.info('没有配置可以保存')
+      return
+    }
+
+    // 验证有效性
+    for (const config of channelPublishData) {
+      if (config.channel.length === 0 || config.hotel.length === 0 || config.roomTypes.length === 0) {
+        message.error('请完整填写渠道发布配置（渠道、酒店及房型均为必选）')
+        return
       }
-      return item
-    }))
-    message.success('保存发布成功')
+    }
+
+    try {
+      setLoading(true)
+      const payload = {
+        rateCode: currentRateCode,
+        configs: channelPublishData.map(item => ({
+          channels: item.channel,
+          hotels: item.hotel,
+          roomTypes: item.roomTypes
+        }))
+      }
+      const response = await channelPublishApi.saveGroupRateCodePublish(payload)
+      if (response && response.success) {
+        message.success(`保存发布配置成功，已同步 ${response.count} 条记录`)
+        fetchPublishRecords(currentRateCode)
+      } else {
+        message.error('保存发布配置失败')
+      }
+    } catch (error) {
+      console.error('保存发布失败:', error)
+      message.error(error.message || '保存发布失败，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
   }
 
+  // 取消发布
   const handleCancelPublish = (record) => {
-    setChannelPublishData(channelPublishData.map(item => {
-      if (item.key === record.key) {
-        return {
-          ...item,
-          published: false
+    const currentRateCode = form.getFieldValue('rateCode')
+    const hotelCode = record.hotel[0]
+    const channelCode = record.channel[0]
+
+    const hotelName = hotelData.find(h => h.hotelCode === hotelCode)?.hotel || hotelCode
+    const channelName = channels.find(c => c.channelCode === channelCode)?.channelName || channelCode
+
+    modal.confirm({
+      title: '确认取消发布吗？',
+      content: `确认要将 ${hotelName} 的 ${currentRateCode} 房价码在 ${channelName} 渠道取消发布吗？`,
+      okText: '确认',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await channelPublishApi.cancelGroupRateCodePublish({
+            rateCode: currentRateCode,
+            hotelCode: hotelCode,
+            channelCode: channelCode
+          })
+          message.success('取消发布成功')
+          fetchPublishRecords(currentRateCode)
+        } catch (error) {
+          console.error('取消发布失败:', error)
+          message.error('取消发布失败，请稍后重试')
         }
       }
-      return item
-    }))
-    message.success('取消发布成功')
+    })
   }
 
   const handleChannelChange = (key, value) => {
@@ -1214,7 +1063,12 @@ const AddGroupRateCode = () => {
       label: '房价码维护',
       children: (
         <Card style={{ marginBottom: 24 }}>
-          <Form form={form} layout="vertical" style={{ maxWidth: 800, overflow: 'visible' }}>
+          <Form
+            form={form}
+            layout="vertical"
+            disabled={recordLoading}
+            style={{ maxWidth: 800, overflow: 'visible' }}
+          >
             {/* 基础信息 */}
             <h3 style={{ marginBottom: 16, fontWeight: 600 }}>基础信息</h3>
             
@@ -1297,7 +1151,6 @@ const AddGroupRateCode = () => {
                   <Select 
                     placeholder="请选择类型"
                     onChange={(value) => setRateType(value)}
-                    defaultValue="basic"
                   >
                     <Option value="basic">基础房价码</Option>
                     <Option value="level1">一级衍生码</Option>
@@ -1327,28 +1180,6 @@ const AddGroupRateCode = () => {
                     </Option>
                   ))}
                 </Select>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  style={{ marginLeft: 8 }}
-                  onClick={handleAddPackage}
-                  size="middle"
-                />
-              </div>
-              <div style={{ marginTop: 8 }}>
-                {includedPackages.map(pkg => (
-                  <Tag
-                    key={pkg.id}
-                    closable
-                    onClose={() => {
-                      setIncludedPackages(includedPackages.filter(item => item.id !== pkg.id))
-                      setSelectedPackages(selectedPackages.filter(code => code !== pkg.code))
-                    }}
-                    style={{ marginRight: 8, marginBottom: 8 }}
-                  >
-                    {pkg.code} - {pkg.name} (集团包价)
-                  </Tag>
-                ))}
               </div>
             </Form.Item>
             
@@ -1769,7 +1600,13 @@ const AddGroupRateCode = () => {
             
             {/* 保存按钮 */}
             <Form.Item style={{ marginTop: 32 }}>
-              <Button type="primary" size="large" onClick={handleSave}>
+              <Button
+                type="primary"
+                size="large"
+                onClick={handleSave}
+                loading={recordLoading || loading}
+                disabled={recordLoading}
+              >
                 保存, 并下一步
               </Button>
             </Form.Item>
@@ -1861,6 +1698,7 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'allocated')}
+                          disabled={allocationLoading}
                         />
                       )
                     },
@@ -1894,7 +1732,7 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'basicInfoEditable')}
-                          disabled={!record.allocated}
+                          disabled={allocationLoading || !record.allocated}
                         />
                       )
                     },
@@ -1928,7 +1766,7 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'priceInfoEditable')}
-                          disabled={!record.allocated}
+                          disabled={allocationLoading || !record.allocated}
                         />
                       )
                     },
@@ -1962,7 +1800,7 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'bookingLimitEditable')}
-                          disabled={!record.allocated}
+                          disabled={allocationLoading || !record.allocated}
                         />
                       )
                     },
@@ -1996,7 +1834,7 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'guaranteeRuleEditable')}
-                          disabled={!record.allocated}
+                          disabled={allocationLoading || !record.allocated}
                         />
                       )
                     },
@@ -2030,12 +1868,13 @@ const AddGroupRateCode = () => {
                         <Switch 
                           checked={text} 
                           onChange={handleSwitchChange(record, 'promotionEditable')}
-                          disabled={!record.allocated}
+                          disabled={allocationLoading || !record.allocated}
                         />
                       )
                     }
                   ]}
-                  dataSource={filteredHotelData}
+                  dataSource={allocationLoading ? [] : filteredHotelData}
+                  loading={allocationLoading}
                   pagination={false}
                   bordered
                   size="middle"
@@ -2063,10 +1902,21 @@ const AddGroupRateCode = () => {
       children: (
         <Card style={{ marginBottom: 24 }}>
           <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="primary" style={{ marginRight: 10 }} onClick={handleAddChannelPublish}>
+            <Button
+              type="primary"
+              style={{ marginRight: 10 }}
+              onClick={handleAddChannelPublish}
+              loading={channelTabLoading}
+              disabled={channelTabLoading}
+            >
               新增
             </Button>
-            <Button type="primary">
+            <Button
+              type="primary"
+              onClick={handleSaveAllPublishConfigs}
+              loading={loading}
+              disabled={channelTabLoading}
+            >
               保存发布
             </Button>
           </div>
@@ -2080,20 +1930,26 @@ const AddGroupRateCode = () => {
                 width: 200,
                 render: (text, record) => {
                   if (record.published) {
-                    return <span>{text.join(', ')}</span>
+                    const names = text.map(code => {
+                      const found = channels.find(c => c.channelCode === code)
+                      return found ? found.channelName : code
+                    })
+                    return <span>{names.join(', ')}</span>
                   }
                   return (
                     <Select
                       mode="multiple"
+                      virtual={false}
                       style={{ width: '100%' }}
                       placeholder="请选择渠道"
                       value={text}
                       onChange={(value) => handleChannelChange(record.key, value)}
+                      loading={loadingChannels || channelTabLoading}
+                      disabled={loadingChannels || channelTabLoading}
                     >
-                      <Option value="携程">携程</Option>
-                      <Option value="飞猪">飞猪</Option>
-                      <Option value="美团">美团</Option>
-                      <Option value="Booking.com">Booking.com</Option>
+                      {channels.map(c => (
+                        <Option key={c.channelCode} value={c.channelCode}>{c.channelName}</Option>
+                      ))}
                     </Select>
                   )
                 }
@@ -2105,40 +1961,37 @@ const AddGroupRateCode = () => {
                 width: 200,
                 render: (text, record) => {
                   if (record.published) {
-                    return <span>{text.join(', ')}</span>
+                    const names = text.map(code => {
+                      const found = hotelData.find(h => h.hotelCode === code)
+                      return found ? found.hotel : code
+                    })
+                    return <span>{names.join(', ')}</span>
                   }
+                  const allocatedHotels = hotelData.filter(h => h.allocated)
                   return (
                     <Select
                       mode="multiple"
+                      virtual={false}
                       style={{ width: '100%' }}
                       placeholder="请选择酒店"
                       value={text}
                       onChange={(value) => handleHotelChange(record.key, value)}
+                      loading={channelTabLoading}
+                      disabled={channelTabLoading}
                     >
-                      <Option value="南风酒店">南风酒店</Option>
-                      <Option value="上海宝丽嘉">上海宝丽嘉</Option>
-                      <Option value="杭州钓美">杭州钓美</Option>
+                      {allocatedHotels.map(h => (
+                        <Option key={h.hotelCode} value={h.hotelCode}>{h.hotel}</Option>
+                      ))}
                     </Select>
                   )
                 }
               },
               {
-                title: (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span>房价</span>
-                    <div style={{ marginTop: 4, display: 'flex', alignItems: 'center' }}>
-                      <Checkbox
-                        checked={selectAllPublishRateCode}
-                        onChange={(e) => handleSelectAllPublishRateCode(e.target.checked)}
-                        style={{ marginRight: 6 }}
-                      />
-                      <span style={{ fontSize: '12px', color: '#52c41a' }}>全选房价</span>
-                    </div>
-                  </div>
-                ),
+                title: '房价',
                 dataIndex: 'rateCode',
                 key: 'rateCode',
-                width: 150
+                width: 150,
+                render: (text) => <span>{form.getFieldValue('rateName') || text || '房价计划'}</span>
               },
               {
                 title: (
@@ -2157,31 +2010,22 @@ const AddGroupRateCode = () => {
                 dataIndex: 'roomTypes',
                 key: 'roomTypes',
                 width: 300,
-                render: (text, record) => (
-                  <Space wrap>
-                    <Checkbox
-                      checked={record.roomTypes.includes('大床房')}
-                      onChange={(e) => handleRoomTypeChange(record.key, '大床房', e.target.checked)}
-                      disabled={record.published}
-                    >
-                      大床房
-                    </Checkbox>
-                    <Checkbox
-                      checked={record.roomTypes.includes('双床房')}
-                      onChange={(e) => handleRoomTypeChange(record.key, '双床房', e.target.checked)}
-                      disabled={record.published}
-                    >
-                      双床房
-                    </Checkbox>
-                    <Checkbox
-                      checked={record.roomTypes.includes('高级房')}
-                      onChange={(e) => handleRoomTypeChange(record.key, '高级房', e.target.checked)}
-                      disabled={record.published}
-                    >
-                      高级房
-                    </Checkbox>
-                  </Space>
-                )
+                render: (text, record) => {
+                  const applicableRoomTypesMetadata = groupRoomTypes.filter(rt => selectedApplicableRoomTypes.includes(rt.roomTypeCode))
+                  return (
+                    <Space wrap>
+                      {applicableRoomTypesMetadata.map(rt => (
+                        <Checkbox
+                          key={rt.roomTypeCode}
+                          checked={record.roomTypes.includes(rt.roomTypeCode)}
+                          onChange={(e) => handleRoomTypeChange(record.key, rt.roomTypeCode, e.target.checked)}
+                        >
+                          {rt.roomTypeName}
+                        </Checkbox>
+                      ))}
+                    </Space>
+                  )
+                }
               },
               {
                 title: '操作',
@@ -2241,19 +2085,38 @@ const AddGroupRateCode = () => {
         defaultActiveKey="1" 
         items={tabItems}
         onChange={(key) => {
-          console.log('切换Tab:', key)
-          console.log('当前状态 - isEditing:', isEditing, 'currentId:', currentId, 'hotelData长度:', hotelData.length)
           // 切换到分配Tab时，如果是编辑模式则加载分配状态
           if (key === '2' && isEditing && currentId) {
-            console.log('切换到分配Tab，强制重新加载分配数据')
             // 先加载酒店数据，确保数据是最新的
-            fetchHotels().then(hotelBaseData => {
-              console.log('重新加载的酒店数据:', hotelBaseData)
-              if (hotelBaseData.length > 0) {
-                console.log('准备调用fetchAllocations，currentId:', currentId)
-                fetchAllocations(currentId, hotelBaseData)
-              }
-            })
+            setAllocationLoading(true)
+            fetchHotels()
+              .then(hotelBaseData => {
+                if (hotelBaseData.length > 0) {
+                  return fetchAllocations(currentId, hotelBaseData)
+                }
+                return undefined
+              })
+              .finally(() => setAllocationLoading(false))
+          }
+          // 切换到渠道发布Tab时
+          if (key === '3') {
+            setChannelTabLoading(true)
+            const rateCode = form.getFieldValue('rateCode')
+            const tasks = [
+              fetchChannels(),
+              fetchHotels().then(hotelBaseData => {
+                if (isEditing && currentId && hotelBaseData.length > 0) {
+                  return fetchAllocations(currentId, hotelBaseData)
+                }
+                return undefined
+              })
+            ]
+            if (isEditing && rateCode) {
+              tasks.push(fetchPublishRecords(rateCode))
+            } else {
+              setChannelPublishData([])
+            }
+            Promise.all(tasks).finally(() => setChannelTabLoading(false))
           }
         }}
       />

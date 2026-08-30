@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { ratePlanApi } from '../../utils/api'
 import { useHotelContext } from '../../contexts/HotelContext'
 import InventoryQuotaTable from './InventoryQuotaTable'

@@ -159,6 +159,9 @@ public class ReservationController {
         orderInfo.put("createTime", formatDateTime(reservation.getCreatedAt()));
         orderInfo.put("isManual", reservation.getIsManual());
         orderInfo.put("manualReason", reservation.getManualReason());
+        orderInfo.put("cancelReason", reservation.getCancelReason());
+        orderInfo.put("cancelledBy", reservation.getCancelledBy());
+        orderInfo.put("cancelledAt", formatDateTime(reservation.getCancelledAt()));
         detail.put("orderInfo", orderInfo);
 
         Map<String, Object> hotelInfo = new LinkedHashMap<>();
@@ -448,12 +451,14 @@ public class ReservationController {
         }
         try {
             String reason = (String) body.getOrDefault("reason", "");
+            String targetStatus = (String) body.get("reservationStatus");
 
-            Reservation updated = reservationService.manualIntervene(id, reason, operator);
+            Reservation updated = reservationService.manualIntervene(id, reason, operator, targetStatus);
 
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("id", updated.getId());
             response.put("isManual", updated.getIsManual());
+            response.put("reservationStatus", updated.getReservationStatus());
             response.put("message", "人工干预标记成功");
 
             return ResponseEntity.ok(response);

@@ -15,6 +15,9 @@ import java.util.Optional;
  */
 @Repository
 public interface BasePriceRepository extends JpaRepository<BasePrice, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<BasePrice> findByIdAndTenantId(Integer id, Integer tenantId);
     
     // 业务关联已统一切换为基于业务编码 (Code) 进行检索。
     // 请优先使用下方的 ByCode 系列方法。
@@ -37,4 +40,3 @@ public interface BasePriceRepository extends JpaRepository<BasePrice, Integer> {
     /** 根据编码组合及精确日期查询 */
     Optional<BasePrice> findByTenantIdAndHotelCodeAndRateTypeCodeAndRoomTypeCodeAndDate(Integer tenantId, String hotelCode, String rateTypeCode, String roomTypeCode, Date date);
 }
-

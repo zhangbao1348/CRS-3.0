@@ -110,7 +110,8 @@ public class GuaranteePolicyController {
             // 检查是否被房价码引用
             Optional<GuaranteePolicy> policyOpt = guaranteePolicyService.getById(id);
             if (policyOpt.isPresent()) {
-                long refCount = groupRateCodeRepository.countByGuaranteeRule(policyOpt.get().getCode());
+                Integer tenantId = com.crs.util.TenantContext.getTenantId();
+                long refCount = groupRateCodeRepository.countByGroupIdAndGuaranteeRule(tenantId, policyOpt.get().getCode());
                 if (refCount > 0) {
                     return ResponseEntity.badRequest().body(Map.of("error", "该担保政策已被 " + refCount + " 个房价码引用，无法删除"));
                 }

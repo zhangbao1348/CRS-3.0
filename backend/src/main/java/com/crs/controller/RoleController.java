@@ -6,6 +6,7 @@ import com.crs.entity.RoleMenu;
 import com.crs.entity.Tenant;
 import com.crs.repository.MenuRepository;
 import com.crs.repository.RoleMenuRepository;
+import com.crs.repository.RoleRepository;
 import com.crs.repository.TenantRepository;
 import com.crs.service.RoleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,9 @@ public class RoleController {
     
     @Autowired
     private RoleMenuRepository roleMenuRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
     
     @Autowired
     private MenuRepository menuRepository;
@@ -77,6 +81,10 @@ public class RoleController {
             response.put("success", true);
             response.put("data", roleDataList);
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "获取角色列表失败: " + e.getMessage());
@@ -92,6 +100,10 @@ public class RoleController {
             response.put("success", true);
             response.put("data", roles);
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "获取角色列表失败: " + e.getMessage());
@@ -152,6 +164,10 @@ public class RoleController {
             response.put("data", createdRole);
             response.put("message", "角色创建成功");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "创建角色失败: " + e.getMessage());
@@ -174,6 +190,10 @@ public class RoleController {
                 response.put("message", "角色不存在");
                 return ResponseEntity.notFound().build();
             }
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "更新角色失败: " + e.getMessage());
@@ -189,6 +209,10 @@ public class RoleController {
             response.put("success", true);
             response.put("message", "角色删除成功");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "删除角色失败: " + e.getMessage());
@@ -223,6 +247,15 @@ public class RoleController {
         Map<String, Object> response = new HashMap<>();
         try {
             List<Integer> menuIds = request.get("menuIds");
+            if (!roleRepository.existsById(roleId)) {
+                throw new IllegalArgumentException("角色不存在");
+            }
+            if (menuIds != null && menuIds.stream().distinct().count() != menuIds.size()) {
+                throw new IllegalArgumentException("菜单权限不能重复");
+            }
+            if (menuIds != null && menuRepository.findAllById(menuIds).size() != menuIds.size()) {
+                throw new IllegalArgumentException("包含不存在的菜单权限");
+            }
             
             roleMenuRepository.deleteByRoleId(roleId);
             
@@ -238,6 +271,10 @@ public class RoleController {
             response.put("success", true);
             response.put("message", "菜单分配成功");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "菜单分配失败: " + e.getMessage());

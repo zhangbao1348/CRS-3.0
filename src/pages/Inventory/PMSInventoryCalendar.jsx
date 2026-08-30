@@ -186,7 +186,7 @@ const PMSInventoryCalendar = () => {
         onHeaderCell: () => ({
           style: { background: isWeekend ? '#fffbf0' : undefined, padding: '4px 2px' },
         }),
-        onCell: (record) => ({
+        onCell: () => ({
           style: {
             background: isWeekend ? '#fffbf0' : undefined,
             textAlign: 'center',

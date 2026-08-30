@@ -1,52 +1,19 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-import axios from 'axios'
+import api from '../../utils/api'
 
 const MarketCodeCategory = () => {
-  const mockMarketCodeCategories = [
-    {
-      key: '1',
-      title: '直接预订',
-      code: 'DIRECT'
-    },
-    {
-      key: '2',
-      title: 'OTA渠道',
-      code: 'OTA'
-    },
-    {
-      key: '3',
-      title: '企业客户',
-      code: 'CORPORATE'
-    },
-    {
-      key: '4',
-      title: '旅行社',
-      code: 'TRAVEL_AGENCY'
-    },
-    {
-      key: '5',
-      title: '会员预订',
-      code: 'MEMBER'
-    },
-    {
-      key: '6',
-      title: '促销活动',
-      code: 'PROMO'
-    }
-  ]
-
-  const [initialData, setInitialData] = useState(mockMarketCodeCategories)
+  const [initialData, setInitialData] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchMarketCodeCategories = async () => {
       try {
-        const response = await axios.get('/api/market-code-categories')
-        setInitialData(response.data || [])
+        const response = await api.get('/market-code-categories')
+        setInitialData(response || [])
       } catch (error) {
-        console.error('加载市场码大类数据失败，使用模拟数据:', error)
-        setInitialData(mockMarketCodeCategories)
+        console.error('加载市场码大类数据失败:', error)
+        setInitialData([])
       } finally {
         setLoading(false)
       }
@@ -62,12 +29,12 @@ const MarketCodeCategory = () => {
           code: nodeData.code,
           name: nodeData.title
         }
-        const response = await axios.post('/api/market-code-categories', marketCodeCategoryData)
+        const response = await api.post('/market-code-categories', marketCodeCategoryData)
         return {
-          key: response.data.id.toString(),
-          title: response.data.name,
-          code: response.data.code,
-          id: response.data.id
+          key: response.id.toString(),
+          title: response.name,
+          code: response.code,
+          id: response.id
         }
       } catch (error) {
         console.error('新增市场码大类失败:', error)
@@ -81,7 +48,7 @@ const MarketCodeCategory = () => {
           code: nodeData.code,
           name: nodeData.title
         }
-        await axios.put(`/api/market-code-categories/${nodeKey}`, marketCodeCategoryData)
+        await api.put(`/market-code-categories/${nodeKey}`, marketCodeCategoryData)
         return true
       } catch (error) {
         console.error('更新市场码大类失败:', error)
@@ -91,27 +58,27 @@ const MarketCodeCategory = () => {
 
     deleteNode: async (nodeKey) => {
       try {
-        await axios.delete(`/api/market-code-categories/${nodeKey}`)
+        await api.delete(`/market-code-categories/${nodeKey}`)
         return true
       } catch (error) {
         console.error('删除市场码大类失败:', error)
-        return true
+        throw new Error(error.response?.data?.message || error.response?.data?.error || '删除市场码大类失败')
       }
     },
 
     checkCodeUnique: async (code, excludeKey) => {
       try {
         const excludeId = excludeKey ? parseInt(excludeKey) : null
-        const response = await axios.get('/api/market-code-categories/check-code', {
+        const response = await api.get('/market-code-categories/check-code', {
           params: {
             code: code,
             id: excludeId
           }
         })
-        return response.data.unique
+        return response.unique
       } catch (error) {
         console.error('检查市场码大类CODE失败:', error)
-        return true
+        throw new Error(error.response?.data?.message || error.response?.data?.error || '无法校验市场码大类唯一性')
       }
     }
   }

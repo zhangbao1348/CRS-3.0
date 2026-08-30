@@ -77,11 +77,15 @@ public class GroupFacilityController {
      */
     @PostMapping
     public ResponseEntity<?> createFacility(@RequestBody GroupFacility facility) {
-        if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
-            return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+        try {
+            if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            GroupFacility createdFacility = groupFacilityService.createFacility(facility);
+            return ResponseEntity.ok(createdFacility);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }
-        GroupFacility createdFacility = groupFacilityService.createFacility(facility);
-        return ResponseEntity.ok(createdFacility);
     }
     
     /**
@@ -92,12 +96,16 @@ public class GroupFacilityController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<?> updateFacility(@PathVariable Integer id, @RequestBody GroupFacility facility) {
-        if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
-            return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+        try {
+            if (facility.getFacilityCode() != null && !CodeValidator.isValid(facility.getFacilityCode())) {
+                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            facility.setId(id);
+            GroupFacility updatedFacility = groupFacilityService.updateFacility(facility);
+            return ResponseEntity.ok(updatedFacility);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
         }
-        facility.setId(id);
-        GroupFacility updatedFacility = groupFacilityService.updateFacility(facility);
-        return ResponseEntity.ok(updatedFacility);
     }
     
     /**

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Popconfirm } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined,
-  LockOutlined
+  LockOutlined,
+  DeleteOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
@@ -16,6 +17,7 @@ import {
 
 const { Option } = Select
 const GroupGuarantee = () => {
+  const { message } = App.useApp()
   const [guaranteePolicies, setGuaranteePolicies] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchName, setSearchName] = useState('')
@@ -48,6 +50,17 @@ const GroupGuarantee = () => {
   
   const handleEditGuarantee = (record) => {
     navigate('/group-management/add-edit-guarantee', { state: { record } })
+  }
+
+  /** 删除前二次确认，服务端负责校验房价码引用。 */
+  const handleDeleteGuarantee = async (record) => {
+    try {
+      await api.delete(`/guarantee-policies/${record.id}`)
+      message.success('担保政策删除成功')
+      loadGuaranteePolicies()
+    } catch (error) {
+      message.error(error?.error || error?.message || '担保政策删除失败')
+    }
   }
   
   // 搜索过滤
@@ -113,6 +126,16 @@ const GroupGuarantee = () => {
       render: (_, record) => (
         <Space size="middle">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditGuarantee(record)}>编辑</Button>
+          <Popconfirm
+            title="确认删除该担保政策？"
+            description="已被房价码引用的政策将被系统拒绝删除。"
+            okText="确定"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDeleteGuarantee(record)}
+          >
+            <Button danger type="link" size="small" icon={<DeleteOutlined />} aria-label={`删除担保政策 ${record.name}`}>删除</Button>
+          </Popconfirm>
         </Space>
       )
     }

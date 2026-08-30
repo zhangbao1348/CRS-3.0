@@ -2,6 +2,7 @@ package com.crs.entity;
 
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Date;
 
 /**
@@ -25,6 +26,7 @@ public class User {
     private String username;
     
     @Column(name = "password", nullable = false, length = 100)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     
     @Column(name = "name", nullable = false, length = 50)

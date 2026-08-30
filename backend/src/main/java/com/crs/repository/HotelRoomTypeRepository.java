@@ -26,6 +26,9 @@ import java.util.Optional;
 @Repository
 public interface HotelRoomTypeRepository extends JpaRepository<HotelRoomType, Integer> {
 
+    /** 在租户维度下根据主键查询酒店房型。 */
+    Optional<HotelRoomType> findByIdAndTenantId(Integer id, Integer tenantId);
+
     // 业务关联已统一切换为基于业务编码 (Code) 进行检索。
     // 请优先使用下方的 ByCode 系列方法。
 

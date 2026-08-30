@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Form, Input, Select, Checkbox, Button, message, Row, Col, InputNumber, Card } from 'antd'
+import { App, Form, Input, Select, Checkbox, Button, Row, Col, InputNumber, Card } from 'antd'
 import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
@@ -57,11 +57,16 @@ const getErrorMessage = (error, fallbackMessage) => {
     return error.response.data.error
   }
 
+  if (typeof error === 'string') {
+    return error
+  }
+
   return fallbackMessage
 }
 
 const EditPackage = () => {
   const [form] = Form.useForm()
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [quantityType, setQuantityType] = useState('')
   const navigate = useNavigate()
@@ -121,8 +126,7 @@ const EditPackage = () => {
       // 设置计数方式状态
       setQuantityType(formData.quantityType)
     } catch (error) {
-      console.error('加载包价数据失败:', error)
-      message.error('加载包价数据失败，请稍后重试')
+      message.error(getErrorMessage(error, '加载包价数据失败，请稍后重试'))
       navigate('/group-management/package-setting')
     } finally {
       setLoading(false)
@@ -157,8 +161,9 @@ const EditPackage = () => {
       // 跳转到包价列表页面
       navigate('/group-management/package-setting')
     } catch (error) {
-      console.error('保存包价失败:', error)
-      message.error(getErrorMessage(error, '保存失败，请稍后重试'))
+      if (!error?.errorFields) {
+        message.error(getErrorMessage(error, '保存失败，请稍后重试'))
+      }
     } finally {
       setLoading(false)
     }
@@ -252,7 +257,7 @@ const EditPackage = () => {
                   label="包价代码"
                   rules={[
                     { required: true, message: '请输入包价代码' },
-                    { pattern: /^[A-Za-z0-9_]+$/, message: '包价代码只能包含英文字母、数字和下划线' }
+                    { pattern: /^[A-Za-z0-9_]+$/, message: '包价代码仅允许英文字母、数字和下划线' }
                   ]}
                 >
                   <Input placeholder="请输入包价代码" disabled size="large" />
@@ -318,7 +323,10 @@ const EditPackage = () => {
                   <Form.Item
                     name="fixedQuantity"
                     label={getQuantityLabel(quantityType)}
-                    rules={[{ required: true, message: `请输入${getQuantityLabel(quantityType)}` }]}
+                    rules={[
+                      { required: true, message: `请输入${getQuantityLabel(quantityType)}` },
+                      { type: 'integer', min: 1, message: '份数必须是大于 0 的整数，请重新输入' }
+                    ]}
                   >
                     <InputNumber
                       style={{ width: '100%' }}
@@ -381,6 +389,7 @@ const EditPackage = () => {
                 <Form.Item
                   name="fixedPrice"
                   label="价格"
+                  rules={[{ type: 'number', min: 0, message: '价格不能为负数，请重新输入' }]}
                 >
                   <InputNumber
                     style={{ width: '100%' }}

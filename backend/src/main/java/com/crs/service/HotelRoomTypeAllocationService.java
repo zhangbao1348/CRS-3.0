@@ -2,7 +2,6 @@ package com.crs.service;
 
 import com.crs.entity.HotelRoomTypeAllocation;
 import com.crs.repository.HotelRoomTypeAllocationRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -22,8 +21,11 @@ import java.util.List;
 @Service
 public class HotelRoomTypeAllocationService {
     
-    @Autowired
-    private HotelRoomTypeAllocationRepository hotelRoomTypeAllocationRepository;
+    private final HotelRoomTypeAllocationRepository hotelRoomTypeAllocationRepository;
+
+    public HotelRoomTypeAllocationService(HotelRoomTypeAllocationRepository hotelRoomTypeAllocationRepository) {
+        this.hotelRoomTypeAllocationRepository = hotelRoomTypeAllocationRepository;
+    }
 
     private Integer getCurrentTenantId() {
         Integer tenantId = com.crs.util.TenantContext.getTenantId();
@@ -73,11 +75,18 @@ public class HotelRoomTypeAllocationService {
     }
     
     public HotelRoomTypeAllocation updateAllocation(HotelRoomTypeAllocation allocation) {
-        allocation.setTenantId(getCurrentTenantId());
-        return hotelRoomTypeAllocationRepository.save(allocation);
+        HotelRoomTypeAllocation existing = hotelRoomTypeAllocationRepository
+                .findByIdAndTenantId(allocation.getId(), getCurrentTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("酒店房型分配不存在或无权访问"));
+        existing.setAllocated(allocation.getAllocated());
+        existing.setRoomInfoEditable(allocation.getRoomInfoEditable());
+        return hotelRoomTypeAllocationRepository.save(existing);
     }
     
     public void deleteAllocation(Integer id) {
-        hotelRoomTypeAllocationRepository.deleteById(id);
+        HotelRoomTypeAllocation existing = hotelRoomTypeAllocationRepository
+                .findByIdAndTenantId(id, getCurrentTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("酒店房型分配不存在或无权访问"));
+        hotelRoomTypeAllocationRepository.delete(existing);
     }
 }

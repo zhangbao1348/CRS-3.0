@@ -1,29 +1,21 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Image, Radio, Table, Switch, message, Tag } from 'antd'
+import { useState, useEffect } from 'react'
+import { App as AntApp, Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Radio, Table, Switch, Tag } from 'antd'
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
-import { tenantApi, hotelApi, hotelFacilityApi, hotelImageApi, groupRateCodeApi, groupRoomTypeApi, hotelRateCodeAllocationApi, groupRoomTypeHotelApi, dictionaryApi } from '../../utils/api'
+import { tenantApi, hotelApi, hotelFacilityApi, groupRateCodeApi, groupRoomTypeApi, hotelRateCodeAllocationApi, groupRoomTypeHotelApi, dictionaryApi } from '../../utils/api'
 import { useTenantContext } from '../../contexts/TenantContext'
 
 const { Option } = Select
 
 const AddHotel = () => {
+  const { message } = AntApp.useApp()
   const [form] = Form.useForm()
-  const [htmlContent, setHtmlContent] = useState('')
-  const [tenants, setTenants] = useState([])
   const { selectedTenant } = useTenantContext()
   const [currentTenantName, setCurrentTenantName] = useState('')
   const [activeTabKey, setActiveTabKey] = useState('1')
-  const [hotelId, setHotelId] = useState(null)
   const [hotelCode, setHotelCode] = useState(null)
   const [regionOptions, setRegionOptions] = useState([])
-  
-  // 集团房价码数据状态
-  const [groupRateCodes, setGroupRateCodes] = useState([])
-  
-  // 集团房型数据状态
-  const [groupRoomTypes, setGroupRoomTypes] = useState([])
   
   // 房价码数据状态
   const [rateCodeData, setRateCodeData] = useState([])
@@ -41,7 +33,6 @@ const AddHotel = () => {
   const editorConfig = {
     placeholder: '请输入酒店简介',
     onChange: (editor) => {
-      setHtmlContent(editor.getHtml())
       form.setFieldsValue({ hotelIntroduction: editor.getHtml() })
     }
   }
@@ -53,7 +44,6 @@ const AddHotel = () => {
         const response = await tenantApi.getAllTenants()
         if (response.success) {
           const tenantList = response.data || []
-          setTenants(tenantList)
           if (selectedTenant) {
             const tenant = tenantList.find(t => t.id === selectedTenant)
             setCurrentTenantName(tenant ? tenant.tenantName : '未知租户')
@@ -83,8 +73,7 @@ const AddHotel = () => {
       try {
         const rateCodes = await groupRateCodeApi.getActiveGroupRateCodes()
         const codes = Array.isArray(rateCodes) ? rateCodes : (rateCodes.data || [])
-        setGroupRateCodes(codes)
-        setRateCodeData(codes.map((code, index) => ({
+        setRateCodeData(codes.map((code) => ({
           key: String(code.id),
           rateCode: code.rateName,
           rateCodeValue: code.rateCode,
@@ -107,14 +96,10 @@ const AddHotel = () => {
     // 加载集团房型
     const loadGroupRoomTypes = async () => {
       try {
-        console.log('开始加载集团房型...')
         const response = await groupRoomTypeApi.getAllGroupRoomTypes()
-        console.log('集团房型API返回:', response)
         if (response.success) {
           const types = response.data || []
-          console.log('解析到的房型数据:', types)
-          setGroupRoomTypes(types)
-          const mappedData = types.map((type, index) => ({
+          const mappedData = types.map((type) => ({
             key: String(type.id),
             roomType: type.roomTypeName || type.roomType,
             roomTypeCode: type.roomTypeCode || '',
@@ -122,7 +107,6 @@ const AddHotel = () => {
             allocated: false,
             roomInfoEditable: false
           }))
-          console.log('映射后的roomTypeData:', mappedData)
           setRoomTypeData(mappedData)
         }
       } catch (error) {
@@ -371,17 +355,9 @@ const AddHotel = () => {
         tenantId: selectedTenant
       }
       
-      let response
-      if (hotelId) {
-        response = await hotelApi.updateHotelByCode(hotelCode, hotelData)
-      } else {
-        response = await hotelApi.createHotel(hotelData)
-        if (response.id) {
-          setHotelId(response.id)
-        }
-        if (response.hotelCode) {
-          setHotelCode(response.hotelCode)
-        }
+      const response = await hotelApi.createHotel(hotelData)
+      if (response.hotelCode) {
+        setHotelCode(response.hotelCode)
       }
       
       return true
@@ -482,8 +458,8 @@ const AddHotel = () => {
       if (facilities.length > 0) {
         try {
           await hotelFacilityApi.deleteHotelFacilitiesByCode(hotelCode)
-        } catch (error) {
-          console.log('删除现有设施失败（可能是首次添加）:', error.message)
+        } catch {
+          // 新建酒店可能尚无设施记录。
         }
         for (const facility of facilities) {
           await hotelFacilityApi.createHotelFacility(facility)
@@ -765,6 +741,7 @@ const AddHotel = () => {
                   label="酒店代码"
                   rules={[
                     { required: true, message: '请输入酒店代码' },
+                    { max: 50, message: '酒店代码不能超过50个字符' },
                     { pattern: /^[A-Za-z0-9_]+$/, message: '酒店代码只能包含英文字母、数字和下划线' }
                   ]}
                 >
@@ -782,7 +759,7 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelChineseName"
                   label="酒店中文名称"
-                  rules={[{ required: true, message: '请输入酒店中文名称' }]}
+                  rules={[{ required: true, message: '请输入酒店中文名称' }, { max: 100, message: '酒店中文名称不能超过100个字符' }]}
                 >
                   <Input placeholder="请输入酒店中文名称" />
                 </Form.Item>
@@ -861,7 +838,7 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelAddress"
                   label="酒店详细地址"
-                  rules={[{ required: true, message: '请输入酒店详细地址' }]}
+                  rules={[{ required: true, message: '请输入酒店详细地址' }, { max: 200, message: '酒店详细地址不能超过200个字符' }]}
                 >
                   <Input placeholder="请输入酒店详细地址" />
                 </Form.Item>
@@ -870,7 +847,11 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelLongitude"
                   label="酒店经度"
-                  rules={[{ required: true, message: '请输入酒店经度' }]}
+                  rules={[
+                    { required: true, message: '请输入酒店经度' },
+                    { validator: (_, value) => value !== undefined && value !== '' && Number.isFinite(Number(value)) && Number(value) >= -180 && Number(value) <= 180
+                      ? Promise.resolve() : Promise.reject(new Error('请输入正确的经度数值（范围 -180 至 180）')) }
+                  ]}
                 >
                   <Input placeholder="请输入经度" />
                 </Form.Item>
@@ -879,7 +860,11 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelLatitude"
                   label="酒店纬度"
-                  rules={[{ required: true, message: '请输入酒店纬度' }]}
+                  rules={[
+                    { required: true, message: '请输入酒店纬度' },
+                    { validator: (_, value) => value !== undefined && value !== '' && Number.isFinite(Number(value)) && Number(value) >= -90 && Number(value) <= 90
+                      ? Promise.resolve() : Promise.reject(new Error('请输入正确的纬度数值（范围 -90 至 90）')) }
+                  ]}
                 >
                   <Input placeholder="请输入纬度" />
                 </Form.Item>
@@ -888,7 +873,7 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelPhone"
                   label="酒店联系电话"
-                  rules={[{ required: true, message: '请输入酒店联系电话' }]}
+                  rules={[{ required: true, message: '请输入酒店联系电话' }, { max: 20, message: '酒店联系电话不能超过20个字符' }]}
                 >
                   <Input placeholder="请输入酒店联系电话" />
                 </Form.Item>
@@ -897,7 +882,11 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelEmail"
                   label="酒店邮箱"
-                  rules={[{ required: true, message: '请输入酒店邮箱' }]}
+                  rules={[
+                    { required: true, message: '请输入酒店邮箱' },
+                    { type: 'email', message: '请输入合法的邮箱地址，例如 hotel@crs.com' },
+                    { max: 100, message: '酒店邮箱不能超过100个字符' }
+                  ]}
                 >
                   <Input placeholder="请输入酒店邮箱" />
                 </Form.Item>
@@ -906,7 +895,10 @@ const AddHotel = () => {
                 <Form.Item
                   name="hotelTotalRooms"
                   label="酒店总房间数"
-                  rules={[{ required: true, message: '请输入酒店总房间数' }]}
+                  rules={[
+                    { required: true, message: '请输入酒店总房间数' },
+                    { type: 'integer', min: 1, message: '总房间数必须为大于 0 的整数' }
+                  ]}
                 >
                   <InputNumber placeholder="请输入酒店总房间数" style={{ width: '100%' }} min={1} />
                 </Form.Item>
@@ -935,10 +927,10 @@ const AddHotel = () => {
               <Col span={24} style={{ textAlign: 'center', marginTop: 32 }}>
                 <Form.Item>
                   <Space>
-                    <Button type="primary" size="large" onClick={() => handleSave(form.getFieldsValue())}>
+                    <Button type="primary" size="large" onClick={() => form.validateFields().then(handleSave).catch(() => undefined)}>
                       保存
                     </Button>
-                    <Button type="primary" size="large" onClick={() => handleSaveAndNext(form.getFieldsValue())}>
+                    <Button type="primary" size="large" onClick={() => form.validateFields().then(handleSaveAndNext).catch(() => undefined)}>
                       保存，并下一步
                     </Button>
                   </Space>
@@ -1517,7 +1509,6 @@ const AddHotel = () => {
                     key: 'roomType',
                     width: 200,
                     render: (text, record) => {
-                      console.log('表格中的record:', record)
                       return (
                         <span>{record.roomType}（{record.roomTypeCode}）</span>
                       )

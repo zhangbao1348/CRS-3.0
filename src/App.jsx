@@ -1,6 +1,5 @@
-import React from 'react'
 import { RouterProvider } from 'react-router-dom'
-import { ConfigProvider } from 'antd'
+import { App as AntApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { router } from './router'
 import { HotelProvider } from './contexts/HotelContext.jsx'
@@ -33,11 +32,44 @@ const themeConfig = {
     fontSize: 14,
     fontSizeLG: 16,
     fontSizeSM: 12,
+    controlHeight: 36,
+    controlHeightLG: 40,
+    controlHeightSM: 28,
+    padding: 16,
+    paddingLG: 24,
+    paddingSM: 12,
+    margin: 16,
+    marginLG: 24,
+    marginSM: 12,
     // 间距
     lineHeight: 1.5715,
     // 阴影
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.09)',
     boxShadowSecondary: '0 4px 12px rgba(0, 0, 0, 0.15)',
+  },
+  components: {
+    Button: {
+      fontWeight: 600,
+      paddingInline: 16,
+    },
+    Card: {
+      bodyPadding: 20,
+      headerHeight: 52,
+      headerFontSize: 16,
+    },
+    Form: {
+      itemMarginBottom: 20,
+      labelFontSize: 14,
+      verticalLabelPadding: '0 0 8px',
+    },
+    Table: {
+      cellPaddingBlockMD: 12,
+      cellPaddingInlineMD: 12,
+      headerBorderRadius: 8,
+    },
+    Modal: {
+      titleFontSize: 18,
+    },
   },
 }
 
@@ -47,13 +79,15 @@ function App() {
       locale={zhCN}
       theme={themeConfig}
     >
-      <AuthProvider>
-        <TenantProvider>
-          <HotelProvider>
-            <RouterProvider router={router} />
-          </HotelProvider>
-        </TenantProvider>
-      </AuthProvider>
+      <AntApp className="crs-antd-app">
+        <AuthProvider>
+          <TenantProvider>
+            <HotelProvider>
+              <RouterProvider router={router} />
+            </HotelProvider>
+          </TenantProvider>
+        </AuthProvider>
+      </AntApp>
     </ConfigProvider>
   )
 }

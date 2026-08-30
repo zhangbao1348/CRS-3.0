@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, InputNumber, Button, Card, Row, Col, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Form, Input, Select, InputNumber, Button, Card, Row, Col } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { taxSettingApi, enumApi } from '../../utils/api'
@@ -8,6 +8,7 @@ const { Option } = Select
 
 const AddEditTax = () => {
   const [form] = Form.useForm()
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [enumLoading, setEnumLoading] = useState(true)
   const navigate = useNavigate()
@@ -29,8 +30,7 @@ const AddEditTax = () => {
         setStatusOptions(response)
       }
     } catch (error) {
-      console.error('获取枚举选项失败:', error)
-      message.error('获取状态选项失败')
+      message.error(error?.error || '获取状态选项失败')
     } finally {
       setEnumLoading(false)
     }
@@ -77,8 +77,9 @@ const AddEditTax = () => {
         navigate('/group-management/tax-setting')
       }, 1000)
     } catch (error) {
-      console.error('保存失败:', error)
-      message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
+      if (!error?.errorFields) {
+        message.error('保存失败: ' + (error?.error || error?.message || '未知错误'))
+      }
     } finally {
       setLoading(false)
     }
@@ -110,9 +111,9 @@ const AddEditTax = () => {
                 label="税率CODE"
                 rules={[
                   { required: true, message: '请输入税率CODE' },
-                  { pattern: /^[A-Za-z0-9_-]+$/, message: '税率CODE只能包含英文字母、数字、短横线和下划线' }
+                  { pattern: /^[A-Za-z0-9_]+$/, message: '税率CODE仅允许输入英文字母、数字和下划线' }
                 ]}
-                extra="唯一编码标识，保存后不可修改。例：VAT-CN-001、SERVICE-CN-001"
+                extra="唯一编码标识，保存后不可修改。例：VAT_CN_001、SERVICE_CN_001"
               >
                 <Input placeholder="请输入税率CODE" disabled={isEditing} />
               </Form.Item>
@@ -133,7 +134,15 @@ const AddEditTax = () => {
               <Form.Item
                 name="rateAmount"
                 label="税率 (%)"
-                rules={[{ required: true, message: '请输入税率百分比' }]}
+                rules={[
+                  { required: true, message: '请输入税率百分比' },
+                  {
+                    validator: (_, value) => value === undefined || value === null
+                      || (value >= 0 && value <= 100 && Number.isInteger(Number(value) * 100))
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('税率必须在 0% 到 100% 之间，最多保留两位小数'))
+                  }
+                ]}
                 extra="以百分比为单位的比例税，例：输入 6 代表 6%"
               >
                 <InputNumber 
@@ -152,7 +161,7 @@ const AddEditTax = () => {
               <Form.Item
                 name="status"
                 label="状态"
-                rules={[{ required: true, message: '请选择状态' }]}
+                rules={[{ required: true, message: '请选择税率状态' }]}
               >
                 <Select placeholder="请选择状态" loading={enumLoading}>
                   {statusOptions.map(option => (

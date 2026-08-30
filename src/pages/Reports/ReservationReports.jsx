@@ -1,17 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Card, Form, Select, DatePicker, Button, Table, Row, Col, message, Checkbox, Radio } from 'antd'
+import { App as AntApp, Card, Form, Select, DatePicker, Button, Table, Row, Col, Checkbox, Radio } from 'antd'
 import { SearchOutlined, ExportOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { reportApi, hotelApi, marketCodeApi, rateTypeApi } from '../../utils/api'
 
 const { Option } = Select
 const { RangePicker } = DatePicker
-
-// ==========================================
-// 模拟报表演示数据 - 丰富页面首次展现与预览内容
-// ==========================================
-// 已移除模拟数据常量
-
 
 /**
  * @module Reports
@@ -87,6 +81,7 @@ const renderTrendValue = (val, changeStr) => {
 };
 
 const ReservationReports = () => {
+  const { message: messageApi } = AntApp.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [initializing, setInitializing] = useState(false)
@@ -195,7 +190,7 @@ const ReservationReports = () => {
             groupBy2: params.groupBy2
           })
           setFormValues({ ...values })
-          message.success('查询成功')
+          messageApi.success('查询成功')
 
           // 检测对比期是否全为0（汇总表缺历史数据场景）
           if (params.enableCompare && compareStartDate && compareEndDate) {
@@ -217,14 +212,14 @@ const ReservationReports = () => {
           })
           setFormValues({ ...values })
           setShowInitHint(false)
-          message.info('未查询到相关订单统计记录')
+          messageApi.info('未查询到相关订单统计记录')
         }
       })
       .catch(err => {
         setReportData([])
         setTotalData(null)
         setShowInitHint(false)
-        message.warning(`获取真实数据失败（${err?.message || '网络连接失败'}）`)
+        messageApi.warning(`获取真实数据失败（${err?.message || '网络连接失败'}）`)
       })
       .finally(() => {
         setLoading(false)
@@ -234,7 +229,7 @@ const ReservationReports = () => {
   // 处理导出
   const handleExport = () => {
     if (!reportData || reportData.length === 0) {
-      message.warning('当前暂无数据可供导出，请先执行查询')
+      messageApi.warning('当前暂无数据可供导出，请先执行查询')
       return
     }
 
@@ -402,7 +397,7 @@ const ReservationReports = () => {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    message.success('订单分析报表导出成功！')
+    messageApi.success('订单分析报表导出成功！')
   }
 
   /**
@@ -431,7 +426,7 @@ const ReservationReports = () => {
     }
 
     if (tasks.length === 0) {
-      message.warning('请先选择查询日期范围')
+      messageApi.warning('请先选择查询日期范围')
       return
     }
 
@@ -440,12 +435,12 @@ const ReservationReports = () => {
       for (const task of tasks) {
         await reportApi.initialize({ startDate: task.startDate, endDate: task.endDate })
       }
-      message.success(`已成功初始化 ${tasks.map(t => t.label).join(' & ')} 的汇总数据，正在重新查询...`)
+      messageApi.success(`已成功初始化 ${tasks.map(t => t.label).join(' & ')} 的汇总数据，正在重新查询...`)
       setShowInitHint(false)
       // 初始化完成后自动重新查询
       setTimeout(() => handleSearch(), 300)
     } catch (err) {
-      message.error(`初始化失败：${err?.message || '请检查后端服务是否已启动'}`)
+      messageApi.error(`初始化失败：${err?.message || '请检查后端服务是否已启动'}`)
     } finally {
       setInitializing(false)
     }
@@ -671,26 +666,12 @@ const ReservationReports = () => {
         key: 'channel',
         width: 120,
         align: 'center',
-        render: (text, record) => {
-          if (activeGroupBys.groupBy2) {
-            if (record.isFirst) {
-              const channelData = reportData.find(c => c.key === record.channelKey);
-              return {
-                children: text,
-                props: {
-                  rowSpan: channelData?.hotels?.length || 1
-                }
-              };
-            }
-            return {
-              children: '',
-              props: {
-                rowSpan: 0
-              }
-            };
-          }
-          return text;
-        }
+        onCell: (record) => ({
+          rowSpan: activeGroupBys.groupBy2
+            ? (record.isFirst ? record.hotelCount || 1 : 0)
+            : 1
+        }),
+        render: (text) => text
       });
     }
 
@@ -934,14 +915,14 @@ const ReservationReports = () => {
       )}
       
       <Card 
-        bordered={false} 
+        variant="borderless"
         style={{ 
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)', 
           borderRadius: '8px', 
           border: '1px solid #e2e8f0',
           marginBottom: '20px'
         }}
-        bodyStyle={{ padding: '20px' }}
+        styles={{ body: { padding: '20px' } }}
       >
         {/* 筛选区域 - 取消折叠，全局精美平铺 */}
         <div style={{ marginBottom: 0 }}>
@@ -1130,13 +1111,13 @@ const ReservationReports = () => {
       {renderKpiCards()}
       
       <Card 
-        bordered={false} 
+        variant="borderless"
         style={{ 
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)', 
           borderRadius: '8px',
           border: '1px solid #e2e8f0'
         }}
-        bodyStyle={{ padding: '0px' }}
+        styles={{ body: { padding: '0px' } }}
       >
         {/* 报表 Table */}
         <Table

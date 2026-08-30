@@ -41,9 +41,11 @@ jest.mock('../../../utils/api', () => {
     default: mockApi,
     ratePlanApi: {
       getRatePlans: jest.fn().mockResolvedValue({ data: [] }),
+      getRatePlansByHotelCode: jest.fn().mockResolvedValue({ data: [] }),
     },
     hotelRoomTypeApi: {
       getHotelRoomTypes: jest.fn().mockResolvedValue({ data: [] }),
+      getHotelRoomTypesByCode: jest.fn().mockResolvedValue({ data: [] }),
     },
   }
 })
@@ -78,14 +80,14 @@ jest.mock('antd', () => {
   const React = require('react')
   const Select = (props) => React.createElement('select', { 'data-testid': 'mock-select' }, props.children)
   Select.Option = (props) => React.createElement('option', { value: props.value }, props.children)
+  const Space = (props) => React.createElement('div', null, props.children)
   const Row = (props) => React.createElement('div', null, props.children)
   const Col = (props) => React.createElement('div', null, props.children)
-  return { Select, Row, Col }
+  return { Select, Space, Row, Col }
 })
 
-// ---- Now import React and testing utilities ----
-import React from 'react'
-import { render } from '@testing-library/react'
+// ---- Now import testing utilities ----
+import { act, render } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
 // ---- Import page components ----
@@ -135,8 +137,11 @@ describe('Bug Condition: Inventory quota pages should render InventoryQuotaTable
     ]
 
     pages.forEach(({ name, Component }) => {
-      test(`${name} should render InventoryQuotaTable component`, () => {
-        const { container } = render(<Component />)
+      test(`${name} should render InventoryQuotaTable component`, async () => {
+        let container
+        await act(async () => {
+          container = render(<Component />).container
+        })
 
         // Should render the Table mock
         const tableEl = container.querySelector('[data-testid="inventory-quota-table"]')

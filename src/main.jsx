@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import App from './App.jsx'
 import './styles/index.css'
+import './styles/experience.css'
 import { initErrorTracker } from './utils/errorTracker.js'
 
 dayjs.locale('zh-cn')

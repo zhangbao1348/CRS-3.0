@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { Button, Input, Table, Form, Select, Upload, Space, Spin, Tabs, Checkbox, Card, Row, Col, message } from 'antd'
-import { PlusOutlined, EditOutlined, UploadOutlined, SearchOutlined, ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
+import { App as AntApp, Alert, Button, Input, Table, Form, Select, Space, Spin, Tabs, Checkbox, Card, Row, Col, Tag } from 'antd'
+import { PlusOutlined, EditOutlined, SearchOutlined, ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useHotelContext } from '../../contexts/HotelContext.jsx'
 import api, { groupFacilityApi } from '../../utils/api'
 import axios from 'axios'
@@ -8,6 +8,7 @@ import axios from 'axios'
 const { Option } = Select
 
 const RoomType = () => {
+  const { message } = AntApp.useApp()
   const [roomTypes, setRoomTypes] = useState([])
   const [filteredRoomTypes, setFilteredRoomTypes] = useState([])
   const [loading, setLoading] = useState(false)
@@ -18,6 +19,7 @@ const RoomType = () => {
   const [viewMode, setViewMode] = useState('list') // 'list' | 'edit'
   const [activeTab, setActiveTab] = useState('1')
   const [saving, setSaving] = useState(false)
+  const [roomTypePermissions, setRoomTypePermissions] = useState(null)
 
   // 房型设施相关
   const [groupFacilities, setGroupFacilities] = useState([])
@@ -50,6 +52,7 @@ const RoomType = () => {
       const activeRoomTypes = roomTypeList.filter(item => item.status === 'active')
       const data = activeRoomTypes.map(item => ({
         id: item.id,
+        groupRoomTypeCode: item.groupRoomTypeCode || '',
         code: item.roomTypeCode,
         name: item.roomTypeName,
         englishName: item.englishName || '',
@@ -66,7 +69,6 @@ const RoomType = () => {
       setRoomTypes(data)
       setFilteredRoomTypes(data)
     } catch (error) {
-      console.error('获取房型数据失败:', error)
       setRoomTypes([])
       setFilteredRoomTypes([])
       message.error('获取房型数据失败')
@@ -81,7 +83,6 @@ const RoomType = () => {
       const facilities = await groupFacilityApi.getAllGroupFacilities({ params: { scope: 'room_type' } })
       setGroupFacilities(Array.isArray(facilities) ? facilities : [])
     } catch (err) {
-      console.error('获取房型设施失败:', err)
       setGroupFacilities([])
     }
   }
@@ -101,6 +102,7 @@ const RoomType = () => {
   const handleAdd = () => {
     setIsEditMode(false)
     setSelectedRoomType(null)
+    setRoomTypePermissions(null)
     editForm.resetFields()
     setRoomFacilities({})
     setActiveTab('1')
@@ -108,9 +110,14 @@ const RoomType = () => {
   }
 
   // 编辑
-  const handleEdit = (record) => {
+  const handleEdit = async (record) => {
     setIsEditMode(true)
     setSelectedRoomType(record)
+    setRoomTypePermissions(
+      record.groupRoomTypeCode
+        ? { isGroupDistributed: true, roomInfoEditable: false, sourceGroupRoomTypeCode: record.groupRoomTypeCode }
+        : { isGroupDistributed: false, roomInfoEditable: true, sourceGroupRoomTypeCode: '' }
+    )
     editForm.setFieldsValue({
       code: record.code,
       name: record.name,
@@ -127,6 +134,12 @@ const RoomType = () => {
     loadRoomFacilities(record.code)
     setActiveTab('1')
     setViewMode('edit')
+    try {
+      const permissionData = await api.get(`/hotel-room-types/${record.id}/permissions`)
+      setRoomTypePermissions(permissionData)
+    } catch (error) {
+      message.error(error?.response?.data?.error || '获取房型编辑权限失败')
+    }
   }
 
   // 加载房型设施
@@ -145,7 +158,6 @@ const RoomType = () => {
       })
       setRoomFacilities(grouped)
     } catch (err) {
-      console.error('加载房型设施失败:', err)
       setRoomFacilities({})
     }
   }
@@ -154,6 +166,7 @@ const RoomType = () => {
   const handleBack = () => {
     setViewMode('list')
     setSelectedRoomType(null)
+    setRoomTypePermissions(null)
     editForm.resetFields()
   }
 
@@ -224,7 +237,6 @@ const RoomType = () => {
       })
       message.success('房型设施保存成功')
     } catch (err) {
-      console.error('保存设施失败:', err)
       message.error('保存设施失败')
     } finally {
       setSaving(false)
@@ -246,6 +258,9 @@ const RoomType = () => {
     { title: '代码', dataIndex: 'code', key: 'code', width: 120 },
     { title: '名称', dataIndex: 'name', key: 'name', width: 150 },
     { title: '英文名称', dataIndex: 'englishName', key: 'englishName', width: 180 },
+    { title: '来源', dataIndex: 'groupRoomTypeCode', key: 'groupRoomTypeCode', width: 150,
+      render: code => code ? <Tag color="blue">集团（{code}）</Tag> : <Tag color="green">自建</Tag>
+    },
     { title: '房型数量', dataIndex: 'roomQuantity', key: 'roomQuantity', width: 100 },
     { title: '面积', dataIndex: 'area', key: 'area', width: 100, render: v => v ? `${v} ㎡` : '-' },
     { title: '楼层', dataIndex: 'floor', key: 'floor', width: 80 },
@@ -263,7 +278,7 @@ const RoomType = () => {
     return (
       <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh' }}>
         <h1 className="page-title" style={{ marginBottom: 24 }}>房型管理</h1>
-        <Card bordered={false} style={{ marginBottom: 16 }}>
+        <Card variant="borderless" style={{ marginBottom: 16 }}>
           <Form form={searchForm} layout="inline" onFinish={handleSearch}>
             <Form.Item name="code" label="代码"><Input placeholder="房型代码" style={{ width: 160 }} /></Form.Item>
             <Form.Item name="name" label="名称"><Input placeholder="房型名称" style={{ width: 200 }} /></Form.Item>
@@ -272,7 +287,7 @@ const RoomType = () => {
             <Form.Item><Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增房型</Button></Form.Item>
           </Form>
         </Card>
-        <Card bordered={false}>
+        <Card variant="borderless">
           <Spin spinning={loading}>
             <Table columns={columns} dataSource={filteredRoomTypes} rowKey="id"
               pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t, r) => `${r[0]}-${r[1]} 共 ${t} 条` }}
@@ -284,11 +299,23 @@ const RoomType = () => {
   }
 
   // ========== 编辑视图 ==========
+  const roomInfoReadOnly = roomTypePermissions?.isGroupDistributed === true
+    && roomTypePermissions?.roomInfoEditable !== true
+
   return (
     <div className="fade-in" style={{ padding: '0 24px 24px', minHeight: '100vh' }}>
       <h1 className="page-title" style={{ marginBottom: 24 }}>{isEditMode ? '编辑房型' : '新增房型'}</h1>
 
-      <Card bordered={false}>
+      <Card variant="borderless">
+        {roomTypePermissions?.isGroupDistributed && (
+          <Alert
+            type={roomInfoReadOnly ? 'warning' : 'info'}
+            showIcon
+            style={{ marginBottom: 16 }}
+            message={`集团下发房型（${roomTypePermissions.sourceGroupRoomTypeCode}）`}
+            description={roomInfoReadOnly ? '集团未开放房型信息修改权限，当前页面为只读。' : '集团已开放房型信息修改权限。'}
+          />
+        )}
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
           {
             key: '1',
@@ -307,42 +334,42 @@ const RoomType = () => {
                     </Col>
                     <Col span={12}>
                       <Form.Item name="name" label="房型中文名称" rules={[{ required: true, message: '请输入房型中文名称' }]}>
-                        <Input placeholder="输入房型中文名称" />
+                        <Input placeholder="输入房型中文名称" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="englishName" label="房型英文名称">
-                        <Input placeholder="输入房型英文名称" />
+                        <Input placeholder="输入房型英文名称" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="roomQuantity" label="房型数量" rules={[{ required: true, message: '请输入房型数量' }]}>
-                        <Input type="number" placeholder="输入房型数量" min={0} />
+                        <Input type="number" placeholder="输入房型数量" min={0} disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="area" label="房型面积（㎡）">
-                        <Input type="number" placeholder="输入面积" />
+                        <Input type="number" placeholder="输入面积" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="floor" label="所在楼层">
-                        <Input placeholder="输入楼层" />
+                        <Input placeholder="输入楼层" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="maxAdults" label="最大入住成人数" rules={[{ required: true, message: '请输入' }]}>
-                        <Input type="number" placeholder="输入成人数" />
+                        <Input type="number" placeholder="输入成人数" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="maxChildren" label="最大入住儿童数">
-                        <Input type="number" placeholder="输入儿童数" />
+                        <Input type="number" placeholder="输入儿童数" disabled={roomInfoReadOnly} />
                       </Form.Item>
                     </Col>
                     <Col span={12}>
                       <Form.Item name="windowType" label="窗型" rules={[{ required: true, message: '请选择窗型' }]}>
-                        <Select placeholder="请选择窗型">
+                        <Select placeholder="请选择窗型" disabled={roomInfoReadOnly}>
                           <Option value="有窗">有窗</Option>
                           <Option value="无窗">无窗</Option>
                         </Select>
@@ -350,7 +377,7 @@ const RoomType = () => {
                     </Col>
                     <Col span={12}>
                       <Form.Item name="bedType" label="床型" rules={[{ required: true, message: '请选择床型' }]}>
-                        <Select placeholder="请选择床型">
+                        <Select placeholder="请选择床型" disabled={roomInfoReadOnly}>
                           <Option value="1张1.8米大床">1张1.8米大床</Option>
                           <Option value="2张1.2米单人床">2张1.2米单人床</Option>
                           <Option value="1张1.5米大床">1张1.5米大床</Option>
@@ -363,7 +390,7 @@ const RoomType = () => {
                 <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
                   <Space>
                     <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>返回列表</Button>
-                    <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSaveBasicInfo}>保存基础信息</Button>
+                    <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSaveBasicInfo} disabled={roomInfoReadOnly}>保存基础信息</Button>
                   </Space>
                 </div>
               </div>
@@ -384,6 +411,7 @@ const RoomType = () => {
                         <Checkbox.Group
                           value={roomFacilities[cat.key] || []}
                           onChange={(vals) => handleFacilityChange(cat.key, vals)}
+                          disabled={roomInfoReadOnly}
                         >
                           <Space wrap>
                             {items.map(f => (
@@ -398,14 +426,14 @@ const RoomType = () => {
                   })}
                   {groupFacilities.length === 0 && (
                     <div style={{ textAlign: 'center', color: '#999', padding: 40 }}>
-                      暂无房型设施数据，请先在集团设施管理中添加适用范围为"房型设施"的设施
+                      暂无房型设施数据，请先在集团设施管理中添加适用范围为“房型设施”的设施
                     </div>
                   )}
                 </div>
                 <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
                   <Space>
                     <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>返回列表</Button>
-                    <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveFacilities}>保存设施信息</Button>
+                    <Button type="primary" icon={<SaveOutlined />} onClick={handleSaveFacilities} disabled={roomInfoReadOnly}>保存设施信息</Button>
                   </Space>
                 </div>
               </div>

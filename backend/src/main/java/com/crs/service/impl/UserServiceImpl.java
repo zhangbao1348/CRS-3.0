@@ -4,6 +4,8 @@ import com.crs.entity.User;
 import com.crs.entity.UserRole;
 import com.crs.repository.UserRepository;
 import com.crs.repository.UserRoleRepository;
+import com.crs.repository.RoleRepository;
+import com.crs.repository.TenantRepository;
 import com.crs.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,6 +40,12 @@ public class UserServiceImpl implements UserService {
     
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
     
     @Override
     public List<User> getAllUsers() {
@@ -59,18 +67,13 @@ public class UserServiceImpl implements UserService {
     
     @Override
     public Optional<User> getUserByUsername(String username) {
-        System.out.println("[DEBUG] getUserByUsername called with username: " + username);
-        Optional<User> user = userRepository.findByUsername(username);
-        System.out.println("[DEBUG] User found: " + user.isPresent());
-        if (user.isPresent()) {
-            System.out.println("[DEBUG] User details: id=" + user.get().getId() + ", username=" + user.get().getUsername() + ", status=" + user.get().getStatus());
-        }
-        return user;
+        return userRepository.findByUsername(username);
     }
     
     @Override
     @Transactional
     public User createUser(User user, List<Integer> roleIds) {
+        normalizeAndValidate(user, roleIds, true);
         if (userRepository.existsByUsername(user.getUsername())) {
             throw new IllegalArgumentException("用户名已存在");
         }
@@ -98,9 +101,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public User updateUser(Integer id, User user, List<Integer> roleIds) {
         return userRepository.findById(id).map(existingUser -> {
-            System.out.println("开始更新用户，ID: " + id);
-            System.out.println("传入的用户数据: " + user);
-            
+            normalizeAndValidate(user, roleIds, false);
             if (user.getUsername() != null && !user.getUsername().equals(existingUser.getUsername())) {
                 if (userRepository.existsByUsername(user.getUsername())) {
                     throw new IllegalArgumentException("用户名已存在");
@@ -125,10 +126,8 @@ public class UserServiceImpl implements UserService {
             existingUser.setTenantId(user.getTenantId());
             
             User updatedUser = userRepository.save(existingUser);
-            System.out.println("用户基本信息已保存: " + updatedUser);
             
             userRoleRepository.deleteByUserId(updatedUser.getId());
-            System.out.println("已删除用户角色关联");
             
             if (roleIds != null && !roleIds.isEmpty()) {
                 for (Integer roleId : roleIds) {
@@ -137,7 +136,6 @@ public class UserServiceImpl implements UserService {
                     userRole.setRoleId(roleId);
                     userRole.setTenantId(updatedUser.getTenantId());
                     userRoleRepository.save(userRole);
-                    System.out.println("已添加角色关联: roleId=" + roleId);
                 }
             }
             
@@ -148,6 +146,9 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void deleteUser(Integer id) {
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("用户不存在");
+        }
         userRoleRepository.deleteByUserId(id);
         userRepository.deleteById(id);
     }
@@ -164,9 +165,57 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public User resetPassword(Integer id, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new IllegalArgumentException("密码长度至少6位");
+        }
         return userRepository.findById(id).map(user -> {
             user.setPassword(passwordEncoder.encode(newPassword));
             return userRepository.save(user);
         }).orElse(null);
+    }
+
+    /** 统一收口用户必填字段、租户与角色引用校验。 */
+    private void normalizeAndValidate(User user, List<Integer> roleIds, boolean creating) {
+        user.setUsername(trim(user.getUsername()));
+        user.setName(trim(user.getName()));
+        user.setEmail(trim(user.getEmail()));
+        user.setPhone(trimToNull(user.getPhone()));
+        if (user.getUsername() == null || user.getUsername().isEmpty()) {
+            throw new IllegalArgumentException("用户名不能为空");
+        }
+        if (user.getName() == null || user.getName().isEmpty()) {
+            throw new IllegalArgumentException("姓名不能为空");
+        }
+        if (user.getEmail() == null || !user.getEmail().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new IllegalArgumentException("请输入有效的邮箱地址");
+        }
+        if (creating && (user.getPassword() == null || user.getPassword().length() < 6)) {
+            throw new IllegalArgumentException("密码长度至少6位");
+        }
+        if (user.getTenantId() != null && !tenantRepository.existsById(user.getTenantId())) {
+            throw new IllegalArgumentException("归属租户不存在");
+        }
+        if (roleIds == null || roleIds.isEmpty()) {
+            throw new IllegalArgumentException("请至少选择一个角色");
+        }
+        if (roleIds.stream().distinct().count() != roleIds.size()) {
+            throw new IllegalArgumentException("角色不能重复");
+        }
+        for (Integer roleId : roleIds) {
+            var role = roleRepository.findById(roleId)
+                    .orElseThrow(() -> new IllegalArgumentException("角色不存在"));
+            if (role.getStatus() != com.crs.entity.Role.Status.active) {
+                throw new IllegalArgumentException("不能分配已停用的角色");
+            }
+        }
+    }
+
+    private String trim(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private String trimToNull(String value) {
+        String normalized = trim(value);
+        return normalized == null || normalized.isEmpty() ? null : normalized;
     }
 }

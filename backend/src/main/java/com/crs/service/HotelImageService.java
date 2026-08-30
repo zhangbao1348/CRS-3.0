@@ -2,7 +2,8 @@ package com.crs.service;
 
 import com.crs.entity.HotelImage;
 import com.crs.repository.HotelImageRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.crs.repository.HotelRepository;
+import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -21,23 +22,52 @@ import java.util.List;
  */
 @Service
 public class HotelImageService {
-    
-    @Autowired
-    private HotelImageRepository hotelImageRepository;
+
+    private final HotelImageRepository hotelImageRepository;
+    private final HotelRepository hotelRepository;
+
+    public HotelImageService(
+            HotelImageRepository hotelImageRepository,
+            HotelRepository hotelRepository) {
+        this.hotelImageRepository = hotelImageRepository;
+        this.hotelRepository = hotelRepository;
+    }
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("Tenant context missing");
+        }
+        return tenantId;
+    }
     
     public HotelImage createImage(HotelImage image) {
-        if (image.getTenantId() == null) {
-            image.setTenantId(com.crs.util.TenantContext.getTenantId());
-        }
+        Integer tenantId = getCurrentTenantId();
+        hotelRepository.findByHotelCodeAndTenantId(image.getHotelCode(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Hotel not found or access denied"));
+        image.setTenantId(tenantId);
         return hotelImageRepository.save(image);
     }
     
     public HotelImage updateImage(HotelImage image) {
-        return hotelImageRepository.save(image);
+        Integer tenantId = getCurrentTenantId();
+        HotelImage existing = hotelImageRepository.findByIdAndTenantId(image.getId(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("Image not found or access denied"));
+        if (image.getHotelCode() != null && !image.getHotelCode().equals(existing.getHotelCode())) {
+            throw new IllegalArgumentException("不允许变更图片所属酒店");
+        }
+        if (image.getImageType() != null) existing.setImageType(image.getImageType());
+        if (image.getImagePath() != null) existing.setImagePath(image.getImagePath());
+        if (image.getImageName() != null) existing.setImageName(image.getImageName());
+        if (image.getDescription() != null) existing.setDescription(image.getDescription());
+        if (image.getSortOrder() != null) existing.setSortOrder(image.getSortOrder());
+        return hotelImageRepository.save(existing);
     }
     
     public void deleteImage(Integer id) {
-        hotelImageRepository.deleteById(id);
+        HotelImage existing = hotelImageRepository.findByIdAndTenantId(id, getCurrentTenantId())
+                .orElseThrow(() -> new IllegalArgumentException("Image not found or access denied"));
+        hotelImageRepository.delete(existing);
     }
     
     public List<HotelImage> getImagesByHotelCode(String hotelCode) {
@@ -57,6 +87,6 @@ public class HotelImageService {
     }
 
     public HotelImage getImageById(Integer id) {
-        return hotelImageRepository.findById(id).orElse(null);
+        return hotelImageRepository.findByIdAndTenantId(id, getCurrentTenantId()).orElse(null);
     }
 }

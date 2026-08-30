@@ -37,9 +37,7 @@ public class PackageServiceImpl implements PackageService {
     
     @Override
     public Optional<Package> getPackageById(Integer id) {
-        Integer currentTenantId = getCurrentTenantId();
-        return packageRepository.findById(id)
-                .filter(p -> p.getTenantId() != null && p.getTenantId().equals(currentTenantId));
+        return packageRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     @Override
@@ -50,31 +48,41 @@ public class PackageServiceImpl implements PackageService {
     @Override
     public Package createPackage(Package pkg) {
         Integer currentTenantId = getCurrentTenantId();
+        validatePackage(pkg);
         // 检查租户内代码是否已存在
         if (packageRepository.existsByTenantIdAndCode(currentTenantId, pkg.getCode())) {
-            throw new IllegalArgumentException("包价代码已存在");
+            throw new IllegalArgumentException("该包价代码已存在");
         }
+        pkg.setId(null);
         pkg.setTenantId(currentTenantId);
+        if (pkg.getStatus() == null) {
+            pkg.setStatus(Package.Status.active);
+        }
         return packageRepository.save(pkg);
     }
     
     @Override
     public Package updatePackage(Integer id, Package pkg) {
         Integer tenantId = getCurrentTenantId();
-        // 验证所有权
-        getPackageById(id)
+        Package existing = getPackageById(id)
                 .orElseThrow(() -> new IllegalArgumentException("包价不存在或无权访问"));
-        
-        // 检查代码是否已被同一租户内的其他包价使用
-        Optional<Package> packageByCode = packageRepository.findByTenantIdAndCode(tenantId, pkg.getCode());
-        if (packageByCode.isPresent() && !packageByCode.get().getId().equals(id)) {
-            throw new IllegalArgumentException("包价代码已被使用");
+
+        if (pkg.getCode() != null && !existing.getCode().equals(pkg.getCode())) {
+            throw new IllegalArgumentException("包价代码保存后不可修改");
         }
-        
-        // 更新包价信息
-        pkg.setId(id);
-        pkg.setTenantId(tenantId);
-        return packageRepository.save(pkg);
+
+        pkg.setCode(existing.getCode());
+        validatePackage(pkg);
+        existing.setName(pkg.getName());
+        existing.setDescription(pkg.getDescription());
+        existing.setType(pkg.getType());
+        existing.setQuantityType(pkg.getQuantityType());
+        existing.setFixedQuantity(pkg.getFixedQuantity());
+        existing.setFrequency(pkg.getFrequency());
+        existing.setPriceType(pkg.getPriceType());
+        existing.setFixedPrice(pkg.getFixedPrice());
+        existing.setTaxIncluded(pkg.getTaxIncluded() == null ? false : pkg.getTaxIncluded());
+        return packageRepository.save(existing);
     }
     
     @Override
@@ -124,5 +132,35 @@ public class PackageServiceImpl implements PackageService {
     @Override
     public boolean existsByCode(String code) {
         return packageRepository.existsByTenantIdAndCode(getCurrentTenantId(), code);
+    }
+
+    /** 验证包价的必填字段及条件字段，防止绕过页面提交无效数据。 */
+    private void validatePackage(Package pkg) {
+        if (pkg.getCode() == null || pkg.getCode().isBlank()) {
+            throw new IllegalArgumentException("包价代码不能为空");
+        }
+        if (pkg.getName() == null || pkg.getName().isBlank()) {
+            throw new IllegalArgumentException("包价名称不能为空");
+        }
+        if (pkg.getType() == null || pkg.getType().isBlank()
+                || pkg.getFrequency() == null || pkg.getFrequency().isBlank()
+                || pkg.getQuantityType() == null || pkg.getQuantityType().isBlank()) {
+            throw new IllegalArgumentException("包价类型、发放频率和计数方式为必填项");
+        }
+        if (pkg.getFixedQuantity() == null || pkg.getFixedQuantity() < 1) {
+            throw new IllegalArgumentException("份数必须是大于 0 的整数");
+        }
+        if (pkg.getFixedPrice() != null && pkg.getFixedPrice() < 0) {
+            throw new IllegalArgumentException("价格不能为负数");
+        }
+        if (pkg.getPriceType() == null || pkg.getPriceType().isBlank()) {
+            pkg.setPriceType("group");
+        }
+        if (!List.of("group", "daily", "hotel").contains(pkg.getPriceType())) {
+            throw new IllegalArgumentException("计价方式无效");
+        }
+        if ("daily".equals(pkg.getPriceType())) {
+            pkg.setFixedPrice(null);
+        }
     }
 }

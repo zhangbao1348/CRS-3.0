@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS api_logs (
 -- 8. 档案表
 CREATE TABLE IF NOT EXISTS archives (
     id INT PRIMARY KEY AUTO_INCREMENT,
+    archive_id VARCHAR(50) COMMENT '档案ID',
     name VARCHAR(100) NOT NULL COMMENT '档案名称',
     type VARCHAR(50) NOT NULL COMMENT '档案类型：公司/个人',
     company_name VARCHAR(200) COMMENT '公司名称',
@@ -142,3 +143,6 @@ CREATE TABLE IF NOT EXISTS archives (
     INDEX idx_archives_group_id (group_id),
     INDEX idx_archives_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='档案表';
+
+-- 2026-06-13 补充：为 archives 表增加 archive_id 字段（用于向前兼容已有环境的表结构）
+ALTER TABLE archives ADD COLUMN IF NOT EXISTS archive_id VARCHAR(50) COMMENT '档案ID' AFTER id;

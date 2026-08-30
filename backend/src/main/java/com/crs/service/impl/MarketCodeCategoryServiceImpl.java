@@ -60,9 +60,7 @@ public class MarketCodeCategoryServiceImpl implements MarketCodeCategoryService 
 
     @Override
     public MarketCodeCategory getMarketCodeCategoryById(Integer id) {
-        Integer currentTenantId = getCurrentTenantId();
-        return marketCodeCategoryRepository.findById(id)
-                .filter(c -> c.getTenantId() != null && c.getTenantId().equals(currentTenantId))
+        return marketCodeCategoryRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElse(null);
     }
 
@@ -87,7 +85,7 @@ public class MarketCodeCategoryServiceImpl implements MarketCodeCategoryService 
     public void deleteMarketCodeCategory(Integer id) {
         MarketCodeCategory existing = getMarketCodeCategoryById(id);
         if (existing != null) {
-            marketCodeCategoryRepository.deleteById(id);
+            marketCodeCategoryRepository.delete(existing);
         }
     }
 

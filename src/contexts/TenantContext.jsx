@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react'
+import { createContext, useState, useContext, useEffect } from 'react'
 import { tenantApi } from '../utils/api'
+import { AuthContext } from './AuthContext.jsx'
 
 const TenantContext = createContext()
 const SELECTED_TENANT_KEY = 'crs_selected_tenant'
@@ -33,6 +34,7 @@ export const useTenantContext = () => {
 }
 
 export const TenantProvider = ({ children }) => {
+  const { isAuthenticated } = useContext(AuthContext)
   const [tenants, setTenants] = useState(() => readTenantCache())
   const [selectedTenant, setSelectedTenant] = useState(() => {
     const saved = localStorage.getItem(SELECTED_TENANT_KEY)
@@ -54,6 +56,16 @@ export const TenantProvider = ({ children }) => {
     }
   }
 
+  const selectTenant = (tenantId, tenantList = tenants) => {
+    setSelectedTenant(tenantId)
+    if (tenantId) {
+      localStorage.setItem(SELECTED_TENANT_KEY, tenantId.toString())
+    } else {
+      localStorage.removeItem(SELECTED_TENANT_KEY)
+    }
+    updateSelectedTenantLabel(tenantId, tenantList)
+  }
+
   const fetchTenants = async (retryCount = 1) => {
     setLoading(true)
     setError(null)
@@ -71,15 +83,13 @@ export const TenantProvider = ({ children }) => {
         if (tenantList.length > 0) {
           if (!selectedTenant) {
             // 没有选中的租户时，默认选第一个
-            setSelectedTenant(tenantList[0].id)
-            updateSelectedTenantLabel(tenantList[0].id, tenantList)
+            selectTenant(tenantList[0].id, tenantList)
           } else {
             // 检查当前选中的租户是否还在列表中
             const currentTenantExists = tenantList.some(t => t.id === selectedTenant)
             if (!currentTenantExists) {
               // 当前选中的租户不存在了，选第一个
-              setSelectedTenant(tenantList[0].id)
-              updateSelectedTenantLabel(tenantList[0].id, tenantList)
+              selectTenant(tenantList[0].id, tenantList)
             } else {
               updateSelectedTenantLabel(selectedTenant, tenantList)
             }
@@ -112,18 +122,20 @@ export const TenantProvider = ({ children }) => {
   }
 
   useEffect(() => {
-    fetchTenants()
-  }, [])
+    if (isAuthenticated) {
+      fetchTenants()
+    }
+    // fetchTenants 依赖当前租户状态；这里只在登录状态切换时触发首次加载。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   const changeTenant = (tenantId) => {
     // 确保不会设置 null 或 0
     if (tenantId && tenantId > 0) {
-      setSelectedTenant(tenantId)
-      updateSelectedTenantLabel(tenantId, tenants)
+      selectTenant(tenantId, tenants)
     } else if (tenants.length > 0) {
       // 如果传入了无效值，就设置为第一个租户
-      setSelectedTenant(tenants[0].id)
-      updateSelectedTenantLabel(tenants[0].id, tenants)
+      selectTenant(tenants[0].id, tenants)
     }
   }
 

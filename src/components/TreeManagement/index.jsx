@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Tree, Button, Modal, Form, Input, message, Space, Card, Row, Col } from 'antd'
+import { useState, useRef, useEffect } from 'react'
+import { App as AntApp, Tree, Button, Modal, Form, Input, Space, Card, Row, Col } from 'antd'
 import { 
   PlusOutlined, 
   EditOutlined, 
@@ -8,9 +8,6 @@ import {
   PlusCircleOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons'
-
-const { confirm } = Modal
-const { TextArea } = Input
 
 /**
  * 通用的3级树状结构管理组件
@@ -26,6 +23,7 @@ const { TextArea } = Input
  * @param {Function} props.customMethods.checkCodeUnique - 检查CODE是否唯一方法
  */
 const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddChild = true, customMethods = {} }) => {
+  const { message, modal } = AntApp.useApp()
   // 状态管理
   const [treeData, setTreeData] = useState(initialData)
   const [selectedKeys, setSelectedKeys] = useState([])
@@ -123,15 +121,11 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
 
   // 递归查找并删除节点
   const deleteNode = (nodes, key) => {
-    return nodes.filter(node => {
-      if (node.key === key) {
-        return false
-      }
-      if (node.children) {
-        node.children = deleteNode(node.children, key)
-      }
-      return true
-    })
+    return nodes
+      .filter(node => node.key !== key)
+      .map(node => node.children
+        ? { ...node, children: deleteNode(node.children, key) }
+        : node)
   }
 
   // 验证CODE是否唯一
@@ -167,8 +161,7 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
       }
       return Promise.resolve()
     } catch (error) {
-      console.error('验证CODE唯一性失败:', error)
-      return Promise.reject('验证失败，请稍后重试')
+      return Promise.reject(error?.message || '验证失败，请稍后重试')
     }
   }
 
@@ -239,14 +232,13 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
           setIsModalVisible(false)
           form.resetFields()
         } catch (error) {
-          console.error('提交失败:', error)
           message.error(error.message || '操作失败，请稍后重试')
         } finally {
           setIsLoading(false)
         }
       })
-      .catch(errorInfo => {
-        console.log('表单验证失败:', errorInfo)
+      .catch(() => {
+        // Ant Design 已将字段级校验结果展示在表单中。
       })
   }
 
@@ -257,7 +249,7 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
       return
     }
     
-    confirm({
+    modal.confirm({
       title: '确认删除',
       icon: <ExclamationCircleOutlined />,
       content: `确定要删除${selectedNode.title}(${selectedNode.code})吗？删除后不可恢复，子节点也将被删除。`,
@@ -279,7 +271,6 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
           setSelectedNode(null)
           message.success('删除成功')
         } catch (error) {
-          console.error('删除失败:', error)
           message.error(error.message || '删除失败，请稍后重试')
         } finally {
           setIsLoading(false)
@@ -379,7 +370,7 @@ const TreeManagement = ({ title, initialData = [], codeName = '编码', showAddC
                 padding: '50px 0', 
                 color: '#999' 
               }}>
-                暂无数据，请点击"新增根节点"添加数据
+                暂无数据，请点击“新增根节点”添加数据
               </div>
             )}
           </Card>

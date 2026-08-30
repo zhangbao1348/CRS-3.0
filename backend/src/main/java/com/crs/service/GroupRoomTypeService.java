@@ -63,8 +63,7 @@ public class GroupRoomTypeService {
     }
     
     public Optional<GroupRoomType> getGroupRoomTypeById(Integer id) {
-        return groupRoomTypeRepository.findById(id)
-                .filter(rt -> rt.getGroupId() != null && rt.getGroupId().equals(getCurrentTenantId()));
+        return groupRoomTypeRepository.findByIdAndGroupId(id, getCurrentTenantId());
     }
     
     public List<GroupRoomType> getGroupRoomTypesByGroupId(Integer groupId) {
@@ -135,11 +134,13 @@ public class GroupRoomTypeService {
                     .filter(a -> a.getHotelCode().equals(hotelRoomType.getHotelCode()))
                     .findFirst();
             
-            if (allocation.isPresent() && !allocation.get().getRoomInfoEditable()) {
-                hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
-                hotelRoomType.setDescription(groupRoomType.getDescription());
-                hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
-                hotelRoomType.setRoomTypeCategoryCode(categoryCode);
+            if (allocation.isPresent()) {
+                if (!Boolean.TRUE.equals(allocation.get().getRoomInfoEditable())) {
+                    hotelRoomType.setRoomTypeName(groupRoomType.getRoomTypeName());
+                    hotelRoomType.setDescription(groupRoomType.getDescription());
+                    hotelRoomType.setMaxOccupancy(groupRoomType.getMaxOccupancy());
+                    hotelRoomType.setRoomTypeCategoryCode(categoryCode);
+                }
                 hotelRoomType.setStatus(groupRoomType.getStatus());
                 hotelRoomTypeRepository.save(hotelRoomType);
             }

@@ -3,9 +3,12 @@ package com.crs.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,18 +26,37 @@ import java.util.Map;
  */
 @Component
 public class JwtUtil {
-    
-    /** JWT 签名密钥，从 application.yml/properties 加载 */
-    @Value("${jwt.secret}")
-    private String secret;
-    
+
+    private static final int MINIMUM_SECRET_BYTES = 32;
+
+    /** JWT 签名密钥，从环境变量映射的配置加载 */
+    private final SecretKey signingKey;
+
     /** 访问令牌有效期（秒） */
-    @Value("${jwt.expiration}")
-    private long expiration;
-    
+    private final long expiration;
+
     /** 刷新令牌有效期（秒） */
-    @Value("${jwt.refresh-expiration}")
-    private long refreshExpiration;
+    private final long refreshExpiration;
+
+    /**
+     * 初始化 JWT 签名器，并拒绝长度不足的密钥。
+     *
+     * @param secret 环境变量提供的签名密钥
+     * @param expiration 访问令牌有效期（秒）
+     * @param refreshExpiration 刷新令牌有效期（秒）
+     */
+    public JwtUtil(
+            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.expiration}") long expiration,
+            @Value("${jwt.refresh-expiration}") long refreshExpiration) {
+        byte[] secretBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < MINIMUM_SECRET_BYTES) {
+            throw new IllegalArgumentException("JWT 签名密钥至少需要 32 字节");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(secretBytes);
+        this.expiration = expiration;
+        this.refreshExpiration = refreshExpiration;
+    }
     
     /**
      * 为指定用户生成基础 JWT 令牌。
@@ -116,7 +138,7 @@ public class JwtUtil {
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 // 设置失效时刻 = 当前时间 + 有效秒数
                 .setExpiration(new Date(System.currentTimeMillis() + expirationTime * 1000))
-                .signWith(SignatureAlgorithm.HS256, secret)
+                .signWith(signingKey, SignatureAlgorithm.HS256)
                 .compact();
     }
     
@@ -138,7 +160,7 @@ public class JwtUtil {
      * @throws io.jsonwebtoken.JwtException 若签名不匹配或格式有误则抛出异常
      */
     private Claims extractAllClaims(String token) {
-        return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+        return Jwts.parserBuilder().setSigningKey(signingKey).build().parseClaimsJws(token).getBody();
     }
     
     /**
@@ -163,4 +185,3 @@ public class JwtUtil {
         return (extractedUsername.equals(username) && !isTokenExpired(token));
     }
 }
-

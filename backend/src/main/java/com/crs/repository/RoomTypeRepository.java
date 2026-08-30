@@ -15,6 +15,9 @@ import java.util.Optional;
 @Repository
 public interface RoomTypeRepository extends JpaRepository<RoomType, Integer> {
 
+    /** 按主键与租户双重约束查询。 */
+    Optional<RoomType> findByIdAndTenantId(Integer id, Integer tenantId);
+
     /** 获取指定租户下的所有房型 */
     List<RoomType> findByTenantId(Integer tenantId);
 

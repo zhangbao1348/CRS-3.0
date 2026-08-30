@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react'
-import { Select, Button, Modal, Form, Input, DatePicker, message, Spin, Table, Tag, Row, Col } from 'antd'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { Button, Modal, Form, Input, DatePicker, message, Spin, Table, Tag } from 'antd'
 import { LeftOutlined, RightOutlined, EditOutlined, HistoryOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../../utils/api'
@@ -7,7 +7,6 @@ import { useHotelContext } from '../../contexts/HotelContext'
 import { AuthContext } from '../../contexts/AuthContext'
 
 const { RangePicker } = DatePicker
-const { Option } = Select
 
 const InventoryQuotaCalendar = ({ dimensionType, dimensionCode, dimensionLabel }) => {
   const { selectedHotel: hotelCode } = useHotelContext()

@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 渠道酒店映射仓库接口
@@ -12,6 +13,9 @@ import java.util.List;
  */
 @Repository
 public interface ChannelHotelMappingRepository extends JpaRepository<ChannelHotelMapping, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<ChannelHotelMapping> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /** 获取指定租户下的所有酒店映射 */
     List<ChannelHotelMapping> findByTenantId(Integer tenantId);

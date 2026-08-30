@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Date;
+import java.util.Optional;
 
 /**
  * 房型差价仓库接口
@@ -13,6 +14,9 @@ import java.util.Date;
  */
 @Repository
 public interface RoomTypeDiffRepository extends JpaRepository<RoomTypeDiff, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<RoomTypeDiff> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /**
      * 根据差价体系ID查询房型差价列表
@@ -20,6 +24,8 @@ public interface RoomTypeDiffRepository extends JpaRepository<RoomTypeDiff, Inte
      * @return 房型差价列表
      */
     List<RoomTypeDiff> findBySystemId(Integer systemId);
+
+    List<RoomTypeDiff> findBySystemIdAndTenantId(Integer systemId, Integer tenantId);
     
     /**
      * 根据差价体系ID和状态查询房型差价列表
@@ -28,6 +34,8 @@ public interface RoomTypeDiffRepository extends JpaRepository<RoomTypeDiff, Inte
      * @return 房型差价列表
      */
     List<RoomTypeDiff> findBySystemIdAndStatus(Integer systemId, RoomTypeDiff.Status status);
+
+    List<RoomTypeDiff> findBySystemIdAndTenantIdAndStatus(Integer systemId, Integer tenantId, RoomTypeDiff.Status status);
     
     /**
      * 根据差价体系ID和房型ID查询房型差价

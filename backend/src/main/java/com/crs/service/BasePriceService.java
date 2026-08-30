@@ -43,8 +43,7 @@ public class BasePriceService {
      * @return 基础价格信息
      */
     public Optional<BasePrice> getBasePriceById(Integer id) {
-        return basePriceRepository.findById(id)
-                .filter(p -> p.getTenantId() != null && p.getTenantId().equals(getCurrentTenantId()));
+        return basePriceRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     /**

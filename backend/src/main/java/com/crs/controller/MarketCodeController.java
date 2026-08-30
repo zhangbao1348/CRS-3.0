@@ -2,6 +2,7 @@ package com.crs.controller;
 
 import com.crs.entity.MarketCode;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.repository.RatePlanRepository;
 import com.crs.service.MarketCodeService;
 import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,17 @@ public class MarketCodeController {
 
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    @Autowired
+    private RatePlanRepository ratePlanRepository;
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
 
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getAllMarketCodes() {
@@ -91,11 +103,19 @@ public class MarketCodeController {
     @PostMapping
     public ResponseEntity<?> createMarketCode(@RequestBody MarketCode marketCode) {
         try {
-            if (marketCode.getCode() != null && !CodeValidator.isValid(marketCode.getCode())) {
+            if (marketCode.getCode() == null || marketCode.getName() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "市场码编码和名称为必填项"));
+            }
+            if (!CodeValidator.isValid(marketCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            if (!marketCodeService.isCodeUnique(marketCode.getCode(), null)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "市场码编码已存在"));
             }
             MarketCode createdMarketCode = marketCodeService.createMarketCode(marketCode);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdMarketCode);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
@@ -106,6 +126,9 @@ public class MarketCodeController {
         try {
             if (marketCode.getCode() != null && !CodeValidator.isValid(marketCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            if (!marketCodeService.isCodeUnique(marketCode.getCode(), id)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "市场码编码已存在"));
             }
             marketCode.setId(id);
             MarketCode updatedMarketCode = marketCodeService.updateMarketCode(marketCode);
@@ -125,10 +148,12 @@ public class MarketCodeController {
             // 检查是否被房价码引用
             MarketCode existing = marketCodeService.getMarketCodeById(id);
             if (existing != null) {
-                long refCount = groupRateCodeRepository.countByMarketCode(existing.getCode());
+                long refCount = countSubtreeReferences(existing);
                 if (refCount > 0) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "该市场码已被 " + refCount + " 个房价码引用，无法删除"));
+                    return ResponseEntity.badRequest().body(Map.of("error", "该市场码或其子节点已被 " + refCount + " 个房价码引用，无法删除"));
                 }
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "市场码不存在"));
             }
             marketCodeService.deleteMarketCode(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
@@ -145,5 +170,16 @@ public class MarketCodeController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    /** 同时检查父节点与所有子节点，防止递归删除绕过引用约束。 */
+    private long countSubtreeReferences(MarketCode node) {
+        Integer tenantId = getCurrentTenantId();
+        long count = groupRateCodeRepository.countByGroupIdAndMarketCode(tenantId, node.getCode())
+                + ratePlanRepository.countByTenantIdAndMarketCode(tenantId, node.getCode());
+        for (MarketCode child : marketCodeService.getMarketCodesByParentId(node.getId())) {
+            count += countSubtreeReferences(child);
+        }
+        return count;
     }
 }

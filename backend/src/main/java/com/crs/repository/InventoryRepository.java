@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Date;
+import java.util.Optional;
 
 /**
  * 库存数据访问接口 (InventoryRepository)
@@ -20,6 +21,9 @@ import java.util.Date;
  */
 @Repository
 public interface InventoryRepository extends JpaRepository<Inventory, Integer> {
+
+    /** 在租户维度下根据主键查询库存。 */
+    Optional<Inventory> findByIdAndTenantId(Integer id, Integer tenantId);
 
     /** 获取指定租户下的所有库存记录 */
     List<Inventory> findByTenantId(Integer tenantId);

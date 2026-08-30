@@ -13,6 +13,9 @@ import java.util.Optional;
  */
 @Repository
 public interface RoomTypeDiffSystemRepository extends JpaRepository<RoomTypeDiffSystem, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<RoomTypeDiffSystem> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /** 获取租户下的房型差价体系 */
     List<RoomTypeDiffSystem> findByTenantId(Integer tenantId);

@@ -1,6 +1,7 @@
 package com.crs;
 
 import com.crs.service.ReportService;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.LocalDate;
 
 @SpringBootTest
+@Disabled("手工报表数据初始化工具，禁止在自动化测试中修改数据库")
 public class ReportInitTest {
 
     @Autowired

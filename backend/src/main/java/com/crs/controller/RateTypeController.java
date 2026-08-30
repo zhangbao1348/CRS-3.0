@@ -2,6 +2,7 @@ package com.crs.controller;
 
 import com.crs.entity.RateType;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.repository.RatePlanRepository;
 import com.crs.service.RateTypeService;
 import com.crs.util.CodeValidator;
 import com.crs.util.TenantContext;
@@ -37,6 +38,9 @@ public class RateTypeController {
 
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    @Autowired
+    private RatePlanRepository ratePlanRepository;
     
     private Integer getCurrentTenantId() {
         Integer tenantId = TenantContext.getTenantId();
@@ -143,7 +147,8 @@ public class RateTypeController {
             // 检查是否被房价码引用
             RateType existing = rateTypeService.getRateTypeById(tenantId, id);
             if (existing != null) {
-                long refCount = groupRateCodeRepository.countByRateCategory(existing.getCode());
+                long refCount = groupRateCodeRepository.countByGroupIdAndRateCategory(tenantId, existing.getCode())
+                        + ratePlanRepository.countByTenantIdAndRateCategory(tenantId, existing.getCode());
                 if (refCount > 0) {
                     return ResponseEntity.badRequest().body(Map.of("error", "该房价大类已被 " + refCount + " 个房价码引用，无法删除"));
                 }

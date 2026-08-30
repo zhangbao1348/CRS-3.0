@@ -15,6 +15,9 @@ import java.util.Optional;
 @Repository
 public interface RatePlanRepository extends JpaRepository<RatePlan, Integer> {
 
+    /** 在租户维度下根据主键查询价格计划。 */
+    Optional<RatePlan> findByIdAndTenantId(Integer id, Integer tenantId);
+
     /** 获取指定租户下的所有价格计划 */
     List<RatePlan> findByTenantId(Integer tenantId);
 
@@ -57,5 +60,11 @@ public interface RatePlanRepository extends JpaRepository<RatePlan, Integer> {
      * 根据租户、集团房价码和酒店编码查找对应的单店计划。
      */
     List<RatePlan> findByTenantIdAndSourceGroupRateCodeAndHotelCode(Integer tenantId, String sourceGroupRateCode, String hotelCode);
+
+    long countByTenantIdAndMarketCode(Integer tenantId, String marketCode);
+
+    long countByTenantIdAndSourceCode(Integer tenantId, String sourceCode);
+
+    long countByTenantIdAndRateCategory(Integer tenantId, String rateCategory);
 
 }

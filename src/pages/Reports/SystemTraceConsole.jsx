@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Input, Button, Table, Card, Timeline, Tag, Collapse, Modal, Space, Alert, Empty, message, Drawer, Spin, Tooltip, Badge } from 'antd'
+import { useState, useEffect } from 'react'
+import { Input, Button, Table, Card, Timeline, Tag, Collapse, Modal, Space, Alert, Empty, message, Drawer, Spin, Tooltip } from 'antd'
 import { SearchOutlined, BugOutlined, CheckCircleOutlined, CloseCircleOutlined, ExclamationCircleOutlined, NodeIndexOutlined, FileTextOutlined, CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { traceApi } from '../../utils/api'
 import dayjs from 'dayjs'
@@ -20,7 +20,7 @@ const JsonTreeNode = ({ name, value, level = 0, isLast = true }) => {
       return <span style={{ color: '#13c2c2', fontFamily: 'Consolas, Courier New, monospace' }}>{val}</span>
     }
     if (typeof val === 'string') {
-      return <span style={{ color: '#389e0d', wordBreak: 'break-all' }}>"{val}"</span>
+      return <span style={{ color: '#389e0d', wordBreak: 'break-all' }}>{`"${val}"`}</span>
     }
     return null
   }
@@ -389,15 +389,15 @@ ${log.errorStack || '无'}
 
       <div style={{ marginBottom: 16, padding: 16, backgroundColor: '#f5f5f5', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space size="middle">
-          <Input.Search
-            placeholder="输入 Trace ID 或订单号 (支持R开头的订单编号自动识别)"
-            enterButton={<Button type="primary" icon={<SearchOutlined />}>搜索</Button>}
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            onSearch={handleSearch}
-            style={{ width: 500 }}
-            loading={loading}
-          />
+          <Space.Compact style={{ width: 500 }}>
+            <Input
+              placeholder="输入 Trace ID 或订单号 (支持R开头的订单编号自动识别)"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              onPressEnter={handleSearch}
+            />
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>搜索</Button>
+          </Space.Compact>
           <Button onClick={() => { setSearchVal(''); fetchLogs(); }}>重置</Button>
         </Space>
         

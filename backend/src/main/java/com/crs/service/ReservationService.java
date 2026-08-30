@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +25,7 @@ import com.crs.entity.ReservationGuest;
 import com.crs.entity.ReservationHistory;
 import com.crs.entity.ReservationPayment;
 import com.crs.entity.ReservationPromotion;
+import com.crs.modules.reservation.domain.ReservationStateMachine;
 import com.crs.repository.ReservationDailyPriceRepository;
 import com.crs.repository.ReservationGuestRepository;
 import com.crs.repository.ReservationHistoryRepository;
@@ -110,8 +110,7 @@ public class ReservationService {
     }
 
     public Optional<Reservation> getReservationById(Integer id) {
-        return reservationRepository.findById(id)
-                .filter(r -> r.getTenantId() != null && r.getTenantId().equals(getCurrentTenantId()));
+        return reservationRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
 
     public Reservation getReservationByCode(String reservationCode) {
@@ -202,7 +201,7 @@ public class ReservationService {
 
     @Transactional
     public Reservation cancelReservation(Integer id, String cancelledBy, String cancelReason) {
-        Reservation reservation = getReservationById(id)
+        Reservation reservation = reservationRepository.findByIdAndTenantIdForUpdate(id, getCurrentTenantId())
                 .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
         return cancelReservationInternal(reservation, cancelledBy, cancelReason, "crs");
@@ -211,7 +210,7 @@ public class ReservationService {
     @Transactional
     public Reservation cancelReservationBySystem(Integer id, String cancelledBy, String cancelReason) {
         // 使用悲观写锁锁定该订单，确保后续读写数据具有最高并发原子安全性
-        Reservation reservation = reservationRepository.findByIdForUpdate(id)
+        Reservation reservation = reservationRepository.findByIdAndTenantIdForUpdate(id, getCurrentTenantId())
                 .orElseThrow(() -> new RuntimeException("订单不存在"));
 
         // [TRACE] 记录悲观锁获取与取消判定决策快照
@@ -264,6 +263,9 @@ public class ReservationService {
         if ("cancelled".equals(reservation.getReservationStatus())) {
             throw new RuntimeException("ORDER_ALREADY_CANCELLED");
         }
+        if (transactionId == null || transactionId.isBlank()) {
+            throw new RuntimeException("支付交易流水号不能为空");
+        }
 
         // 3. 幂等性校验 (订单已支付时，如果交易流水号一致，属于重复回调，作幂等返回)
         if ("paid".equals(reservation.getPaymentStatus())) {
@@ -291,6 +293,7 @@ public class ReservationService {
 
         // 6. 保存支付流水明细
         ReservationPayment payment = new ReservationPayment();
+        payment.setTenantId(reservation.getTenantId());
         payment.setReservationId(reservation.getId());
         payment.setPaymentMethod(paymentMethod);
         payment.setPaymentType("payment");
@@ -334,10 +337,21 @@ public class ReservationService {
             return reservation;
         }
 
+        if (cancelledBy == null || cancelledBy.isBlank()) {
+            throw new RuntimeException("取消操作人不能为空");
+        }
+        if (cancelReason == null || cancelReason.isBlank()) {
+            throw new RuntimeException("取消原因不能为空");
+        }
         if (!"confirmed".equals(reservation.getReservationStatus())
                 && !"pending".equals(reservation.getReservationStatus())
                 && !"pending_payment".equals(reservation.getReservationStatus())) {
             throw new RuntimeException("当前状态不允许取消，仅 confirmed/pending/pending_payment 状态可取消");
+        }
+
+        if ("paid".equals(reservation.getPaymentStatus())) {
+            createAutomaticRefund(reservation, cancelledBy);
+            reservation.setPaymentStatus("refunded");
         }
 
         try {
@@ -371,13 +385,53 @@ public class ReservationService {
         return saved;
     }
 
+    /**
+     * 已支付订单取消时生成全额退款流水，保证订单、支付状态与库存释放在同一事务内提交。
+     * 关联模块：订单取消、支付流水、库存释放。
+     */
+    private void createAutomaticRefund(Reservation reservation, String operator) {
+        List<ReservationPayment> payments = paymentRepository
+                .findByReservationIdOrderByCreatedAtDesc(reservation.getId());
+        String paymentMethod = payments.stream()
+                .filter(payment -> "payment".equals(payment.getPaymentType()) && "success".equals(payment.getStatus()))
+                .map(ReservationPayment::getPaymentMethod)
+                .filter(method -> method != null && !method.isBlank())
+                .findFirst()
+                .orElse("original_payment");
+
+        ReservationPayment refund = new ReservationPayment();
+        refund.setTenantId(reservation.getTenantId());
+        refund.setReservationId(reservation.getId());
+        refund.setPaymentMethod(paymentMethod);
+        refund.setPaymentType("refund");
+        refund.setPaymentAmount(reservation.getTotalPrice() != null
+                ? reservation.getTotalPrice()
+                : java.math.BigDecimal.ZERO);
+        refund.setTransactionId("REFUND-" + reservation.getReservationCode() + "-" + System.currentTimeMillis());
+        refund.setStatus("refunded");
+        refund.setPaidAt(new Date());
+        paymentRepository.save(refund);
+
+        ReservationHistory refundHistory = new ReservationHistory();
+        refundHistory.setReservationId(reservation.getId());
+        refundHistory.setAction("REFUND");
+        refundHistory.setContent("订单取消自动退款：" + refund.getPaymentAmount() + " " + reservation.getCurrency());
+        refundHistory.setResult("success");
+        refundHistory.setOperator(operator);
+        refundHistory.setOperatorType("crs");
+        historyRepository.save(refundHistory);
+    }
+
     @Transactional
     public Reservation updateReservationStatus(Integer id, String newStatus, String operator) {
-        Reservation reservation = getReservationById(id)
+        Reservation reservation = reservationRepository.findByIdAndTenantIdForUpdate(id, getCurrentTenantId())
                 .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
 
         String oldStatus = reservation.getReservationStatus();
-        validateStatusTransition(oldStatus, newStatus);
+        if ("cancelled".equals(newStatus)) {
+            throw new RuntimeException("请使用取消订单接口并填写取消原因");
+        }
+        ReservationStateMachine.requireTransition(oldStatus, newStatus);
 
         reservation.setReservationStatus(newStatus);
         reservation.setModifiedBy(operator);
@@ -409,9 +463,29 @@ public class ReservationService {
     }
 
     @Transactional
-    public Reservation manualIntervene(Integer id, String reason, String operator) {
-        Reservation reservation = getReservationById(id)
+    public Reservation manualIntervene(Integer id, String reason, String operator, String targetStatus) {
+        Reservation reservation = reservationRepository.findByIdAndTenantIdForUpdate(id, getCurrentTenantId())
                 .orElseThrow(() -> new RuntimeException("订单不存在或无权访问"));
+
+        if (reason == null || reason.isBlank()) {
+            throw new RuntimeException("人工干预原因不能为空");
+        }
+
+        String oldStatus = reservation.getReservationStatus();
+        if (targetStatus != null && !targetStatus.isBlank() && !targetStatus.equals(oldStatus)) {
+            if (!java.util.Set.of("pending", "pending_payment", "confirmed", "checked_in", "checked_out", "no_show")
+                    .contains(targetStatus)) {
+                throw new RuntimeException("人工干预目标状态不合法");
+            }
+            reservation.setReservationStatus(targetStatus);
+            if ("checked_out".equals(targetStatus)) {
+                reservation.setStatus(Reservation.Status.completed);
+                reservation.setCompletedAt(new Date());
+            } else {
+                reservation.setStatus(Reservation.Status.active);
+                reservation.setCompletedAt(null);
+            }
+        }
 
         reservation.setIsManual(true);
         reservation.setManualReason(reason);
@@ -422,26 +496,16 @@ public class ReservationService {
         ReservationHistory history = new ReservationHistory();
         history.setReservationId(saved.getId());
         history.setAction("MANUAL_INTERVENE");
-        history.setContent("人工干预：" + reason);
+        history.setContent("人工干预：" + reason
+                + (targetStatus != null && !targetStatus.isBlank() && !targetStatus.equals(oldStatus)
+                        ? "；强制状态变更：" + oldStatus + " → " + targetStatus
+                        : ""));
         history.setResult("success");
         history.setOperator(operator);
         history.setOperatorType("crs");
         historyRepository.save(history);
 
         return saved;
-    }
-
-    private void validateStatusTransition(String from, String to) {
-        Map<String, Set<String>> allowed = Map.of(
-                "pending", Set.of("confirmed", "cancelled"),
-                "pending_payment", Set.of("confirmed", "cancelled"),
-                "confirmed", Set.of("checked_in", "cancelled", "no_show"),
-                "checked_in", Set.of("checked_out")
-        );
-        Set<String> allowedTargets = allowed.get(from);
-        if (allowedTargets == null || !allowedTargets.contains(to)) {
-            throw new RuntimeException("不允许的状态变更：" + from + " → " + to);
-        }
     }
 
     private void checkAndReserveInventory(Reservation reservation) {

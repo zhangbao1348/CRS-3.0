@@ -4,6 +4,7 @@ import com.crs.entity.HotelRoomType;
 import com.crs.entity.Hotel;
 import com.crs.service.HotelRoomTypeService;
 import com.crs.repository.HotelRepository;
+import com.crs.repository.GroupRoomTypeHotelRepository;
 import com.crs.util.CodeValidator;
 import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,9 @@ public class HotelRoomTypeController {
     
     @Autowired
     private HotelRepository hotelRepository;
+
+    @Autowired
+    private GroupRoomTypeHotelRepository groupRoomTypeHotelRepository;
     
     public HotelRoomTypeController(HotelRoomTypeService hotelRoomTypeService) {
         this.hotelRoomTypeService = hotelRoomTypeService;
@@ -62,11 +66,8 @@ public class HotelRoomTypeController {
     public ResponseEntity<Map<String, Object>> getHotelRoomTypes(@PathVariable Integer hotelId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            Hotel hotel = hotelRepository.findById(hotelId)
-                    .orElseThrow(() -> new RuntimeException("Hotel not found"));
-            if (!hotel.getTenantId().equals(getCurrentTenantId())) {
-                throw new RuntimeException("Access denied");
-            }
+            Hotel hotel = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId())
+                    .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
             List<HotelRoomType> roomTypes = hotelRoomTypeService.getHotelRoomTypes(hotel.getHotelCode());
             response.put("success", true);
             response.put("data", roomTypes);
@@ -92,6 +93,31 @@ public class HotelRoomTypeController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * 获取酒店房型的集团来源与编辑权限。
+     * 关联模块：集团房型分配、酒店房型编辑。
+     */
+    @GetMapping("/{id}/permissions")
+    public ResponseEntity<?> getHotelRoomTypePermissions(@PathVariable Integer id) {
+        HotelRoomType roomType = hotelRoomTypeService.getHotelRoomTypeById(id)
+                .orElseThrow(() -> new RuntimeException("Hotel room type not found or access denied"));
+        boolean groupDistributed = roomType.getGroupRoomTypeCode() != null
+                && !roomType.getGroupRoomTypeCode().isBlank();
+        boolean roomInfoEditable = true;
+        if (groupDistributed) {
+            roomInfoEditable = groupRoomTypeHotelRepository
+                    .findByTenantIdAndGroupRoomTypeCodeAndHotelCode(
+                            getCurrentTenantId(), roomType.getGroupRoomTypeCode(), roomType.getHotelCode())
+                    .map(allocation -> Boolean.TRUE.equals(allocation.getAllocated())
+                            && Boolean.TRUE.equals(allocation.getRoomInfoEditable()))
+                    .orElse(false);
+        }
+        return ResponseEntity.ok(Map.of(
+                "isGroupDistributed", groupDistributed,
+                "sourceGroupRoomTypeCode", groupDistributed ? roomType.getGroupRoomTypeCode() : "",
+                "roomInfoEditable", roomInfoEditable));
     }
     
     /**

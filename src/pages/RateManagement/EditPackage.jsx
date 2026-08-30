@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Form, Tabs, Input, Select, Radio, Button, message, Row, Col, InputNumber, Checkbox, Card } from 'antd'
+import { App, Form, Tabs, Input, Select, Radio, Button, Row, Col, InputNumber, Checkbox, Card } from 'antd'
 import { SaveOutlined, LeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
 import { useHotelContext } from '../../contexts/HotelContext'
 import PackageDailyPriceEditor from './PackageDailyPriceEditor'
 
-const { TabPane } = Tabs
 const { Option } = Select
 const { Group: RadioGroup } = Radio
 
@@ -69,6 +68,7 @@ const getErrorMessage = (error, fallbackMessage) => {
 }
 
 const EditPackage = () => {
+  const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [quantityType, setQuantityType] = useState('')
@@ -141,8 +141,7 @@ const EditPackage = () => {
       setSavedPriceType(normalizedPriceType)
       setPackageCode(packageData.code)
       setActiveTab(targetTab === 'daily-price' && normalizedPriceType === 'daily' ? 'daily-price' : '1')
-    } catch (error) {
-      console.error('加载包价数据失败:', error)
+    } catch {
       message.error('加载包价数据失败，请稍后重试')
       navigate('/rate-management/package-setting')
     } finally {
@@ -184,7 +183,6 @@ const EditPackage = () => {
         navigate('/rate-management/package-setting')
       }
     } catch (error) {
-      console.error('保存包价失败:', error)
       message.error(getErrorMessage(error, '保存失败，请稍后重试'))
     } finally {
       setLoading(false)
@@ -220,8 +218,12 @@ const EditPackage = () => {
             taxIncluded: false
           }}
         >
-          <Tabs activeKey={activeTab} onChange={setActiveTab}>
-            <TabPane tab="基础信息" key="1">
+          <Tabs activeKey={activeTab} onChange={setActiveTab} items={[
+            {
+              key: '1',
+              label: '基础信息',
+              children: (
+                <>
               <Row gutter={[16, 16]}>
                 <Col span={12}>
                   <Form.Item
@@ -325,13 +327,7 @@ const EditPackage = () => {
                     <Form.Item
                       name="fixedPrice"
                       label="价格"
-                      dependencies={['priceType']}
-                      rules={[
-                        ({ getFieldValue }) => ({
-                          required: getFieldValue('priceType') === 'fixed',
-                          message: '请输入价格'
-                        })
-                      ]}
+                      rules={[{ required: true, message: '请输入价格' }]}
                     >
                       <InputNumber
                         style={{ width: '100%' }}
@@ -359,10 +355,13 @@ const EditPackage = () => {
               >
                 <Input.TextArea rows={4} placeholder="请输入包价描述" />
               </Form.Item>
-            </TabPane>
-            {(priceType === 'daily' || savedPriceType === 'daily') && (
-              <TabPane tab="每日价格设置" key="daily-price">
-                {savedPriceType === 'daily' && priceType === 'daily' ? (
+                </>
+              )
+            },
+            ...((priceType === 'daily' || savedPriceType === 'daily') ? [{
+              key: 'daily-price',
+              label: '每日价格设置',
+              children: savedPriceType === 'daily' && priceType === 'daily' ? (
                   <PackageDailyPriceEditor
                     hotelCode={hotelCode}
                     packageCode={packageCode}
@@ -372,10 +371,9 @@ const EditPackage = () => {
                   <div style={{ color: '#8c8c8c', padding: '16px 0' }}>
                     请先保存“按日期设置价格”的基础信息后，再维护每日价格。
                   </div>
-                )}
-              </TabPane>
-            )}
-          </Tabs>
+                )
+            }] : [])
+          ]} />
           
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <Button

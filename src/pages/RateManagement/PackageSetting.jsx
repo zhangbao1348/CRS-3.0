@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
@@ -39,6 +39,7 @@ const mapPackageToRow = (pkg) => ({
 })
 
 const PackageSetting = () => {
+  const { message } = App.useApp()
   const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchParams, setSearchParams] = useState({
@@ -80,8 +81,7 @@ const PackageSetting = () => {
     try {
       const response = await api.get('/packages')
       setPackages(response.map(mapPackageToRow))
-    } catch (error) {
-      console.error('获取包价列表失败:', error)
+    } catch {
       message.error('获取包价列表失败，请稍后重试')
     } finally {
       setLoading(false)
@@ -100,8 +100,7 @@ const PackageSetting = () => {
 
       const response = await api.post('/packages/search', params)
       setPackages(response.map(mapPackageToRow))
-    } catch (error) {
-      console.error('搜索包价失败:', error)
+    } catch {
       message.error('搜索失败，请稍后重试')
     } finally {
       setLoading(false)

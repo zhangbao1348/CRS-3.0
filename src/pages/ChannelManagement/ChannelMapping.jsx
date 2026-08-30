@@ -1,189 +1,105 @@
-import React, { useState } from 'react'
-import { Card, Tabs, Table, Select, Input, Row, Col, Tag, Button, Space, Popconfirm, Form, Modal, message, Checkbox } from 'antd'
+import { useCallback, useEffect, useState } from 'react'
+import { Alert, App, Card, Tabs, Table, Select, Input, Row, Col, Tag, Button, Space, Popconfirm, Form, Modal } from 'antd'
 import { LinkOutlined, PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons'
+import { channelMappingApi, hotelApi, hotelRoomTypeApi, ratePlanApi, tenantChannelApi } from '../../utils/api'
+import { useTenantContext } from '../../contexts/TenantContext.jsx'
+import { PageScaffold } from '../../components/ui'
 
 const { Option } = Select
-const { TabPane } = Tabs
 
-// 模拟渠道数据
-const channels = [
-  { id: 1, name: '携程', code: 'CTRIP' },
-  { id: 2, name: '飞猪', code: 'FLIGGY' },
-  { id: 3, name: '美团', code: 'MEITUAN' },
-  { id: 4, name: '红色加力', code: 'RED_POWER' }
-]
+const normalizeList = (response) => {
+  if (Array.isArray(response)) return response
+  if (Array.isArray(response?.data)) return response.data
+  return []
+}
 
-// 模拟酒店数据
-const hotels = [
-  { id: 1, name: '上海宝丽嘉酒店', code: 'SHBLJ001' },
-  { id: 2, name: '杭州钓美酒店', code: 'HZDM001' },
-  { id: 3, name: '北京王府井酒店', code: 'BJWFJ001' },
-  { id: 4, name: '深圳南山酒店', code: 'SZNS001' }
-]
-
-// 模拟房型数据
-const roomTypes = [
-  { id: 1, name: '标准大床房', code: 'STD_KING' },
-  { id: 2, name: '豪华大床房', code: 'DELUXE_KING' },
-  { id: 3, name: '标准双床房', code: 'STD_TWIN' },
-  { id: 4, name: '豪华双床房', code: 'DELUXE_TWIN' },
-  { id: 5, name: '行政大床房', code: 'EXECUTIVE_KING' }
-]
-
-// 模拟房价码数据
-const rateCodes = [
-  { id: 1, name: '牌价', code: 'RACK' },
-  { id: 2, name: '净价', code: 'NET' },
-  { id: 3, name: '企业价', code: 'CORP' },
-  { id: 4, name: 'OTA价', code: 'OTA' },
-  { id: 5, name: '周末价', code: 'WEEKEND' }
-]
-
-// 模拟酒店映射数据
-const hotelMappings = [
-  {
-    id: 1,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    hotelCode: 'SHBLJ001',
-    channelHotelCode: 'CTRIP_SH_BLJ_001',
-    status: 'active',
-    updatedAt: '2025-12-15 10:30:00'
-  },
-  {
-    id: 2,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 2,
-    hotelName: '杭州钓美酒店',
-    hotelCode: 'HZDM001',
-    channelHotelCode: 'CTRIP_HZ_DM_001',
-    status: 'active',
-    updatedAt: '2025-12-15 10:35:00'
-  },
-  {
-    id: 3,
-    channelId: 2,
-    channelName: '飞猪',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    hotelCode: 'SHBLJ001',
-    channelHotelCode: 'FLIGGY_SH_001',
-    status: 'active',
-    updatedAt: '2025-12-14 15:20:00'
-  }
-]
-
-// 模拟房型映射数据
-const roomTypeMappings = [
-  {
-    id: 1,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    roomTypeId: 1,
-    roomTypeName: '标准大床房',
-    roomTypeCode: 'STD_KING',
-    channelRoomTypeCode: 'CTRIP_STD_KING',
-    channelRoomTypeName: '携程标准大床房',
-    status: 'active',
-    updatedAt: '2025-12-15 10:30:00'
-  },
-  {
-    id: 2,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    roomTypeId: 2,
-    roomTypeName: '豪华大床房',
-    roomTypeCode: 'DELUXE_KING',
-    channelRoomTypeCode: 'CTRIP_DELUXE_KING',
-    channelRoomTypeName: '携程豪华大床房',
-    status: 'active',
-    updatedAt: '2025-12-15 10:35:00'
-  },
-  {
-    id: 3,
-    channelId: 2,
-    channelName: '飞猪',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    roomTypeId: 1,
-    roomTypeName: '标准大床房',
-    roomTypeCode: 'STD_KING',
-    channelRoomTypeCode: 'FLIGGY_KING',
-    channelRoomTypeName: '飞猪大床房',
-    status: 'active',
-    updatedAt: '2025-12-14 15:20:00'
-  }
-]
-
-// 模拟房价码映射数据
-const rateCodeMappings = [
-  {
-    id: 1,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    rateCodeId: 1,
-    rateCodeName: '牌价',
-    rateCode: 'RACK',
-    channelRateCode: 'CTRIP_RACK',
-    channelRateName: '携程门市价',
-    markup: 0,
-    status: 'active',
-    updatedAt: '2025-12-15 10:30:00'
-  },
-  {
-    id: 2,
-    channelId: 1,
-    channelName: '携程',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    rateCodeId: 4,
-    rateCodeName: 'OTA价',
-    rateCode: 'OTA',
-    channelRateCode: 'CTRIP_OTA',
-    channelRateName: '携程OTA价',
-    markup: 10,
-    status: 'active',
-    updatedAt: '2025-12-15 10:35:00'
-  },
-  {
-    id: 3,
-    channelId: 2,
-    channelName: '飞猪',
-    hotelId: 1,
-    hotelName: '上海宝丽嘉酒店',
-    rateCodeId: 1,
-    rateCodeName: '牌价',
-    rateCode: 'RACK',
-    channelRateCode: 'FLIGGY_BASIC',
-    channelRateName: '飞猪基础价',
-    markup: 5,
-    status: 'active',
-    updatedAt: '2025-12-14 15:20:00'
-  }
-]
+const formatError = (error, fallback) => {
+  const detail = error?.message || error?.error || fallback
+  const traceId = error?.traceId || error?.trace_id
+  return traceId ? `${detail}（Trace: ${traceId}）` : detail
+}
 
 const ChannelMapping = () => {
+  const { message } = App.useApp()
+  const { selectedTenant } = useTenantContext()
   const [activeTab, setActiveTab] = useState('hotel')
   const [selectedChannel, setSelectedChannel] = useState(null)
   const [selectedHotel, setSelectedHotel] = useState(null)
-  const [hotelMappingsData, setHotelMappingsData] = useState(hotelMappings)
-  const [roomTypeMappingsData, setRoomTypeMappingsData] = useState(roomTypeMappings)
-  const [rateCodeMappingsData, setRateCodeMappingsData] = useState(rateCodeMappings)
+  const [channels, setChannels] = useState([])
+  const [hotels, setHotels] = useState([])
+  const [roomTypes, setRoomTypes] = useState([])
+  const [rateCodes, setRateCodes] = useState([])
+  const [hotelMappingsData, setHotelMappingsData] = useState([])
+  const [roomTypeMappingsData, setRoomTypeMappingsData] = useState([])
+  const [rateCodeMappingsData, setRateCodeMappingsData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [isModalVisible, setIsModalVisible] = useState(false)
   const [isBatchModalVisible, setIsBatchModalVisible] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [form] = Form.useForm()
   const [batchForm] = Form.useForm()
+  const formHotelCode = Form.useWatch('hotelCode', form)
+
+  const refreshMappings = useCallback(async () => {
+    const [hotelResult, roomTypeResult, rateCodeResult] = await Promise.all([
+      channelMappingApi.listHotels(),
+      channelMappingApi.listRoomTypes(),
+      channelMappingApi.listRateCodes()
+    ])
+    setHotelMappingsData(normalizeList(hotelResult))
+    setRoomTypeMappingsData(normalizeList(roomTypeResult))
+    setRateCodeMappingsData(normalizeList(rateCodeResult))
+  }, [])
+
+  const loadPage = useCallback(async () => {
+    if (!selectedTenant) return
+    setLoading(true)
+    setLoadError('')
+    try {
+      const [channelResult, hotelResult] = await Promise.all([
+        tenantChannelApi.getAllChannels(selectedTenant),
+        hotelApi.getAllHotels(selectedTenant)
+      ])
+      setChannels(normalizeList(channelResult).map(item => ({ id: item.id, name: item.channelName, code: item.channelCode })))
+      setHotels(normalizeList(hotelResult).map(item => ({ id: item.id, name: item.chineseName, code: item.hotelCode })))
+      await refreshMappings()
+    } catch (error) {
+      const detail = formatError(error, '渠道映射加载失败')
+      setLoadError(detail)
+      message.error(detail)
+    } finally {
+      setLoading(false)
+    }
+  }, [refreshMappings, selectedTenant])
+
+  useEffect(() => {
+    setSelectedChannel(null)
+    setSelectedHotel(null)
+    setSelectedRowKeys([])
+    loadPage()
+  }, [loadPage])
+
+  useEffect(() => {
+    if (!isModalVisible || !formHotelCode || activeTab === 'hotel') {
+      setRoomTypes([])
+      setRateCodes([])
+      return
+    }
+    let active = true
+    Promise.all([
+      hotelRoomTypeApi.getHotelRoomTypesByCodeAndStatus(formHotelCode, 'active'),
+      ratePlanApi.getRatePlans(formHotelCode)
+    ]).then(([roomTypeResult, rateCodeResult]) => {
+      if (!active) return
+      setRoomTypes(normalizeList(roomTypeResult).map(item => ({ id: item.id, name: item.roomTypeName, code: item.roomTypeCode })))
+      setRateCodes(normalizeList(rateCodeResult).map(item => ({ id: item.id, name: item.rateName, code: item.rateCode })))
+    }).catch(error => {
+      if (active) message.error(formatError(error, '酒店产品数据加载失败'))
+    })
+    return () => { active = false }
+  }, [activeTab, formHotelCode, isModalVisible])
 
   // 筛选数据（关联查询原则：使用 channelCode/hotelCode，而非 channelId/hotelId）
   const getFilteredData = (data) => {
@@ -229,188 +145,110 @@ const ChannelMapping = () => {
   }
 
   // 保存映射
-  const handleSave = () => {
-    form.validateFields().then(values => {
-      if (editingRecord) {
-        // 编辑模式
-        if (activeTab === 'hotel') {
-          setHotelMappingsData(prev => prev.map(item => 
-            item.id === editingRecord.id ? { ...item, ...values, updatedAt: new Date().toLocaleString('zh-CN') } : item
-          ))
-        } else if (activeTab === 'roomType') {
-          setRoomTypeMappingsData(prev => prev.map(item => 
-            item.id === editingRecord.id ? { ...item, ...values, updatedAt: new Date().toLocaleString('zh-CN') } : item
-          ))
-        } else if (activeTab === 'rateCode') {
-          setRateCodeMappingsData(prev => prev.map(item => 
-            item.id === editingRecord.id ? { ...item, ...values, updatedAt: new Date().toLocaleString('zh-CN') } : item
-          ))
-        }
-        message.success('更新成功')
-      } else {
-        // 新增模式
-        const newRecord = {
-          ...values,
-          id: Date.now(),
-          channelName: channels.find(c => c.code === values.channelCode)?.name || '',
-          hotelName: hotels.find(h => h.code === values.hotelCode)?.name || '',
-          hotelCode: values.hotelCode,
-          status: 'active',
-          updatedAt: new Date().toLocaleString('zh-CN')
-        }
-        
-        if (activeTab === 'hotel') {
-          setHotelMappingsData(prev => [...prev, newRecord])
-        } else if (activeTab === 'roomType') {
-          setRoomTypeMappingsData(prev => [...prev, {
-            ...newRecord,
-            roomTypeName: roomTypes.find(r => r.code === values.roomTypeCode)?.name || '',
-            roomTypeCode: values.roomTypeCode
-          }])
-        } else if (activeTab === 'rateCode') {
-          setRateCodeMappingsData(prev => [...prev, {
-            ...newRecord,
-            rateCodeName: rateCodes.find(r => r.code === values.rateCode)?.name || '',
-            rateCode: values.rateCode
-          }])
-        }
-        message.success('新增成功')
-      }
+  const getTabApi = () => ({
+    hotel: { create: channelMappingApi.createHotel, update: channelMappingApi.updateHotel, remove: channelMappingApi.deleteHotel, toggle: channelMappingApi.toggleHotel },
+    roomType: { create: channelMappingApi.createRoomType, update: channelMappingApi.updateRoomType, remove: channelMappingApi.deleteRoomType, toggle: channelMappingApi.toggleRoomType },
+    rateCode: { create: channelMappingApi.createRateCode, update: channelMappingApi.updateRateCode, remove: channelMappingApi.deleteRateCode, toggle: channelMappingApi.toggleRateCode }
+  })[activeTab]
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields()
+      const payload = { ...editingRecord, ...values }
+      const tabApi = getTabApi()
+      if (editingRecord) await tabApi.update(editingRecord.id, payload)
+      else await tabApi.create(payload)
+      message.success(editingRecord ? '更新成功' : '新增成功')
       handleCloseModal()
-    })
+      await refreshMappings()
+    } catch (error) {
+      if (!error?.errorFields) message.error(formatError(error, '保存映射失败'))
+    }
   }
 
   // 批量保存映射
-  const handleBatchSave = () => {
-    batchForm.validateFields().then(values => {
-      const { channelId, hotelId, channelCodePrefix, ...otherValues } = values
+  const handleBatchSave = async () => {
+    try {
+      const values = await batchForm.validateFields()
+      const { channelCodePrefix, ...otherValues } = values
       const currentData = getCurrentDataSource()
       const selectedRecords = currentData.filter(item => selectedRowKeys.includes(item.id))
-      
       if (selectedRecords.length === 0) {
         message.warning('请先选择要批量设置的记录')
         return
       }
-
-      let successCount = 0
-      const updateTime = new Date().toLocaleString('zh-CN')
-
-      if (activeTab === 'hotel') {
-        setHotelMappingsData(prev => prev.map(item => {
-          if (selectedRowKeys.includes(item.id)) {
-            successCount++
-            return {
-              ...item,
-              channelHotelCode: channelCodePrefix ? `${channelCodePrefix}_${item.hotelCode}` : item.channelHotelCode,
-              updatedAt: updateTime
-            }
+      const tabApi = getTabApi()
+      const payloads = selectedRecords.map(item => {
+        const targetField = activeTab === 'hotel' ? 'channelHotelCode' : activeTab === 'roomType' ? 'channelRoomTypeCode' : 'channelRateCode'
+        return {
+          item,
+          payload: {
+            ...item,
+            ...Object.fromEntries(Object.entries(otherValues).filter(([, value]) => value !== undefined && value !== '')),
+            [targetField]: channelCodePrefix ? `${channelCodePrefix}_${activeTab === 'hotel' ? item.hotelCode : activeTab === 'roomType' ? item.roomTypeCode : item.rateCode}` : item[targetField]
           }
-          return item
-        }))
-      } else if (activeTab === 'roomType') {
-        setRoomTypeMappingsData(prev => prev.map(item => {
-          if (selectedRowKeys.includes(item.id)) {
-            successCount++
-            return {
-              ...item,
-              channelRoomTypeCode: channelCodePrefix ? `${channelCodePrefix}_${item.roomTypeCode}` : item.channelRoomTypeCode,
-              channelRoomTypeName: otherValues.channelRoomTypeName || item.channelRoomTypeName,
-              updatedAt: updateTime
-            }
-          }
-          return item
-        }))
-      } else if (activeTab === 'rateCode') {
-        setRateCodeMappingsData(prev => prev.map(item => {
-          if (selectedRowKeys.includes(item.id)) {
-            successCount++
-            return {
-              ...item,
-              channelRateCode: channelCodePrefix ? `${channelCodePrefix}_${item.rateCode}` : item.channelRateCode,
-              channelRateName: otherValues.channelRateName || item.channelRateName,
-              markup: otherValues.markup !== undefined ? otherValues.markup : item.markup,
-              updatedAt: updateTime
-            }
-          }
-          return item
-        }))
-      }
-
-      message.success(`成功批量设置 ${successCount} 条记录`)
+        }
+      })
+      const results = await Promise.allSettled(payloads.map(({ item, payload }) => tabApi.update(item.id, payload)))
+      const successCount = results.filter(result => result.status === 'fulfilled').length
+      if (successCount !== results.length) message.warning(`已完成 ${successCount}/${results.length} 条，其余记录请按 Trace 排查`)
+      else message.success(`成功批量设置 ${successCount} 条记录`)
       handleCloseBatchModal()
-    })
+      await refreshMappings()
+    } catch (error) {
+      if (!error?.errorFields) message.error(formatError(error, '批量设置失败'))
+    }
   }
 
   // 删除映射
-  const handleDelete = (id) => {
-    if (activeTab === 'hotel') {
-      setHotelMappingsData(prev => prev.filter(item => item.id !== id))
-    } else if (activeTab === 'roomType') {
-      setRoomTypeMappingsData(prev => prev.filter(item => item.id !== id))
-    } else if (activeTab === 'rateCode') {
-      setRateCodeMappingsData(prev => prev.filter(item => item.id !== id))
+  const handleDelete = async (id) => {
+    try {
+      await getTabApi().remove(id)
+      message.success('删除成功')
+      await refreshMappings()
+    } catch (error) {
+      message.error(formatError(error, '删除映射失败'))
     }
-    message.success('删除成功')
   }
 
   // 批量删除
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要删除的记录')
       return
     }
 
-    if (activeTab === 'hotel') {
-      setHotelMappingsData(prev => prev.filter(item => !selectedRowKeys.includes(item.id)))
-    } else if (activeTab === 'roomType') {
-      setRoomTypeMappingsData(prev => prev.filter(item => !selectedRowKeys.includes(item.id)))
-    } else if (activeTab === 'rateCode') {
-      setRateCodeMappingsData(prev => prev.filter(item => !selectedRowKeys.includes(item.id)))
-    }
-    message.success(`成功删除 ${selectedRowKeys.length} 条记录`)
+    const results = await Promise.allSettled(selectedRowKeys.map(id => getTabApi().remove(id)))
+    const successCount = results.filter(result => result.status === 'fulfilled').length
+    if (successCount === results.length) message.success(`成功删除 ${successCount} 条记录`)
+    else message.warning(`已删除 ${successCount}/${results.length} 条记录`)
     setSelectedRowKeys([])
+    await refreshMappings()
   }
 
   // 切换状态
-  const toggleStatus = (id, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
-    if (activeTab === 'hotel') {
-      setHotelMappingsData(prev => prev.map(item => 
-        item.id === id ? { ...item, status: newStatus } : item
-      ))
-    } else if (activeTab === 'roomType') {
-      setRoomTypeMappingsData(prev => prev.map(item => 
-        item.id === id ? { ...item, status: newStatus } : item
-      ))
-    } else if (activeTab === 'rateCode') {
-      setRateCodeMappingsData(prev => prev.map(item => 
-        item.id === id ? { ...item, status: newStatus } : item
-      ))
+  const toggleStatus = async (id, currentStatus) => {
+    try {
+      await getTabApi().toggle(id)
+      message.success(`已${currentStatus === 'active' ? '禁用' : '启用'}`)
+      await refreshMappings()
+    } catch (error) {
+      message.error(formatError(error, '状态更新失败'))
     }
-    message.success(`已${newStatus === 'active' ? '启用' : '禁用'}`)
   }
 
   // 批量切换状态
-  const handleBatchToggleStatus = (status) => {
+  const handleBatchToggleStatus = async (status) => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要操作的记录')
       return
     }
 
-    if (activeTab === 'hotel') {
-      setHotelMappingsData(prev => prev.map(item => 
-        selectedRowKeys.includes(item.id) ? { ...item, status: status } : item
-      ))
-    } else if (activeTab === 'roomType') {
-      setRoomTypeMappingsData(prev => prev.map(item => 
-        selectedRowKeys.includes(item.id) ? { ...item, status: status } : item
-      ))
-    } else if (activeTab === 'rateCode') {
-      setRateCodeMappingsData(prev => prev.map(item => 
-        selectedRowKeys.includes(item.id) ? { ...item, status: status } : item
-      ))
-    }
-    message.success(`成功${status === 'active' ? '启用' : '禁用'} ${selectedRowKeys.length} 条记录`)
+    const targets = getCurrentDataSource().filter(item => selectedRowKeys.includes(item.id) && item.status !== status)
+    const results = await Promise.allSettled(targets.map(item => getTabApi().toggle(item.id)))
+    const successCount = results.filter(result => result.status === 'fulfilled').length
+    message.success(`成功${status === 'active' ? '启用' : '禁用'} ${successCount} 条记录`)
+    await refreshMappings()
   }
 
   // 表格行选择
@@ -725,17 +563,31 @@ const ChannelMapping = () => {
   }
 
   return (
-    <div className="fade-in">
-      <h1 className="page-title">
-        <LinkOutlined />
-        渠道映射
-      </h1>
+    <PageScaffold
+      className="fade-in"
+      eyebrow="CHANNEL CODE MAPPING"
+      title={<><LinkOutlined /> 渠道映射</>}
+      description="维护集团酒店、房型和房价码与外部渠道 CODE 的对应关系；批量操作仅作用于当前选中记录。"
+    >
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          closable
+          message="真实映射数据加载失败"
+          description={loadError}
+          style={{ marginBottom: 16 }}
+          action={<Button size="small" onClick={loadPage}>重新加载</Button>}
+        />
+      )}
       
-      <Card style={{ marginBottom: 24 }}>
+      <Card className="ui-panel">
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={8} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} className="ui-field">
+            <span className="ui-field__label">渠道</span>
             <Select
-              placeholder="选择渠道"
+              aria-label="渠道"
+              placeholder="全部渠道"
               style={{ width: '100%' }}
               allowClear
               value={selectedChannel}
@@ -747,9 +599,11 @@ const ChannelMapping = () => {
               ))}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} className="ui-field">
+            <span className="ui-field__label">酒店</span>
             <Select
-              placeholder="选择酒店"
+              aria-label="酒店"
+              placeholder="全部酒店"
               style={{ width: '100%' }}
               allowClear
               value={selectedHotel}
@@ -761,7 +615,8 @@ const ChannelMapping = () => {
               ))}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} className="ui-field ui-field--action">
+            <span className="ui-field__label">映射维护</span>
             <Space>
               <Button 
                 type="primary" 
@@ -815,47 +670,18 @@ const ChannelMapping = () => {
       
       <Tabs 
         activeKey={activeTab} 
-        onChange={setActiveTab} 
+        onChange={(key) => {
+          setActiveTab(key)
+          setSelectedRowKeys([])
+        }}
         type="card" 
         size="large"
-      >
-        <TabPane tab="酒店CODE映射" key="hotel">
-          <Card>
-            <Table
-              rowSelection={rowSelection}
-              columns={getCurrentColumns()}
-              dataSource={getCurrentDataSource()}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1200 }}
-            />
-          </Card>
-        </TabPane>
-        <TabPane tab="房型CODE映射" key="roomType">
-          <Card>
-            <Table
-              rowSelection={rowSelection}
-              columns={getCurrentColumns()}
-              dataSource={getCurrentDataSource()}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1400 }}
-            />
-          </Card>
-        </TabPane>
-        <TabPane tab="房价CODE映射" key="rateCode">
-          <Card>
-            <Table
-              rowSelection={rowSelection}
-              columns={getCurrentColumns()}
-              dataSource={getCurrentDataSource()}
-              rowKey="id"
-              pagination={{ pageSize: 10 }}
-              scroll={{ x: 1500 }}
-            />
-          </Card>
-        </TabPane>
-      </Tabs>
+        items={[
+          { key: 'hotel', label: '酒店CODE映射', children: <Card className="ui-panel"><Table rowSelection={rowSelection} columns={getCurrentColumns()} dataSource={getCurrentDataSource()} loading={loading} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1200 }} /></Card> },
+          { key: 'roomType', label: '房型CODE映射', children: <Card className="ui-panel"><Table rowSelection={rowSelection} columns={getCurrentColumns()} dataSource={getCurrentDataSource()} loading={loading} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1400 }} /></Card> },
+          { key: 'rateCode', label: '房价CODE映射', children: <Card className="ui-panel"><Table rowSelection={rowSelection} columns={getCurrentColumns()} dataSource={getCurrentDataSource()} loading={loading} rowKey="id" pagination={{ pageSize: 10 }} scroll={{ x: 1500 }} /></Card> }
+        ]}
+      />
 
       {/* 新增/编辑模态框 */}
       <Modal
@@ -1047,7 +873,7 @@ const ChannelMapping = () => {
           )}
         </Form>
       </Modal>
-    </div>
+    </PageScaffold>
   )
 }
 

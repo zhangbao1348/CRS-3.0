@@ -147,6 +147,10 @@ public class Reservation {
     @Column(name = "member_no", length = 50)
     private String memberNo;
 
+    /** 企业预订代码 */
+    @Column(name = "booking_code", length = 50)
+    private String bookingCode;
+
     /** 会员等级 */
     @Column(name = "member_level", length = 30)
     private String memberLevel;
@@ -403,6 +407,8 @@ public class Reservation {
     public void setChildCount(Integer childCount) { this.childCount = childCount; }
     public String getMemberNo() { return memberNo; }
     public void setMemberNo(String memberNo) { this.memberNo = memberNo; }
+    public String getBookingCode() { return bookingCode; }
+    public void setBookingCode(String bookingCode) { this.bookingCode = bookingCode; }
     public String getMemberLevel() { return memberLevel; }
     public void setMemberLevel(String memberLevel) { this.memberLevel = memberLevel; }
     public BigDecimal getOriginalPrice() { return originalPrice; }

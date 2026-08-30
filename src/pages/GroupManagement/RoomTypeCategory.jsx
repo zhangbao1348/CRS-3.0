@@ -1,55 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import TreeManagement from '../../components/TreeManagement'
-import axios from 'axios'
+import api from '../../utils/api'
 import { message } from 'antd'
 
 const RoomTypeCategory = () => {
-  // 模拟房型大类数据（只有一级）
-  const mockRoomTypeCategories = [
-    {
-      key: '1',
-      title: '标准房',
-      code: 'STANDARD'
-    },
-    {
-      key: '2',
-      title: '大床房',
-      code: 'KING'
-    },
-    {
-      key: '3',
-      title: '双床房',
-      code: 'TWIN'
-    },
-    {
-      key: '4',
-      title: '套房',
-      code: 'SUITE'
-    },
-    {
-      key: '5',
-      title: '行政房',
-      code: 'EXECUTIVE'
-    },
-    {
-      key: '6',
-      title: '家庭房',
-      code: 'FAMILY'
-    }
-  ]
-
-  const [initialData, setInitialData] = useState(mockRoomTypeCategories)
+  const [initialData, setInitialData] = useState([])
   const [loading, setLoading] = useState(true)
 
   // 从API获取房型大类数据
   useEffect(() => {
     const fetchRoomTypeCategories = async () => {
       try {
-        const response = await axios.get('/api/room-type-categories')
-        setInitialData(response.data || [])
+        const response = await api.get('/room-type-categories')
+        setInitialData(response || [])
       } catch (error) {
-        console.error('加载房型大类数据失败，使用模拟数据:', error)
-        setInitialData(mockRoomTypeCategories)
+        console.error('加载房型大类数据失败:', error)
+        setInitialData([])
+        message.error(error.response?.data?.message || '加载房型大类数据失败')
       } finally {
         setLoading(false)
       }
@@ -64,18 +31,17 @@ const RoomTypeCategory = () => {
     addNode: async (parentKey, nodeData) => {
       try {
         const roomTypeCategoryData = {
-          code: nodeData.code,
-          name: nodeData.title
+          categoryCode: nodeData.code,
+          categoryName: nodeData.title
         }
-        const response = await axios.post('/api/room-type-categories', roomTypeCategoryData)
+        const response = await api.post('/room-type-categories', roomTypeCategoryData)
         return {
-          key: response.data.id.toString(),
-          title: response.data.name,
-          code: response.data.code,
-          id: response.data.id
+          key: response.id.toString(),
+          title: response.name,
+          code: response.code,
+          id: response.id
         }
       } catch (error) {
-        console.error('新增房型大类失败:', error)
         throw new Error('新增房型大类失败，请稍后重试')
       }
     },
@@ -84,13 +50,12 @@ const RoomTypeCategory = () => {
     updateNode: async (nodeKey, nodeData) => {
       try {
         const roomTypeCategoryData = {
-          code: nodeData.code,
-          name: nodeData.title
+          categoryCode: nodeData.code,
+          categoryName: nodeData.title
         }
-        await axios.put(`/api/room-type-categories/${nodeKey}`, roomTypeCategoryData)
+        await api.put(`/room-type-categories/${nodeKey}`, roomTypeCategoryData)
         return true
       } catch (error) {
-        console.error('更新房型大类失败:', error)
         throw new Error('更新房型大类失败，请稍后重试')
       }
     },
@@ -98,11 +63,10 @@ const RoomTypeCategory = () => {
     // 删除房型大类
     deleteNode: async (nodeKey) => {
       try {
-        await axios.delete(`/api/room-type-categories/${nodeKey}`)
+        await api.delete(`/room-type-categories/${nodeKey}`)
         return true
       } catch (error) {
-        console.error('删除房型大类失败:', error)
-        return true
+        throw new Error(error.response?.data?.message || error.response?.data?.error || '删除房型大类失败')
       }
     },
 
@@ -110,16 +74,15 @@ const RoomTypeCategory = () => {
     checkCodeUnique: async (code, excludeKey) => {
       try {
         const excludeId = excludeKey ? parseInt(excludeKey) : null
-        const response = await axios.get('/api/room-type-categories/check-code', {
+        const response = await api.get('/room-type-categories/check-code', {
           params: {
             code: code,
             id: excludeId
           }
         })
-        return response.data.unique
+        return response.unique
       } catch (error) {
-        console.error('检查房型大类CODE失败:', error)
-        return true
+        throw new Error(error.response?.data?.message || error.response?.data?.error || '无法校验房型大类唯一性')
       }
     }
   }

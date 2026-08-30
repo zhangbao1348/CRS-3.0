@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Card, Row, Col, Button, DatePicker, InputNumber, Empty, Spin, message, Modal, Form, Checkbox } from 'antd'
+import { App, Card, Row, Col, Button, DatePicker, InputNumber, Empty, Spin, Modal, Form, Checkbox } from 'antd'
 import dayjs from 'dayjs'
 import { packageApi } from '../../utils/api'
 
@@ -23,6 +23,7 @@ const normalizePriceValue = (value) => {
 }
 
 const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
+  const { message } = App.useApp()
   const [batchForm] = Form.useForm()
   const [selectedMonth, setSelectedMonth] = useState(dayjs())
   const [priceMap, setPriceMap] = useState({})
@@ -97,7 +98,6 @@ const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
       setPriceMap(nextPriceMap)
       persistedPriceMapRef.current = nextPriceMap
     } catch (error) {
-      console.error('加载包价每日价格失败:', error)
       message.error(error?.error || '加载包价每日价格失败')
     } finally {
       setLoading(false)
@@ -124,12 +124,12 @@ const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
     persistedPriceMapRef.current = nextPriceMap
   }
 
-  const handlePriceBlur = async (dateKey) => {
+  const handlePriceBlur = async (dateKey, rawValue) => {
     if (!hotelCode || !packageCode) {
       return
     }
 
-    const currentValue = normalizePriceValue(priceMap[dateKey])
+    const currentValue = normalizePriceValue(rawValue)
     const persistedValue = normalizePriceValue(persistedPriceMapRef.current[dateKey])
 
     if (currentValue === persistedValue) {
@@ -151,7 +151,6 @@ const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
       normalizeResponsePrices(response)
       message.success('保存成功')
     } catch (error) {
-      console.error('保存包价每日价格失败:', error)
       setPriceMap((prev) => ({
         ...prev,
         [dateKey]: persistedPriceMapRef.current[dateKey]
@@ -208,7 +207,6 @@ const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
       if (error?.errorFields) {
         return
       }
-      console.error('批量修改每日价格失败:', error)
       message.error(error?.error || '批量修改每日价格失败')
     } finally {
       setBatchSaving(false)
@@ -325,7 +323,7 @@ const PackageDailyPriceEditor = ({ hotelCode, packageCode, packageName }) => {
                         step={0.01}
                         value={priceMap[dateKey]}
                         onChange={(value) => handlePriceChange(dateKey, value)}
-                        onBlur={() => handlePriceBlur(dateKey)}
+                        onBlur={(event) => handlePriceBlur(dateKey, event.target.value)}
                         placeholder="价格"
                         prefix="¥"
                         disabled={savingDateKey === dateKey}

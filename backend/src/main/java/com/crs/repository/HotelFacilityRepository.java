@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 酒店设施数据访问接口 (HotelFacilityRepository)
@@ -18,6 +19,12 @@ import java.util.List;
  * </ul>
  */
 public interface HotelFacilityRepository extends JpaRepository<HotelFacility, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<HotelFacility> findByIdAndTenantId(Integer id, Integer tenantId);
+
+    /** 获取当前租户的全部酒店设施。 */
+    List<HotelFacility> findByTenantId(Integer tenantId);
     
     // =====================================================================
     // 合规方法：必须包含 tenantId（符合多租户隔离规范）

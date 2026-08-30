@@ -67,7 +67,9 @@ public class ApiLoggingAspect {
     @Autowired
     private SystemTraceLogRepository systemTraceLogRepository;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /** 复用 Spring Boot 已配置的 ObjectMapper，确保 LocalDate 等 Java Time 类型可序列化。 */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Around("execution(* com.crs.controller..*Controller.*(..))")
     public Object logApiCall(ProceedingJoinPoint joinPoint) throws Throwable {

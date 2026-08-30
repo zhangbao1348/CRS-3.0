@@ -43,6 +43,8 @@ import com.crs.entity.Inventory;
 import com.crs.entity.RatePlan;
 import com.crs.entity.RoomTypeFacility;
 import com.crs.entity.TenantChannel;
+import com.crs.entity.Archive;
+import com.crs.repository.ArchiveRepository;
 import com.crs.repository.BookingControlRepository;
 import com.crs.repository.CancellationPolicyRepository;
 import com.crs.repository.ChannelHotelMappingRepository;
@@ -95,6 +97,7 @@ public class OpenHotelController {
     @Autowired private PackageRepository packageRepo;
     @Autowired private ChannelHotelMappingRepository channelHotelMappingRepo;
     @Autowired private ChannelPublishRecordRepository channelPublishRecordRepo;
+    @Autowired private ArchiveRepository archiveRepo;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -284,7 +287,8 @@ public class OpenHotelController {
             @RequestParam(defaultValue = "0") int childCount,
             @RequestParam(defaultValue = "1") int roomCount,
             @RequestParam(required = false) String memberNo,
-            @RequestParam(required = false) String memberLevel) {
+            @RequestParam(required = false) String memberLevel,
+            @RequestParam(required = false) String bookingCode) {
         try {
             TenantChannel channel = getChannel(req);
             String priceRounding = channel.getPriceRounding();
@@ -372,14 +376,40 @@ public class OpenHotelController {
                     .collect(Collectors.toSet());
 
             // 3. 构建返回数据
+            List<String> archiveRateCodes = new ArrayList<>();
+            if (bookingCode != null && !bookingCode.isBlank()) {
+                Optional<Archive> archiveOpt = archiveRepo.findByGroupIdAndBookingCode(channel.getTenantId(), bookingCode);
+                if (archiveOpt.isPresent() && "启用".equals(archiveOpt.get().getStatus())) {
+                    Archive archive = archiveOpt.get();
+                    String rcJson = archive.getRateCodes();
+                    if (rcJson != null && !rcJson.isBlank()) {
+                        try {
+                            List<Map<String, Object>> rcList = objectMapper.readValue(rcJson, new TypeReference<>() {});
+                            for (Map<String, Object> map : rcList) {
+                                String hCode = (String) map.get("hotel");
+                                if (hotelCode.equals(hCode)) {
+                                    Object rcObj = map.get("rateCode");
+                                    if (rcObj instanceof List) {
+                                        for (Object o : (List<?>) rcObj) {
+                                            archiveRateCodes.add(String.valueOf(o));
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
             List<Map<String, Object>> roomTypeResults = new ArrayList<>();
             for (HotelRoomType rt : roomTypes) {
                 Map<String, Object> rtMap = buildRoomTypeSummary(rt);
                 List<Map<String, Object>> ratePlanResults = new ArrayList<>();
 
                 for (RatePlan rp : allRatePlans) {
-                    // A. 校验发布状态
-                    if (!publishedSet.contains(rp.getRateCode() + "_" + rt.getRoomTypeCode())) continue;
+                    // A. 校验发布状态 (如果是档案关联的企业协议房价码，免除发布校验)
+                    boolean isArchiveRate = archiveRateCodes.contains(rp.getRateCode());
+                    if (!isArchiveRate && !publishedSet.contains(rp.getRateCode() + "_" + rt.getRoomTypeCode())) continue;
 
                     // B. 校验会员等级
                     String pm = rp.getPersonalMembership();
@@ -541,9 +571,40 @@ public class OpenHotelController {
             }
 
             // 3.5 渠道发布校验
+            String bookingCode = (String) body.get("bookingCode");
             boolean isPublished = channelPublishRecordRepo.existsByTenantIdAndHotelCodeAndChannelCodeAndRateCodeAndRoomTypeCode(
                     hotel.getTenantId(), hotelCode, channel.getChannelCode(), ratePlanCode, roomTypeCode);
-            if (!isPublished) {
+
+            boolean isArchiveAuthorized = false;
+            if (bookingCode != null && !bookingCode.isBlank()) {
+                Optional<Archive> archiveOpt = archiveRepo.findByGroupIdAndBookingCode(channel.getTenantId(), bookingCode);
+                if (archiveOpt.isPresent() && "启用".equals(archiveOpt.get().getStatus())) {
+                    Archive archive = archiveOpt.get();
+                    String rcJson = archive.getRateCodes();
+                    if (rcJson != null && !rcJson.isBlank()) {
+                        try {
+                            List<Map<String, Object>> rcList = objectMapper.readValue(rcJson, new TypeReference<>() {});
+                            for (Map<String, Object> map : rcList) {
+                                String hCode = (String) map.get("hotel");
+                                if (hotelCode.equals(hCode)) {
+                                    Object rcObj = map.get("rateCode");
+                                    if (rcObj instanceof List) {
+                                        for (Object o : (List<?>) rcObj) {
+                                            if (ratePlanCode.equals(String.valueOf(o))) {
+                                                isArchiveAuthorized = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (isArchiveAuthorized) break;
+                            }
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            if (!isPublished && !isArchiveAuthorized) {
                 return ResponseEntity.status(409).body(unavailable("RATE_PLAN_NOT_PUBLISHED", "该房型+价格计划未发布至该渠道", null));
             }
 
@@ -650,6 +711,9 @@ public class OpenHotelController {
 
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("available", true);
+            if (isArchiveAuthorized) {
+                data.put("bookingCode", bookingCode);
+            }
             data.put("hotelCode", hotelCode);
             data.put("roomTypeCode", roomTypeCode);
             data.put("ratePlanCode", ratePlanCode);

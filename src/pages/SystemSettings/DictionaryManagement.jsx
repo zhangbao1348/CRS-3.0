@@ -17,7 +17,7 @@ import {
   Table,
   Tag,
   Typography,
-  message
+  App
 } from 'antd'
 import {
   DeleteOutlined,
@@ -27,6 +27,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { dictionaryApi } from '../../utils/api'
+import { PageScaffold } from '../../components/ui'
 
 const statusOptions = [
   { label: '启用', value: 'active' },
@@ -34,6 +35,7 @@ const statusOptions = [
 ]
 
 const DictionaryManagement = () => {
+  const { message } = App.useApp()
   const [typeKeyword, setTypeKeyword] = useState('')
   const [itemKeyword, setItemKeyword] = useState('')
   const [dictionaryTypes, setDictionaryTypes] = useState([])
@@ -294,10 +296,16 @@ const DictionaryManagement = () => {
   }
 
   return (
-    <div style={{ padding: 24 }}>
-      <Row gutter={16}>
-        <Col span={8}>
+    <PageScaffold
+      className="fade-in dictionary-management"
+      eyebrow="CONFIGURATION CATALOG"
+      title="字典管理"
+      description="维护系统字典类型与字典项，为自定义渠道和业务枚举提供统一数据来源。"
+    >
+      <Row gutter={[16, 16]}>
+        <Col xs={24} xl={8}>
           <Card
+            className="ui-panel"
             title="字典类型"
             extra={(
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAddType}>
@@ -305,8 +313,9 @@ const DictionaryManagement = () => {
               </Button>
             )}
           >
-            <Space style={{ width: '100%', marginBottom: 16 }}>
+            <Space className="dictionary-management__search">
               <Input
+                aria-label="搜索字典类型"
                 value={typeKeyword}
                 onChange={(event) => setTypeKeyword(event.target.value)}
                 placeholder="搜索类型名称/编码"
@@ -322,6 +331,7 @@ const DictionaryManagement = () => {
               locale={{ emptyText: <Empty description="暂无字典类型" /> }}
               renderItem={(item) => (
                 <List.Item
+                  className="dictionary-management__type-item"
                   style={{
                     cursor: 'pointer',
                     padding: '12px 8px',
@@ -361,7 +371,7 @@ const DictionaryManagement = () => {
                   <List.Item.Meta
                     avatar={<SettingOutlined style={{ fontSize: 18, color: '#1677ff' }} />}
                     title={(
-                      <Space>
+                      <Space wrap size={[6, 6]}>
                         <span>{item.typeName}</span>
                         <Tag color={item.status === 'active' ? 'green' : 'red'}>
                           {item.status === 'active' ? '启用' : '停用'}
@@ -382,8 +392,9 @@ const DictionaryManagement = () => {
           </Card>
         </Col>
 
-        <Col span={16}>
+        <Col xs={24} xl={16}>
           <Card
+            className="ui-panel"
             title={selectedType ? `字典项 - ${selectedType.typeName}` : '字典项'}
             extra={(
               <Space>
@@ -397,8 +408,9 @@ const DictionaryManagement = () => {
               <Empty description="请先选择左侧字典类型" />
             ) : (
               <>
-                <Space style={{ width: '100%', marginBottom: 16 }}>
+                <Space className="dictionary-management__search">
                   <Input
+                    aria-label="搜索字典项"
                     value={itemKeyword}
                     onChange={(event) => setItemKeyword(event.target.value)}
                     placeholder="搜索字典项名称/编码"
@@ -413,6 +425,7 @@ const DictionaryManagement = () => {
                   loading={itemLoading}
                   columns={itemColumns}
                   dataSource={dictionaryItems}
+                  scroll={{ x: 900 }}
                   pagination={{ pageSize: 10 }}
                   locale={{ emptyText: <Empty description="暂无字典项" /> }}
                 />
@@ -428,6 +441,7 @@ const DictionaryManagement = () => {
         onOk={handleSubmitType}
         onCancel={() => setTypeModalVisible(false)}
         destroyOnHidden
+        forceRender
       >
         <Form form={typeForm} layout="vertical">
           <Form.Item
@@ -471,6 +485,7 @@ const DictionaryManagement = () => {
         onOk={handleSubmitItem}
         onCancel={() => setItemModalVisible(false)}
         destroyOnHidden
+        forceRender
       >
         <Form form={itemForm} layout="vertical">
           <Form.Item name="typeCode" label="所属字典类型">
@@ -513,7 +528,7 @@ const DictionaryManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageScaffold>
   )
 }
 

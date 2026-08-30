@@ -1,309 +1,22 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, Radio, message, Modal, Spin } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Spin } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  EyeOutlined,
   DollarOutlined,
-  ReloadOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import api from '../../utils/api'
 
 const { Option } = Select
-const { Group: RadioGroup } = Radio
 
 const GroupRateCode = () => {
   const navigate = useNavigate()
+  const { message, modal } = App.useApp()
 
-  // 模拟集团房价码数据
-  const mockRateCodes = [
-    {
-      id: 1,
-      name: '标准价',
-      code: 'RACK',
-      rateCategory: '公共价',
-      marketCode: 'MARKET01',
-      sourceCode: 'SOURCE01',
-      type: '基础房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 2,
-      name: '周末价',
-      code: 'WEEKEND',
-      rateCategory: '公共价',
-      marketCode: 'MARKET02',
-      sourceCode: 'SOURCE02',
-      type: '基础房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 3,
-      name: '企业价',
-      code: 'CORP',
-      rateCategory: '协议价',
-      marketCode: 'MARKET03',
-      sourceCode: 'SOURCE03',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 4,
-      name: '会员价',
-      code: 'MEMBER',
-      rateCategory: '会员价',
-      marketCode: 'MARKET04',
-      sourceCode: 'SOURCE04',
-      type: '衍生房价码',
-      status: '停用',
-      includeBreakfast: '含双早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不可用优惠'
-    },
-    {
-      id: 5,
-      name: '团队价',
-      code: 'GROUP',
-      rateCategory: '团队价',
-      marketCode: 'MARKET05',
-      sourceCode: 'SOURCE05',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 6,
-      name: '促销价',
-      code: 'PROMO',
-      rateCategory: '促销价',
-      marketCode: 'MARKET06',
-      sourceCode: 'SOURCE06',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 7,
-      name: '长住价',
-      code: 'LONG_STAY',
-      rateCategory: '协议价',
-      marketCode: 'MARKET07',
-      sourceCode: 'SOURCE07',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 8,
-      name: '政府价',
-      code: 'GOV',
-      rateCategory: '协议价',
-      marketCode: 'MARKET08',
-      sourceCode: 'SOURCE08',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 9,
-      name: '军人价',
-      code: 'MILITARY',
-      rateCategory: '协议价',
-      marketCode: 'MARKET09',
-      sourceCode: 'SOURCE09',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 10,
-      name: '学生价',
-      code: 'STUDENT',
-      rateCategory: '促销价',
-      marketCode: 'MARKET10',
-      sourceCode: 'SOURCE10',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '不含早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 11,
-      name: '旺季价',
-      code: 'PEAK',
-      rateCategory: '公共价',
-      marketCode: 'MARKET11',
-      sourceCode: 'SOURCE11',
-      type: '基础房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 12,
-      name: '淡季价',
-      code: 'OFF_PEAK',
-      rateCategory: '公共价',
-      marketCode: 'MARKET12',
-      sourceCode: 'SOURCE12',
-      type: '基础房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 13,
-      name: '节假日价',
-      code: 'HOLIDAY',
-      rateCategory: '公共价',
-      marketCode: 'MARKET13',
-      sourceCode: 'SOURCE13',
-      type: '基础房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 14,
-      name: '生日价',
-      code: 'BIRTHDAY',
-      rateCategory: '促销价',
-      marketCode: 'MARKET14',
-      sourceCode: 'SOURCE14',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 15,
-      name: '情侣价',
-      code: 'COUPLE',
-      rateCategory: '促销价',
-      marketCode: 'MARKET15',
-      sourceCode: 'SOURCE15',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '不限制'
-    },
-    {
-      id: 16,
-      name: '家庭价',
-      code: 'FAMILY',
-      rateCategory: '促销价',
-      marketCode: 'MARKET16',
-      sourceCode: 'SOURCE16',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含三早',
-      refundable: '可退',
-      guarantee: '需要担保',
-      promotion: '不限制'
-    },
-    {
-      id: 17,
-      name: '商务价',
-      code: 'BUSINESS',
-      rateCategory: '协议价',
-      marketCode: 'MARKET17',
-      sourceCode: 'SOURCE17',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 18,
-      name: '会议价',
-      code: 'MEETING',
-      rateCategory: '团队价',
-      marketCode: 'MARKET18',
-      sourceCode: 'SOURCE18',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含双早',
-      refundable: '不可退',
-      guarantee: '需要担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 19,
-      name: '航空价',
-      code: 'AIRLINE',
-      rateCategory: '协议价',
-      marketCode: 'MARKET19',
-      sourceCode: 'SOURCE19',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '限制部分优惠'
-    },
-    {
-      id: 20,
-      name: '酒店员工价',
-      code: 'EMPLOYEE',
-      rateCategory: '协议价',
-      marketCode: 'MARKET20',
-      sourceCode: 'SOURCE20',
-      type: '衍生房价码',
-      status: '启用',
-      includeBreakfast: '含单早',
-      refundable: '可退',
-      guarantee: '无需担保',
-      promotion: '限制部分优惠'
-    }
-  ]
-  
   // 状态管理
-  const [rateCodes, setRateCodes] = useState(mockRateCodes)
+  const [rateCodes, setRateCodes] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [searchParams, setSearchParams] = useState({
@@ -371,17 +84,16 @@ const GroupRateCode = () => {
   // 处理停用前确认（检查子衍生码）
   const confirmDisableRateCode = (record) => {
     // 检查是否有子衍生码（通过查看列表中parentRateCodeId匹配的记录）
-    const childCount = rateCodes.filter(rc => rc.parentRateCodeId === record.id).length
     const hasChildren = record.derivativeLevelValue === 'basic' || record.derivativeLevelValue === 'level1'
     
     if (hasChildren) {
-      Modal.confirm({
+      modal.confirm({
         title: '确认停用',
         content: `停用房价码"${record.name}"将同时停用其下所有衍生码，并将已下发到酒店的该房价码全部置为无效。确定要继续吗？`,
         onOk: () => handleDisableRateCode(record)
       })
     } else {
-      Modal.confirm({
+      modal.confirm({
         title: '确认停用',
         content: `停用房价码"${record.name}"将同时将已下发到酒店的该房价码置为无效。确定要继续吗？`,
         onOk: () => handleDisableRateCode(record)
@@ -405,13 +117,11 @@ const GroupRateCode = () => {
         if (value) params[key] = value
       })
       
-      console.log('API请求参数:', params)
       
       const response = await api.get('/group-rate-codes', {
         params
       })
       
-      console.log('API响应数据:', response)
       
       // 转换数据格式以匹配前端展示需求
       const formattedRateCodes = response.map(item => {
@@ -485,11 +195,11 @@ const GroupRateCode = () => {
         }
       })
       
-      console.log('格式化后的数据:', formattedRateCodes)
       setRateCodes(formattedRateCodes)
     } catch (error) {
-      console.error('获取房价码数据失败，使用模拟数据:', error)
-      setRateCodes(mockRateCodes)
+      console.error('获取房价码数据失败:', error)
+      setRateCodes([])
+      message.error(error?.message || '获取集团房价码失败')
     } finally {
       setLoading(false)
     }
@@ -588,22 +298,6 @@ const GroupRateCode = () => {
     fetchRateCodes()
   }
   
-  // 处理重置
-  const handleReset = () => {
-    setSearchParams({
-      name: '',
-      code: '',
-      rateCategory: '',
-      marketCode: '',
-      sourceCode: '',
-      type: '',
-      derivativeLevel: '',
-      promotion: '',
-      status: '',
-      rateClass: ''
-    })
-    fetchRateCodes()
-  }
   
   const columns = [
     {
@@ -712,7 +406,7 @@ const GroupRateCode = () => {
               size="small" 
               style={{ color: '#52c41a' }}
               onClick={() => {
-                Modal.confirm({
+                modal.confirm({
                   title: '确认启用',
                   content: `确定要启用房价码"${record.name}"吗？`,
                   onOk: () => handleEnableRateCode(record)
@@ -924,7 +618,7 @@ const GroupRateCode = () => {
       {/* 房价码列表表格 */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <Spin size="large" tip="加载中..." />
+          <Spin size="large"><span>加载中...</span></Spin>
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '100px 0', color: '#ff4d4f' }}>

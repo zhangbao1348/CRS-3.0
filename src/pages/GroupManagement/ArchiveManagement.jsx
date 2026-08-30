@@ -1,51 +1,78 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Table, Button, Space, Tag, Form, Input, Select, Row, Col, Popconfirm, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Card, Table, Button, Space, Tag, Form, Input, Select, Row, Col, Popconfirm } from 'antd'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { archiveApi } from '../../utils/api'
 
 const { Option } = Select
 
 const ArchiveManagement = () => {
+  const { message } = App.useApp()
   const [data, setData] = useState([])
   const [filteredData, setFilteredData] = useState([])
+  const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const savedData = localStorage.getItem('archiveData')
-    if (savedData) {
-      const parsedData = JSON.parse(savedData)
-      const dataWithLevel = parsedData.map(item => ({
-        ...item,
-        level: item.level || '银卡'
-      }))
-      setData(dataWithLevel)
-      setFilteredData(dataWithLevel)
-      localStorage.setItem('archiveData', JSON.stringify(dataWithLevel))
-    } else {
-      const initialData = [
-        { id: 1, archiveId: 'ARCH001', name: '档案1', type: '公司', contact: '张三', address: '北京市', status: '启用', level: '金卡' },
-        { id: 2, archiveId: 'ARCH002', name: '档案2', type: '旅行社', contact: '李四', address: '上海市', status: '启用', level: '银卡' }
-      ]
-      setData(initialData)
-      setFilteredData(initialData)
-      localStorage.setItem('archiveData', JSON.stringify(initialData))
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const res = await archiveApi.getAllArchives()
+      let list = []
+      if (res && res.success) {
+        list = res.data || []
+      } else if (Array.isArray(res)) {
+        list = res
+      }
+
+      const formattedList = list.map(item => {
+        let rc = item.rateCodes
+        if (typeof rc === 'string' && rc.startsWith('[')) {
+          try {
+            rc = JSON.parse(rc)
+          } catch (e) {
+            rc = []
+          }
+        }
+        return {
+          ...item,
+          contact: item.contactName || item.contact,
+          phone: item.contactPhone || item.phone,
+          rateCodes: Array.isArray(rc) ? rc : []
+        }
+      })
+      setData(formattedList)
+      setFilteredData(formattedList)
+    } catch (error) {
+      console.error('加载档案列表失败:', error)
+      setData([])
+      setFilteredData([])
+      message.error('加载档案列表失败，请稍后重试')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    loadData()
   }, [])
 
   const handleSearch = (values) => {
     let result = data
     if (values.archiveId) {
-      result = result.filter(item => item.archiveId.includes(values.archiveId))
+      result = result.filter(item => item.archiveId && item.archiveId.includes(values.archiveId))
     }
     if (values.name) {
-      result = result.filter(item => item.name.includes(values.name))
+      result = result.filter(item => item.name && item.name.includes(values.name))
     }
     if (values.type) {
       result = result.filter(item => item.type === values.type)
     }
-    if (values.level) {
-      result = result.filter(item => item.level === values.level)
+    if (values.bookingCode) {
+      result = result.filter(item => item.bookingCode && item.bookingCode.includes(values.bookingCode))
+    }
+    if (values.phone) {
+      result = result.filter(item => item.phone && item.phone.includes(values.phone))
     }
     if (values.status) {
       result = result.filter(item => item.status === values.status)
@@ -58,15 +85,28 @@ const ArchiveManagement = () => {
     setFilteredData(data)
   }
 
-  const handleToggleStatus = (record) => {
+  const handleToggleStatus = async (record) => {
     const newStatus = record.status === '启用' ? '停用' : '启用'
-    const updatedData = data.map(item => 
-      item.id === record.id ? { ...item, status: newStatus } : item
-    )
-    setData(updatedData)
-    setFilteredData(updatedData)
-    localStorage.setItem('archiveData', JSON.stringify(updatedData))
-    message.success(`档案已${newStatus}`)
+    try {
+      const updatedRecord = {
+        ...record,
+        status: newStatus,
+        contactName: record.contact,
+        contactPhone: record.phone,
+        rateCodes: JSON.stringify(record.rateCodes)
+      }
+      await archiveRepoUpdate(record.id, updatedRecord)
+      message.success(`档案已${newStatus}`)
+      loadData()
+    } catch (error) {
+      console.error('更新状态失败:', error)
+      message.error('更新状态失败，服务器未保存任何变更')
+    }
+  }
+
+  // 辅助方法以避免 eslint 或运行期未定义 archiveApi 调用的问题
+  const archiveRepoUpdate = async (id, updatedRecord) => {
+    return await archiveApi.updateArchive(id, updatedRecord)
   }
 
   const columns = [
@@ -81,6 +121,11 @@ const ArchiveManagement = () => {
       key: 'name'
     },
     {
+      title: '预订代码',
+      dataIndex: 'bookingCode',
+      key: 'bookingCode'
+    },
+    {
       title: '档案类型',
       dataIndex: 'type',
       key: 'type',
@@ -90,24 +135,16 @@ const ArchiveManagement = () => {
         </Tag>
       )
     },
-    {
-      title: '档案等级',
-      dataIndex: 'level',
-      key: 'level',
-      render: (level) => {
-        const levelColors = {
-          '银卡': 'default',
-          '金卡': 'gold',
-          '铂金卡': 'orange',
-          '黑卡': 'purple'
-        }
-        return <Tag color={levelColors[level] || 'default'}>{level}</Tag>
-      }
-    },
+
     {
       title: '档案联系人',
       dataIndex: 'contact',
       key: 'contact'
+    },
+    {
+      title: '联系电话',
+      dataIndex: 'phone',
+      key: 'phone'
     },
     {
       title: '档案联系地址',
@@ -125,7 +162,7 @@ const ArchiveManagement = () => {
           okText="确定"
           cancelText="取消"
         >
-          <Tag 
+          <Tag
             color={status === '启用' ? 'success' : 'default'}
             style={{ cursor: 'pointer' }}
           >
@@ -189,13 +226,13 @@ const ArchiveManagement = () => {
               </Form.Item>
             </Col>
             <Col span={4}>
-              <Form.Item name="level" label="档案等级">
-                <Select placeholder="请选择档案等级" allowClear>
-                  <Option value="银卡">银卡</Option>
-                  <Option value="金卡">金卡</Option>
-                  <Option value="铂金卡">铂金卡</Option>
-                  <Option value="黑卡">黑卡</Option>
-                </Select>
+              <Form.Item name="bookingCode" label="预订代码">
+                <Input placeholder="请输入预订代码" />
+              </Form.Item>
+            </Col>
+            <Col span={4}>
+              <Form.Item name="phone" label="联系电话">
+                <Input placeholder="请输入联系电话" />
               </Form.Item>
             </Col>
             <Col span={4}>
@@ -227,6 +264,7 @@ const ArchiveManagement = () => {
 
       <Card>
         <Table
+          loading={loading}
           columns={columns}
           dataSource={filteredData}
           rowKey="id"

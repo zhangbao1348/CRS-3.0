@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message, Tag, Typography } from 'antd'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Tag, Typography, Popconfirm } from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
   GiftOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DeleteOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { packageApi } from '../../utils/api'
@@ -96,6 +97,7 @@ const formatUpdatedAt = (value) => {
 }
 
 const PackageSetting = () => {
+  const { message } = App.useApp()
   const [packages, setPackages] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchParams, setSearchParams] = useState(DEFAULT_SEARCH_PARAMS)
@@ -133,7 +135,6 @@ const PackageSetting = () => {
       const response = await packageApi.searchPackages(requestData)
       setPackages(Array.isArray(response) ? response : [])
     } catch (error) {
-      console.error('获取包价列表失败:', error)
       message.error(error?.error || '获取包价列表失败，请稍后重试')
     } finally {
       setLoading(false)
@@ -162,6 +163,17 @@ const PackageSetting = () => {
 
   const handleEditPackage = (record) => {
     navigate(`/group-management/edit-package?id=${record.id}`)
+  }
+
+  /** 删除动作保留二次确认，引用约束交由服务端最终判定。 */
+  const handleDeletePackage = async (record) => {
+    try {
+      await packageApi.deletePackage(record.id)
+      message.success('包价删除成功')
+      fetchPackages(searchParams)
+    } catch (error) {
+      message.error(error?.error || error?.message || '包价删除失败')
+    }
   }
 
   const columns = [
@@ -247,12 +259,24 @@ const PackageSetting = () => {
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 220,
       render: (_, record) => (
         <Space size="middle">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditPackage(record)}>
             编辑
           </Button>
+          <Popconfirm
+            title="确认删除该包价？"
+            description="已被房价码引用的包价将被系统拒绝删除。"
+            okText="确定"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDeletePackage(record)}
+          >
+            <Button danger type="link" size="small" icon={<DeleteOutlined />} aria-label={`删除包价 ${record.name}`}>
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
       )
     }

@@ -44,8 +44,7 @@ public class InventoryService {
      * @return 库存信息
      */
     public Optional<Inventory> getInventoryById(Integer id) {
-        return inventoryRepository.findById(id)
-                .filter(i -> i.getTenantId() != null && i.getTenantId().equals(getCurrentTenantId()));
+        return inventoryRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
 
     /**
@@ -319,4 +318,3 @@ public class InventoryService {
         return inventories.size();
     }
 }
-

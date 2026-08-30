@@ -393,7 +393,15 @@ public class InventoryDeductionServiceImpl implements InventoryDeductionService 
     }
 
     private void deductPmsInventory(InventoryDeductionContext ctx, java.sql.Date date) {
-        int hotelAvailable = calculateHotelAvailable(ctx.getTenantId(), ctx.getHotelCode(), date);
+        // 先锁定酒店当日全部房型行，防止两个不同房型同时通过酒店总量校验而超卖。
+        List<PmsInventory> lockedInventory = pmsInventoryRepository.findHotelDateInventoryForUpdate(
+                ctx.getTenantId(), ctx.getHotelCode(), date);
+        if (lockedInventory.isEmpty()) {
+            throw new RuntimeException("未找到酒店库存，日期：" + date);
+        }
+
+        int hotelAvailable = calculateHotelAvailable(
+                ctx.getTenantId(), ctx.getHotelCode(), date, lockedInventory);
         if (hotelAvailable < ctx.getRoomCount()) {
             throw new RuntimeException("酒店库存不足，日期：" + date + "，酒店可售" + hotelAvailable + "间，需" + ctx.getRoomCount() + "间");
         }
@@ -410,17 +418,15 @@ public class InventoryDeductionServiceImpl implements InventoryDeductionService 
         }
     }
 
-    private int calculateHotelAvailable(Integer tenantId, String hotelCode, java.sql.Date date) {
+    private int calculateHotelAvailable(Integer tenantId, String hotelCode, java.sql.Date date,
+                                        List<PmsInventory> lockedInventory) {
         Integer hotelOverbook = overbookingRepository
                 .findByTenantIdAndHotelCodeAndDimensionTypeAndDimensionCodeAndOverbookDate(
                         tenantId, hotelCode, "hotel", "", date)
                 .map(Overbooking::getOverbookCount).orElse(0);
 
-        List<PmsInventory> allRoomTypes = pmsInventoryRepository
-                .findByTenantIdAndHotelCodeAndInventoryDateBetween(tenantId, hotelCode, date, date);
-
         int sumOriginalAvailable = 0;
-        for (PmsInventory pms : allRoomTypes) {
+        for (PmsInventory pms : lockedInventory) {
             sumOriginalAvailable += pms.getAvailableRooms() - pms.getOverbookCount();
         }
         return sumOriginalAvailable + hotelOverbook;

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, Form, Modal, message, Spin } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Form, Modal, Spin } from 'antd'
 import { PlusOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons'
-import axios from 'axios'
+import { groupFacilityApi } from '../../utils/api'
 
 const { Option } = Select
 
@@ -42,6 +42,7 @@ const allFacilityTypes = [
 ]
 
 const GroupFacility = () => {
+  const { message } = App.useApp()
   const [facilities, setFacilities] = useState([])
   const [filteredFacilities, setFilteredFacilities] = useState([])
   const [loading, setLoading] = useState(false)
@@ -56,12 +57,12 @@ const GroupFacility = () => {
   const fetchFacilities = async () => {
     setLoading(true)
     try {
-      const response = await axios.get('/api/group-facilities')
-      setFacilities(response.data)
-      setFilteredFacilities(response.data)
+      const response = await groupFacilityApi.getAllGroupFacilities()
+      const list = Array.isArray(response) ? response : []
+      setFacilities(list)
+      setFilteredFacilities(list)
     } catch (error) {
-      console.error('获取设施列表失败:', error)
-      message.error('获取设施列表失败')
+      message.error(error?.error || '获取设施列表失败')
     } finally {
       setLoading(false)
     }
@@ -132,22 +133,21 @@ const GroupFacility = () => {
   const handleSubmit = async (values) => {
     try {
       if (isEditing) {
-        const response = await axios.put(`/api/group-facilities/${currentFacility.id}`, values)
-        const updated = facilities.map(f => f.id === currentFacility.id ? response.data : f)
+        const response = await groupFacilityApi.updateGroupFacility(currentFacility.id, values)
+        const updated = facilities.map(f => f.id === currentFacility.id ? response : f)
         setFacilities(updated)
         setFilteredFacilities(updated)
         message.success('编辑设施成功')
       } else {
-        const response = await axios.post('/api/group-facilities', values)
-        const updated = [...facilities, response.data]
+        const response = await groupFacilityApi.createGroupFacility(values)
+        const updated = [...facilities, response]
         setFacilities(updated)
         setFilteredFacilities(updated)
         message.success('新增设施成功')
       }
       setModalVisible(false)
     } catch (error) {
-      console.error('保存设施失败:', error)
-      message.error('保存设施失败')
+      message.error(error?.error || error?.message || '保存设施失败')
     }
   }
 
@@ -172,7 +172,7 @@ const GroupFacility = () => {
     <div className="fade-in">
       <h1 className="page-title">集团设施管理</h1>
 
-      <Card bordered={false} style={{ marginBottom: 16 }}>
+      <Card variant="borderless" style={{ marginBottom: 16 }}>
         <Form form={searchForm} layout="inline" onFinish={handleSearch}>
           <Form.Item name="searchScope" label="适用范围">
             <Select placeholder="全部" allowClear style={{ width: 120 }} onChange={handleSearchScopeChange}>
@@ -211,7 +211,7 @@ const GroupFacility = () => {
       </Spin>
 
       <Modal title={isEditing ? '编辑设施' : '新增设施'} open={modalVisible}
-        onCancel={() => setModalVisible(false)} footer={null} width={600} destroyOnClose>
+        onCancel={() => setModalVisible(false)} footer={null} width={600} forceRender>
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={[16, 0]}>
             <Col span={12}>
@@ -238,7 +238,7 @@ const GroupFacility = () => {
             <Col span={12}>
               <Form.Item name="facilityCode" label="设施代码" rules={[
                 { required: true, message: '请输入设施代码' },
-                { pattern: /^[A-Za-z0-9_]+$/, message: '只能包含英文字母、数字和下划线' }
+                { pattern: /^[A-Za-z0-9_]+$/, message: '设施代码仅允许输入英文字母、数字和下划线' }
               ]}>
                 <Input placeholder="请输入设施代码" disabled={isEditing} />
               </Form.Item>

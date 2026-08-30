@@ -5,6 +5,7 @@ import com.crs.repository.MarketCodeRepository;
 import com.crs.service.MarketCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -41,23 +42,19 @@ public class MarketCodeServiceImpl implements MarketCodeService {
 
     @Override
     public List<Map<String, Object>> getAllMarketCodesAsTree() {
-        try {
-            Integer currentTenantId = getCurrentTenantId();
-            List<MarketCode> allMarketCodes = marketCodeRepository.findByTenantId(currentTenantId);
-            List<Map<String, Object>> treeData = new ArrayList<>();
+        Integer currentTenantId = getCurrentTenantId();
+        List<MarketCode> allMarketCodes = marketCodeRepository.findByTenantId(currentTenantId);
+        List<Map<String, Object>> treeData = new ArrayList<>();
 
-            for (MarketCode marketCode : allMarketCodes) {
-                if (marketCode.getParentId() == null) {
-                    Map<String, Object> rootNode = buildTreeNode(marketCode);
-                    rootNode.put("children", buildChildNodes(marketCode.getId(), allMarketCodes));
-                    treeData.add(rootNode);
-                }
+        for (MarketCode marketCode : allMarketCodes) {
+            if (marketCode.getParentId() == null) {
+                Map<String, Object> rootNode = buildTreeNode(marketCode);
+                rootNode.put("children", buildChildNodes(marketCode.getId(), allMarketCodes));
+                treeData.add(rootNode);
             }
-
-            return treeData;
-        } catch (Exception e) {
-            return new ArrayList<>();
         }
+
+        return treeData;
     }
 
     @Override
@@ -67,24 +64,21 @@ public class MarketCodeServiceImpl implements MarketCodeService {
 
     @Override
     public List<MarketCode> getThirdLevelMarketCodes() {
-        try {
-            return marketCodeRepository.findByTenantIdAndLevel(getCurrentTenantId(), 3);
-        } catch (Exception e) {
-            return new ArrayList<>();
-        }
+        return marketCodeRepository.findByTenantIdAndLevel(getCurrentTenantId(), 3);
     }
 
     @Override
     public MarketCode getMarketCodeById(Integer id) {
-        Integer currentTenantId = getCurrentTenantId();
-        return marketCodeRepository.findById(id)
-                .filter(mc -> mc.getTenantId() != null && mc.getTenantId().equals(currentTenantId))
+        return marketCodeRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElse(null);
     }
 
     @Override
     public MarketCode createMarketCode(MarketCode marketCode) {
-        marketCode.setTenantId(getCurrentTenantId());
+        Integer tenantId = getCurrentTenantId();
+        marketCode.setId(null);
+        marketCode.setTenantId(tenantId);
+        applyHierarchy(marketCode, tenantId);
         return marketCodeRepository.save(marketCode);
     }
 
@@ -93,13 +87,37 @@ public class MarketCodeServiceImpl implements MarketCodeService {
         Integer currentTenantId = getCurrentTenantId();
         MarketCode existing = getMarketCodeById(marketCode.getId());
         if (existing != null) {
-            marketCode.setTenantId(currentTenantId);
-            return marketCodeRepository.save(marketCode);
+            existing.setCode(marketCode.getCode());
+            existing.setName(marketCode.getName());
+            if (marketCode.getDescription() != null) {
+                existing.setDescription(marketCode.getDescription());
+            }
+            if (marketCode.getStatus() != null) {
+                existing.setStatus(marketCode.getStatus());
+            }
+            return marketCodeRepository.save(existing);
         }
         return null;
     }
 
+    /** 根据当前租户中的父节点计算树层级，树深度最多三级。 */
+    private void applyHierarchy(MarketCode marketCode, Integer tenantId) {
+        if (marketCode.getParentId() == null) {
+            marketCode.setLevel(1);
+            marketCode.setParentCode(null);
+            return;
+        }
+        MarketCode parent = marketCodeRepository.findByIdAndTenantId(marketCode.getParentId(), tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("父节点不存在或无权访问"));
+        if (parent.getLevel() == null || parent.getLevel() >= 3) {
+            throw new IllegalArgumentException("市场码最多支持三级结构");
+        }
+        marketCode.setLevel(parent.getLevel() + 1);
+        marketCode.setParentCode(parent.getCode());
+    }
+
     @Override
+    @Transactional
     public void deleteMarketCode(Integer id) {
         Integer currentTenantId = getCurrentTenantId();
         // 验证根节点所有权
@@ -116,18 +134,13 @@ public class MarketCodeServiceImpl implements MarketCodeService {
     }
 
     private void deleteRecursive(Integer tenantId, Integer parentId) {
-        try {
-            List<MarketCode> children = marketCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
-            for (MarketCode child : children) {
-                deleteRecursive(tenantId, child.getId());
-            }
-            // 最终删除操作也应带上 tenantId 验证
-            marketCodeRepository.findById(parentId)
-                .filter(mc -> mc.getTenantId().equals(tenantId))
-                .ifPresent(mc -> marketCodeRepository.delete(mc));
-        } catch (Exception e) {
-            e.printStackTrace();
+        List<MarketCode> children = marketCodeRepository.findByTenantIdAndParentId(tenantId, parentId);
+        for (MarketCode child : children) {
+            deleteRecursive(tenantId, child.getId());
         }
+        // 最终删除操作也应带上 tenantId 验证
+        marketCodeRepository.findByIdAndTenantId(parentId, tenantId)
+            .ifPresent(marketCodeRepository::delete);
     }
 
     private List<Map<String, Object>> buildChildNodes(Integer parentId, List<MarketCode> allMarketCodes) {

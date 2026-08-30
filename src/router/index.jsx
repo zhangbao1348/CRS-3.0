@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { lazy } from 'react'
 import MainLayout from '../components/Layout/MainLayout'
 import ProtectedRoute from '../components/ProtectedRoute'
 
@@ -6,113 +7,91 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import Login from '../pages/Auth/Login'
 
 // 首页组件
-import Dashboard from '../pages/Dashboard'
+const Dashboard = lazy(() => import('../pages/Dashboard'))
 
 // 订单管理
-import ReservationList from '../pages/Reservation/ReservationList'
-import ReservationDetail from '../pages/Reservation/ReservationDetail'
+const ReservationList = lazy(() => import('../pages/Reservation/ReservationList'))
+const ReservationDetail = lazy(() => import('../pages/Reservation/ReservationDetail'))
 
 // 房控日历
-import Inventory from '../pages/Inventory/Inventory'
-import RoomStatus from '../pages/Inventory/RoomStatus'
-import BookingControl from '../pages/Inventory/BookingControl'
+const Inventory = lazy(() => import('../pages/Inventory/Inventory'))
+const RoomStatus = lazy(() => import('../pages/Inventory/RoomStatus'))
+const BookingControl = lazy(() => import('../pages/Inventory/BookingControl'))
 
 // 集团管理页面
-import HotelManagement from '../pages/GroupManagement/HotelManagement'
-import AddHotel from '../pages/HotelManagement/AddHotel'
-import EditHotel from '../pages/HotelManagement/EditHotel'
-import GroupRoomType from '../pages/GroupManagement/GroupRoomType'
-import AddGroupRoomType from '../pages/GroupManagement/AddGroupRoomType'
-import GroupRateCode from '../pages/GroupManagement/GroupRateCode'
-import AddGroupRateCode from '../pages/GroupManagement/AddGroupRateCode'
-import MarketCode from '../pages/GroupManagement/MarketCode'
-import ChannelCode from '../pages/GroupManagement/ChannelCode'
-import SourceCode from '../pages/GroupManagement/SourceCode'
-import TaxSetting from '../pages/GroupManagement/TaxSetting'
-import AddEditTax from '../pages/GroupManagement/AddEditTax'
-import PackageSetting from '../pages/GroupManagement/PackageSetting'
-import AddPackage from '../pages/GroupManagement/AddPackage'
-import EditPackage from '../pages/GroupManagement/EditPackage'
-import GroupGuarantee from '../pages/GroupManagement/GroupGuarantee'
-import AddEditGuarantee from '../pages/GroupManagement/AddEditGuarantee'
-import GroupCancellation from '../pages/GroupManagement/GroupCancellation'
-import AddEditCancellation from '../pages/GroupManagement/AddEditCancellation'
-import GroupFacility from '../pages/GroupManagement/GroupFacility'
-import ArchiveManagement from '../pages/GroupManagement/ArchiveManagement'
-import AddArchive from '../pages/GroupManagement/AddArchive'
-import EditArchive from '../pages/GroupManagement/EditArchive'
-import RateCategory from '../pages/GroupManagement/RateCategory'
-import RoomTypeCategory from '../pages/GroupManagement/RoomTypeCategory'
+const HotelManagement = lazy(() => import('../pages/GroupManagement/HotelManagement'))
+const AddHotel = lazy(() => import('../pages/HotelManagement/AddHotel'))
+const EditHotel = lazy(() => import('../pages/HotelManagement/EditHotel'))
+const GroupRoomType = lazy(() => import('../pages/GroupManagement/GroupRoomType'))
+const AddGroupRoomType = lazy(() => import('../pages/GroupManagement/AddGroupRoomType'))
+const GroupRateCode = lazy(() => import('../pages/GroupManagement/GroupRateCode'))
+const AddGroupRateCode = lazy(() => import('../pages/GroupManagement/AddGroupRateCode'))
+const MarketCode = lazy(() => import('../pages/GroupManagement/MarketCode'))
+const ChannelCode = lazy(() => import('../pages/GroupManagement/ChannelCode'))
+const SourceCode = lazy(() => import('../pages/GroupManagement/SourceCode'))
+const TaxSetting = lazy(() => import('../pages/GroupManagement/TaxSetting'))
+const AddEditTax = lazy(() => import('../pages/GroupManagement/AddEditTax'))
+const PackageSetting = lazy(() => import('../pages/GroupManagement/PackageSetting'))
+const AddPackage = lazy(() => import('../pages/GroupManagement/AddPackage'))
+const EditPackage = lazy(() => import('../pages/GroupManagement/EditPackage'))
+const GroupGuarantee = lazy(() => import('../pages/GroupManagement/GroupGuarantee'))
+const AddEditGuarantee = lazy(() => import('../pages/GroupManagement/AddEditGuarantee'))
+const GroupCancellation = lazy(() => import('../pages/GroupManagement/GroupCancellation'))
+const AddEditCancellation = lazy(() => import('../pages/GroupManagement/AddEditCancellation'))
+const GroupFacility = lazy(() => import('../pages/GroupManagement/GroupFacility'))
+const ArchiveManagement = lazy(() => import('../pages/GroupManagement/ArchiveManagement'))
+const AddArchive = lazy(() => import('../pages/GroupManagement/AddArchive'))
+const EditArchive = lazy(() => import('../pages/GroupManagement/EditArchive'))
+const RateCategory = lazy(() => import('../pages/GroupManagement/RateCategory'))
+const RoomTypeCategory = lazy(() => import('../pages/GroupManagement/RoomTypeCategory'))
 
 // 酒店管理页面
-import RoomType from '../pages/HotelManagement/RoomType'
-import RackRateCalendar from '../pages/HotelManagement/RackRateCalendar'
-import RateCode from '../pages/HotelManagement/RateCode'
+const RoomType = lazy(() => import('../pages/HotelManagement/RoomType'))
+const RackRateCalendar = lazy(() => import('../pages/HotelManagement/RackRateCalendar'))
+const RateCode = lazy(() => import('../pages/HotelManagement/RateCode'))
 
 // 渠道管理页面
-import ChannelList from '../pages/ChannelManagement/ChannelList'
-import ChannelMapping from '../pages/ChannelManagement/ChannelMapping'
-import FliggySetting from '../pages/ChannelManagement/FliggySetting'
-import ChannelSetting from '../pages/ChannelManagement/ChannelSetting'
-import CtripSetting from '../pages/ChannelManagement/CtripSetting'
-import AddCtripPromotion from '../pages/ChannelManagement/AddCtripPromotion'
-import CtripPromotionRegistration from '../pages/ChannelManagement/CtripPromotionRegistration'
+const ChannelList = lazy(() => import('../pages/ChannelManagement/ChannelList'))
+const ChannelMapping = lazy(() => import('../pages/ChannelManagement/ChannelMapping'))
+const ChannelSetting = lazy(() => import('../pages/ChannelManagement/ChannelSetting'))
+const IntegrationUnavailable = lazy(() => import('../pages/IntegrationUnavailable'))
 
 // 价格管理页面
-import RatePackageSetting from '../pages/RateManagement/PackageSetting'
-import RatePlan from '../pages/RateManagement/RatePlan'
-import AddRatePlan from '../pages/RateManagement/AddRatePlan'
-import RackRate from '../pages/RateManagement/RackRate'
-import AddRatePackage from '../pages/RateManagement/AddPackage'
-import EditRatePackage from '../pages/RateManagement/EditPackage'
-import PriceQuery from '../pages/RateManagement/PriceQuery'
+const RatePackageSetting = lazy(() => import('../pages/RateManagement/PackageSetting'))
+const RatePlan = lazy(() => import('../pages/RateManagement/RatePlan'))
+const AddRatePlan = lazy(() => import('../pages/RateManagement/AddRatePlan'))
+const RackRate = lazy(() => import('../pages/RateManagement/RackRate'))
+const AddRatePackage = lazy(() => import('../pages/RateManagement/AddPackage'))
+const EditRatePackage = lazy(() => import('../pages/RateManagement/EditPackage'))
+const PriceQuery = lazy(() => import('../pages/RateManagement/PriceQuery'))
 
 // 系统设置页面
-import UserManagement from '../pages/SystemSettings/UserManagement'
-import RoleManagement from '../pages/SystemSettings/RoleManagement'
-import GroupSettings from '../pages/SystemSettings/GroupSettings'
-import DictionaryManagement from '../pages/SystemSettings/DictionaryManagement'
+const UserManagement = lazy(() => import('../pages/SystemSettings/UserManagement'))
+const RoleManagement = lazy(() => import('../pages/SystemSettings/RoleManagement'))
+const GroupSettings = lazy(() => import('../pages/SystemSettings/GroupSettings'))
+const DictionaryManagement = lazy(() => import('../pages/SystemSettings/DictionaryManagement'))
 // CRM页面
-import CrmDashboard from '../pages/Crm/CrmDashboard'
+const CrmDashboard = lazy(() => import('../pages/Crm/CrmDashboard'))
 
 // 小程序页面
-import MiniProgramDashboard from '../pages/MiniProgram/MiniProgramDashboard'
+const MiniProgramDashboard = lazy(() => import('../pages/MiniProgram/MiniProgramDashboard'))
 
 // 超管设置页面
-import TenantManagement from '../pages/SuperAdminSettings/TenantManagement'
-import AddEditTenant from '../pages/SuperAdminSettings/AddEditTenant'
-import SuperAdminRoleManagement from '../pages/SuperAdminSettings/RoleManagement'
-import SuperAdminMenuManagement from '../pages/SuperAdminSettings/MenuManagement'
-
-// 集团促销管理页面
-import OTAPromotionManagement from '../pages/GroupPromotionManagement/OTAPromotionManagement'
-import AddOTAPromotion from '../pages/GroupPromotionManagement/AddOTAPromotion'
-import CtripActivityManagement from '../pages/GroupPromotionManagement/CtripActivityManagement'
-import CtripActivityRegistration from '../pages/GroupPromotionManagement/CtripActivityRegistration'
+const TenantManagement = lazy(() => import('../pages/SuperAdminSettings/TenantManagement'))
+const AddEditTenant = lazy(() => import('../pages/SuperAdminSettings/AddEditTenant'))
+const SuperAdminRoleManagement = lazy(() => import('../pages/SuperAdminSettings/RoleManagement'))
+const SuperAdminMenuManagement = lazy(() => import('../pages/SuperAdminSettings/MenuManagement'))
 
 // 报表页面
-import ReservationReports from '../pages/Reports/ReservationReports'
-import OccupancyReports from '../pages/Reports/OccupancyReports'
-import RevenueReports from '../pages/Reports/RevenueReports'
-import SystemTraceConsole from '../pages/Reports/SystemTraceConsole'
-import TestPage from '../pages/TestPage'
-import TestPageWithLayout from '../pages/TestPageWithLayout'
-
-// 演示模式标志
-const DEMO_MODE = false
-
+const ReservationReports = lazy(() => import('../pages/Reports/ReservationReports'))
+const OccupancyReports = lazy(() => import('../pages/Reports/OccupancyReports'))
+const RevenueReports = lazy(() => import('../pages/Reports/RevenueReports'))
+const DataExport = lazy(() => import('../pages/Reports/DataExport'))
+const SystemTraceConsole = lazy(() => import('../pages/Reports/SystemTraceConsole'))
 export const router = createBrowserRouter([
   {
     path: '/login',
-    element: DEMO_MODE ? <Navigate to="/" replace /> : <Login />
-  },
-  {
-    path: '/test',
-    element: <TestPage />
-  },
-  {
-    path: '/test-with-layout',
-    element: <TestPageWithLayout />
+    element: <Login />
   },
   {
     path: '/',
@@ -257,19 +236,19 @@ export const router = createBrowserRouter([
   },
   {
     path: '/group-promotion-management/ota-promotion-management',
-    element: <ProtectedRoute><MainLayout><OTAPromotionManagement /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="OTA 促销尚未接入" system="OTA 促销平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/group-promotion-management/ota-promotion-management/add',
-    element: <ProtectedRoute><MainLayout><AddOTAPromotion /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="OTA 促销尚未接入" system="OTA 促销平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/group-promotion-management/ctrip-activity-management',
-    element: <ProtectedRoute><MainLayout><CtripActivityManagement /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="携程活动尚未接入" system="携程活动平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/group-promotion-management/ctrip-activity-registration',
-    element: <ProtectedRoute><MainLayout><CtripActivityRegistration /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="携程活动报名尚未接入" system="携程活动平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/hotel-operation',
@@ -309,7 +288,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/channel-management/fliggy-setting',
-    element: <ProtectedRoute><MainLayout><FliggySetting /></MainLayout></ProtectedRoute>
+    element: <Navigate to="/channel-management/channel-setting/FLIGGY" replace />
   },
   {
     path: '/channel-management/channel-setting/:channelCode',
@@ -317,19 +296,19 @@ export const router = createBrowserRouter([
   },
   {
     path: '/channel-management/ctrip-setting',
-    element: <ProtectedRoute><MainLayout><CtripSetting /></MainLayout></ProtectedRoute>
+    element: <Navigate to="/channel-management/channel-setting/CTRIP" replace />
   },
   {
     path: '/channel-management/ctrip-setting/promotion/add',
-    element: <ProtectedRoute><MainLayout><AddCtripPromotion /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="携程促销尚未接入" system="携程促销平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/channel-management/ctrip-setting/promotion/edit/:id',
-    element: <ProtectedRoute><MainLayout><AddCtripPromotion /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="携程促销尚未接入" system="携程促销平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/channel-management/ctrip-setting/promotion/registration/:id',
-    element: <ProtectedRoute><MainLayout><CtripPromotionRegistration /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><IntegrationUnavailable title="携程促销报名尚未接入" system="携程促销平台" /></MainLayout></ProtectedRoute>
   },
   {
     path: '/rate-management',
@@ -389,7 +368,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/reports/data-export',
-    element: <ProtectedRoute><MainLayout><ReservationReports /></MainLayout></ProtectedRoute>
+    element: <ProtectedRoute><MainLayout><DataExport /></MainLayout></ProtectedRoute>
   },
   {
     path: '/system-settings',

@@ -2,6 +2,7 @@ package com.crs.controller;
 
 import com.crs.entity.RoomTypeDiffSystem;
 import com.crs.service.RoomTypeDiffSystemService;
+import com.crs.util.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,7 +59,11 @@ public class RoomTypeDiffSystemController {
      */
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<?> getRoomTypeDiffSystemsByHotelId(@PathVariable Integer hotelId) {
-        return hotelRepository.findById(hotelId)
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return hotelRepository.findByIdAndTenantId(hotelId, tenantId)
                 .map(hotel -> ResponseEntity.ok(roomTypeDiffSystemService.getRoomTypeDiffSystemsByHotelCode(hotel.getHotelCode())))
                 .orElse(ResponseEntity.notFound().build());
     }

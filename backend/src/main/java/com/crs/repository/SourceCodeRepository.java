@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 订单来源码数据访问接口 (SourceCodeRepository)
@@ -13,6 +14,9 @@ import java.util.List;
  */
 @Repository
 public interface SourceCodeRepository extends JpaRepository<SourceCode, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<SourceCode> findByIdAndTenantId(Integer id, Integer tenantId);
 
     /**
      * 获取指定父节点下的所有来源码。

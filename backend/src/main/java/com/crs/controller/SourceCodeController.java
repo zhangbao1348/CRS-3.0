@@ -2,6 +2,7 @@ package com.crs.controller;
 
 import com.crs.entity.SourceCode;
 import com.crs.repository.GroupRateCodeRepository;
+import com.crs.repository.RatePlanRepository;
 import com.crs.service.SourceCodeService;
 import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,17 @@ public class SourceCodeController {
 
     @Autowired
     private GroupRateCodeRepository groupRateCodeRepository;
+
+    @Autowired
+    private RatePlanRepository ratePlanRepository;
+
+    private Integer getCurrentTenantId() {
+        Integer tenantId = com.crs.util.TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new RuntimeException("Tenant context missing");
+        }
+        return tenantId;
+    }
 
     /**
      * 获取所有来源码（树形结构）
@@ -97,11 +109,19 @@ public class SourceCodeController {
     @PostMapping
     public ResponseEntity<?> createSourceCode(@RequestBody SourceCode sourceCode) {
         try {
-            if (sourceCode.getCode() != null && !CodeValidator.isValid(sourceCode.getCode())) {
+            if (sourceCode.getCode() == null || sourceCode.getName() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "来源码编码和名称为必填项"));
+            }
+            if (!CodeValidator.isValid(sourceCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            if (!sourceCodeService.isCodeUnique(sourceCode.getCode(), null)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "来源码编码已存在"));
             }
             SourceCode createdSourceCode = sourceCodeService.createSourceCode(sourceCode);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdSourceCode);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
@@ -115,6 +135,9 @@ public class SourceCodeController {
         try {
             if (sourceCode.getCode() != null && !CodeValidator.isValid(sourceCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            if (!sourceCodeService.isCodeUnique(sourceCode.getCode(), id)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "来源码编码已存在"));
             }
             sourceCode.setId(id);
             SourceCode updatedSourceCode = sourceCodeService.updateSourceCode(sourceCode);
@@ -137,10 +160,12 @@ public class SourceCodeController {
             // 检查是否被房价码引用
             SourceCode existing = sourceCodeService.getSourceCodeById(id);
             if (existing != null) {
-                long refCount = groupRateCodeRepository.countBySourceCode(existing.getCode());
+                long refCount = countSubtreeReferences(existing);
                 if (refCount > 0) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "该来源码已被 " + refCount + " 个房价码引用，无法删除"));
+                    return ResponseEntity.badRequest().body(Map.of("error", "该来源码或其子节点已被 " + refCount + " 个房价码引用，无法删除"));
                 }
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "来源码不存在"));
             }
             sourceCodeService.deleteSourceCode(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
@@ -161,5 +186,16 @@ public class SourceCodeController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    /** 同时检查父节点与所有子节点，防止递归删除绕过引用约束。 */
+    private long countSubtreeReferences(SourceCode node) {
+        Integer tenantId = getCurrentTenantId();
+        long count = groupRateCodeRepository.countByGroupIdAndSourceCode(tenantId, node.getCode())
+                + ratePlanRepository.countByTenantIdAndSourceCode(tenantId, node.getCode());
+        for (SourceCode child : sourceCodeService.getSourceCodesByParentId(node.getId())) {
+            count += countSubtreeReferences(child);
+        }
+        return count;
     }
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Radio, Button, Tabs, Card, Row, Col, Table, Switch, message, Spin, InputNumber, Space, Modal, Checkbox } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Form, Input, Select, Radio, Button, Tabs, Card, Row, Col, Table, Switch, InputNumber, Space, Modal, Checkbox } from 'antd'
 import { PlusOutlined, ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import axios from 'axios'
@@ -11,19 +11,15 @@ const { Option } = Select
 const AddGroupRoomType = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { message } = App.useApp()
   
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [hotelData, setHotelData] = useState([])
-  const [hotels, setHotels] = useState([])
   const [categories, setCategories] = useState([])
   const [isEditing, setIsEditing] = useState(false)
   const [currentId, setCurrentId] = useState(null)
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || '1')
-  
-  // 全选/取消全选状态
-  const [selectAll, setSelectAll] = useState(false)
-  const [selectAllRoomInfo, setSelectAllRoomInfo] = useState(false)
   
   // 批量分配模态框
   const [batchModalVisible, setBatchModalVisible] = useState(false)
@@ -61,15 +57,18 @@ const AddGroupRoomType = () => {
   // 监听tab切换，当切换到房型分配时加载分配数据
   useEffect(() => {
     if (activeTab === '2' && isEditing && currentId && hotelBaseData.length > 0) {
-      console.log('切换到房型分配标签，开始加载分配数据...')
       fetchRoomTypeAllocations(currentId, hotelBaseData)
     }
   }, [activeTab, isEditing, currentId, hotelBaseData])
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get('/api/room-type-categories/group/1')
-      setCategories(response.data)
+      const groupId = getCurrentTenantId()
+      if (!groupId) {
+        throw new Error('缺少当前集团上下文')
+      }
+      const response = await axios.get(`/api/room-type-categories/group/${groupId}`)
+      setCategories(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('获取房型大类失败:', error)
     }
@@ -113,11 +112,9 @@ const AddGroupRoomType = () => {
           roomInfoEditable: false
         }))
         setHotelData(formattedHotelData)
-        setHotels(response.data)
         return formattedHotelData
       } else {
         setHotelData([])
-        setHotels([])
         return []
       }
     } catch (error) {
@@ -131,18 +128,14 @@ const AddGroupRoomType = () => {
   const fetchRoomTypeAllocations = async (roomTypeId, baseData) => {
     if (!roomTypeId) return
     try {
-      console.log('开始获取房型分配数据... roomTypeId:', roomTypeId)
       const response = await axios.get(`/api/group-room-types/${roomTypeId}/allocations`)
       const allocations = response.data
-      console.log('获取到的分配数据:', allocations)
-      console.log('基础酒店数据:', baseData)
       
       if (Array.isArray(allocations)) {
         if (baseData) {
           const merged = baseData.map(item => {
             // 关联查询原则：使用 hotelCode 匹配，而非 hotelId（符合CODE关联规范）
             const alloc = allocations.find(a => a.hotelCode && a.hotelCode === item.hotelCode)
-            console.log(`处理酒店 ${item.hotelCode} (${item.hotel}), 找到分配:`, alloc)
             if (alloc) {
               return {
                 ...item,
@@ -152,7 +145,6 @@ const AddGroupRoomType = () => {
             }
             return item
           })
-          console.log('合并后的酒店数据:', merged)
           setHotelData(merged)
         } else {
           setHotelData(prev => prev.map(item => {
@@ -205,6 +197,9 @@ const AddGroupRoomType = () => {
       
       setActiveTab('2')
     } catch (error) {
+      if (error?.errorFields) {
+        return
+      }
       console.error('保存失败:', error)
       message.error('保存失败: ' + (error.response?.data?.error || error.message || '未知错误'))
     } finally {
@@ -233,15 +228,6 @@ const AddGroupRoomType = () => {
       })
       
       setHotelData(updatedData)
-      
-      if (field === 'allocated') {
-        const allChecked = updatedData.every(item => item.allocated)
-        setSelectAll(allChecked)
-      } else if (field === 'roomInfoEditable') {
-        const allAllocated = updatedData.filter(item => item.allocated)
-        const allChecked = allAllocated.every(item => item.roomInfoEditable)
-        setSelectAllRoomInfo(allChecked)
-      }
     }
   }
 
@@ -312,31 +298,14 @@ const AddGroupRoomType = () => {
       message.success('保存成功')
       navigate('/group-management/group-room-type')
     } catch (error) {
+      if (error?.errorFields) {
+        return
+      }
       console.error('保存失败:', error)
       message.error('保存失败: ' + (error.response?.data?.error || error.message || '未知错误'))
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleSelectAll = (checked) => {
-    setSelectAll(checked)
-    const newData = hotelData.map(item => ({
-      ...item,
-      allocated: checked
-    }))
-    setHotelData(newData)
-  }
-  
-  const handleSelectAllRoomInfo = (checked) => {
-    setSelectAllRoomInfo(checked)
-    const newData = hotelData.map(item => {
-      if (item.allocated) {
-        return { ...item, roomInfoEditable: checked }
-      }
-      return item
-    })
-    setHotelData(newData)
   }
 
   const handleBatchAllocate = () => {

@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react'
-import { Select, Button, Modal, Form, Input, DatePicker, message, Row, Col, Card, Tabs, Spin, Table, Tag } from 'antd'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { App, Select, Button, Modal, Form, Input, DatePicker, Row, Col, Card, Tabs, Spin, Table, Tag } from 'antd'
 import { LeftOutlined, RightOutlined, EditOutlined, HistoryOutlined, HomeOutlined, TagOutlined, LinkOutlined, DollarOutlined, GlobalOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { ratePlanApi } from '../../utils/api'
 import { useHotelContext } from '../../contexts/HotelContext'
 import { AuthContext } from '../../contexts/AuthContext'
+import { PageScaffold } from '../../components/ui'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
 
 const BookingControl = () => {
+  const { message } = App.useApp()
   const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
@@ -84,14 +86,14 @@ const BookingControl = () => {
     return ''
   }, [activeTab, selectedRateCode, selectedChannel, selectedRateCategory, selectedMarket])
 
-  const isSelectionValid = () => {
+  const isSelectionValid = useCallback(() => {
     if (activeTab === 'hotel') return true
     if (activeTab === 'rate') return !!selectedRateCode
     if (activeTab === 'channel') return !!selectedChannel
     if (activeTab === 'rateCategory') return !!selectedRateCategory
     if (activeTab === 'market') return !!selectedMarket
     return false
-  }
+  }, [activeTab, selectedRateCode, selectedChannel, selectedRateCategory, selectedMarket])
 
   const fetchData = useCallback(async () => {
     if (!hotelCode || !isSelectionValid()) return
@@ -112,9 +114,9 @@ const BookingControl = () => {
     } finally {
       setLoading(false)
     }
-  }, [hotelCode, selectedMonth, activeTab, getDimensionCode])
+  }, [hotelCode, selectedMonth, activeTab, getDimensionCode, isSelectionValid])
 
-  useEffect(() => { if (isSelectionValid()) fetchData() }, [selectedMonth, activeTab, selectedRateCode, selectedChannel, selectedRateCategory, selectedMarket, hotelCode])
+  useEffect(() => { if (isSelectionValid()) fetchData() }, [fetchData, isSelectionValid])
 
   const handlePrevMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').subtract(1, 'month').format('YYYY-MM'))
   const handleNextMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').add(1, 'month').format('YYYY-MM'))
@@ -209,9 +211,13 @@ const BookingControl = () => {
   }
 
   return (
-    <div className="fade-in">
-      <h1 className="page-title">预订控制</h1>
-      <Card style={{ marginBottom: 16 }}>
+    <PageScaffold
+      className="fade-in calendar-control-page"
+      eyebrow="BOOKING RESTRICTIONS"
+      title="预订控制"
+      description="维护取消规则、提前预订天数和连住限制，并按业务维度追踪操作记录。"
+    >
+      <Card className="ui-panel ui-dimension-tabs">
         <Tabs activeKey={activeTab} onChange={k => { setActiveTab(k); setControlData({}) }}
           items={[
             { key: 'hotel', label: <span><HomeOutlined /> 酒店预订控制</span> },
@@ -221,38 +227,38 @@ const BookingControl = () => {
             { key: 'market', label: <span><GlobalOutlined /> 市场预订控制</span> }
           ]} />
       </Card>
-      <Card>
+      <Card className="ui-panel">
         <Row gutter={16} style={{ marginBottom: 16 }}>
           {activeTab === 'rate' && (
             <Col span={8}>
-              <Select placeholder="请选择房价码" style={{ width: '100%' }} value={selectedRateCode} onChange={setSelectedRateCode} allowClear showSearch optionFilterProp="children">
+              <Select aria-label="房价码" placeholder="请选择房价码" style={{ width: '100%' }} value={selectedRateCode} onChange={setSelectedRateCode} allowClear showSearch optionFilterProp="children">
                 {ratePlans.map(rp => <Option key={rp.rateCode} value={rp.rateCode}>{rp.rateName}（{rp.rateCode}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'channel' && (
             <Col span={8}>
-              <Select placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannel} onChange={setSelectedChannel} allowClear showSearch optionFilterProp="children">
+              <Select aria-label="渠道" placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannel} onChange={setSelectedChannel} allowClear showSearch optionFilterProp="children">
                 {channelCodes.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'rateCategory' && (
             <Col span={8}>
-              <Select placeholder="请选择房价大类" style={{ width: '100%' }} value={selectedRateCategory} onChange={setSelectedRateCategory} allowClear showSearch optionFilterProp="children">
+              <Select aria-label="房价大类" placeholder="请选择房价大类" style={{ width: '100%' }} value={selectedRateCategory} onChange={setSelectedRateCategory} allowClear showSearch optionFilterProp="children">
                 {rateCategories.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
           {activeTab === 'market' && (
             <Col span={8}>
-              <Select placeholder="请选择市场码" style={{ width: '100%' }} value={selectedMarket} onChange={setSelectedMarket} allowClear showSearch optionFilterProp="children">
+              <Select aria-label="市场码" placeholder="请选择市场码" style={{ width: '100%' }} value={selectedMarket} onChange={setSelectedMarket} allowClear showSearch optionFilterProp="children">
                 {marketCodes.map(c => <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>)}
               </Select>
             </Col>
           )}
         </Row>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 16, gap: 16 }}>
+        <div className="calendar-control-page__toolbar">
           <Button icon={<LeftOutlined />} onClick={handlePrevMonth}>上月</Button>
           <span style={{ fontSize: 16, fontWeight: 500, minWidth: 100, textAlign: 'center' }}>{selectedMonth}</span>
           <Button icon={<RightOutlined />} onClick={handleNextMonth}>下月</Button>
@@ -337,7 +343,7 @@ const BookingControl = () => {
             ]} />
         </Modal>
       </Card>
-    </div>
+    </PageScaffold>
   )
 }
 

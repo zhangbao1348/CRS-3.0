@@ -20,6 +20,18 @@ module.exports = {
       version: '18.2'
     }
   },
+  overrides: [
+    {
+      files: ['**/__tests__/**/*.{js,jsx}', '**/*.{test,spec}.{js,jsx}'],
+      env: {
+        jest: true,
+        node: true
+      },
+      rules: {
+        'react/display-name': 'off'
+      }
+    }
+  ],
   plugins: ['react-refresh'],
   rules: {
     'react-refresh/only-export-components': [

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Table, Button, Space, Card, Row, Col, Input, InputNumber, Select, message, Modal, Form, Tree } from 'antd'
 import { SearchOutlined, PlusOutlined, EditOutlined, DeleteOutlined, SafetyOutlined } from '@ant-design/icons'
 import { roleApi, menuApi, tenantApi } from '../../utils/api'
@@ -159,7 +159,6 @@ const RoleManagement = () => {
     try {
       const response = await roleApi.getRoleMenus(record.id)
       if (response.success && response.data) {
-        console.log('当前角色已分配的菜单ID:', response.data)
         setCheckedKeys(Array.isArray(response.data) ? response.data : [])
       } else {
         setCheckedKeys([])

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { Select, Button, DatePicker, Table, Card, message, Alert, Radio, Row, Col } from 'antd'
-import { SearchOutlined, ExportOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
+import { App, Select, Button, DatePicker, Table, Card, Radio, Row, Col } from 'antd'
+import { SearchOutlined, ExportOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { Line } from '@ant-design/plots'
 import { hotelApi, reportApi } from '../../utils/api'
@@ -8,6 +8,7 @@ import { hotelApi, reportApi } from '../../utils/api'
 const { Option } = Select
 
 const RevenueReports = () => {
+  const { message } = App.useApp()
   const [selectedMonth, setSelectedMonth] = useState(dayjs())
   const [selectedHotel, setSelectedHotel] = useState('全集团')
   const [selectedStatisticMethod, setSelectedStatisticMethod] = useState('按酒店纬度')
@@ -23,8 +24,7 @@ const RevenueReports = () => {
         const hotelList = res?.data || res || []
         setHotels([{ hotelCode: '全集团', chineseName: '全集团' }, ...hotelList])
       })
-      .catch(err => {
-        console.error('加载酒店列表失败:', err)
+      .catch(() => {
         message.error('加载酒店列表失败')
       })
   }, [])
@@ -311,8 +311,8 @@ const RevenueReports = () => {
           <div>
             <label style={{ marginRight: 8, fontWeight: '500' }}>统计维度:</label>
             <Select value={selectedStatisticMethod} style={{ width: 140 }} onChange={setSelectedStatisticMethod}>
-              <Option value="按酒店纬度">按酒店纬度</Option>
-              <Option value="按房型纬度">按房型纬度</Option>
+              <Option value="按酒店纬度">按酒店维度</Option>
+              <Option value="按房型纬度">按房型维度</Option>
             </Select>
           </div>
           <div>
@@ -341,7 +341,7 @@ const RevenueReports = () => {
       </div>
 
       {viewMode === 'table' ? (
-        <Card bordered={false} bodyStyle={{ padding: 0 }} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8, overflow: 'hidden' }}>
+        <Card variant="borderless" styles={{ body: { padding: 0 } }} style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8, overflow: 'hidden' }}>
           <Table
             columns={getColumns()}
             dataSource={reportData}
@@ -359,7 +359,7 @@ const RevenueReports = () => {
           <Col span={24}>
             <Card 
               title={<span style={{ fontWeight: 600 }}>每日订单量趋势</span>} 
-              bordered={false} 
+              variant="borderless"
               style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
             >
               <div style={{ height: 350 }}>
@@ -374,7 +374,7 @@ const RevenueReports = () => {
           <Col span={24}>
             <Card 
               title={<span style={{ fontWeight: 600 }}>客房平均房价 (ADR) 走势</span>} 
-              bordered={false} 
+              variant="borderless"
               style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.02)', borderRadius: 8 }}
             >
               <div style={{ height: 350 }}>

@@ -41,8 +41,7 @@ public class RoomTypeDiffSystemService {
      * @return 房型差价体系信息
      */
     public Optional<RoomTypeDiffSystem> getRoomTypeDiffSystemById(Integer id) {
-        return roomTypeDiffSystemRepository.findById(id)
-                .filter(s -> s.getTenantId() != null && s.getTenantId().equals(getCurrentTenantId()));
+        return roomTypeDiffSystemRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     /**

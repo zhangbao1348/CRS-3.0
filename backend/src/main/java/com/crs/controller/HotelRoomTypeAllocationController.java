@@ -103,7 +103,7 @@ public class HotelRoomTypeAllocationController {
     @Deprecated
     @GetMapping("/hotel/{hotelId}")
     public ResponseEntity<List<HotelRoomTypeAllocation>> getAllocationsByHotelId(@PathVariable Integer hotelId) {
-        Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
+        Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId());
         if (!hotelOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
@@ -130,7 +130,7 @@ public class HotelRoomTypeAllocationController {
     @Deprecated
     @GetMapping("/hotel/{hotelId}/allocated")
     public ResponseEntity<List<HotelRoomTypeAllocation>> getAllocatedRoomTypesByHotelId(@PathVariable Integer hotelId) {
-        Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
+        Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId());
         if (!hotelOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
@@ -164,7 +164,7 @@ public class HotelRoomTypeAllocationController {
     @Deprecated
     @DeleteMapping("/hotel/{hotelId}")
     public ResponseEntity<Void> deleteAllocationsByHotelId(@PathVariable Integer hotelId) {
-        Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId);
+        Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId());
         if (!hotelOpt.isPresent()) {
             return ResponseEntity.notFound().build();
         }

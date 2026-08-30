@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Image, Radio, Table, Switch, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { App as AntApp, Form, Input, Select, Button, Tabs, Card, Row, Col, InputNumber, Checkbox, Space, Upload, Radio, Table, Switch } from 'antd'
 import { PlusOutlined, LeftOutlined } from '@ant-design/icons'
 import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
@@ -8,9 +8,8 @@ import { hotelApi, hotelFacilityApi, hotelImageApi, groupFacilityApi, hotelRateC
 const { Option } = Select
 
 const EditHotel = () => {
+  const { message } = AntApp.useApp()
   const [form] = Form.useForm()
-  const [htmlContent, setHtmlContent] = useState('')
-  const [hotelId, setHotelId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTabKey, setActiveTabKey] = useState('1')
   const [loadedTabs, setLoadedTabs] = useState(new Set(['1']))
@@ -20,12 +19,6 @@ const EditHotel = () => {
   
   // 集团设施数据状态
   const [groupFacilities, setGroupFacilities] = useState([])
-  
-  // 集团房价码数据状态
-  const [groupRateCodes, setGroupRateCodes] = useState([])
-  
-  // 集团房型数据状态
-  const [groupRoomTypes, setGroupRoomTypes] = useState([])
   
   // 设施数据状态
   const [facilities, setFacilities] = useState({
@@ -45,9 +38,6 @@ const EditHotel = () => {
     lobby: [],
     video: []
   })
-  
-  // 表单数据状态
-  const [formData, setFormData] = useState({})
   
   // 房型数据状态
   const [roomTypeData, setRoomTypeData] = useState([
@@ -84,7 +74,6 @@ const EditHotel = () => {
   const editorConfig = {
     placeholder: '请输入酒店简介',
     onChange: (editor) => {
-      setHtmlContent(editor.getHtml())
       form.setFieldsValue({ hotelIntroduction: editor.getHtml() })
     }
   }
@@ -101,7 +90,6 @@ const EditHotel = () => {
     const id = urlParams.get('id')
     if (id) {
       const numericId = parseInt(id)
-      setHotelId(numericId)
       loadHotelData(numericId)
     } else {
       setLoading(false)
@@ -141,7 +129,6 @@ const EditHotel = () => {
   // 当设施数据变化时，更新表单
   useEffect(() => {
     if (form && !loading) {
-      console.log('Updating form with facilities:', facilities)
       try {
         form.setFieldsValue({
           transportationServices: facilities.transportationServices,
@@ -151,7 +138,6 @@ const EditHotel = () => {
           recreationServices: facilities.recreationServices,
           frontDeskServices: facilities.frontDeskServices
         })
-        console.log('Facilities updated in form via useEffect')
       } catch (error) {
         console.error('Error updating form with facilities:', error)
       }
@@ -161,7 +147,6 @@ const EditHotel = () => {
   // 加载酒店基础数据
   const loadHotelData = async (id) => {
     try {
-      console.log('开始加载酒店基础数据，ID:', id)
       
       // 先加载集团设施（因为设施Tab需要这个数据）
       try {
@@ -170,7 +155,6 @@ const EditHotel = () => {
           metadata: { skipAutoLogout: true }
         })
         setGroupFacilities(facilities)
-        console.log('集团设施加载成功:', facilities)
       } catch (facilityError) {
         console.error('加载集团设施失败:', facilityError)
       }
@@ -179,10 +163,8 @@ const EditHotel = () => {
       const response = await hotelApi.getHotelById(id, {
         metadata: { skipAutoLogout: true }
       })
-      console.log('API响应:', response)
       const hotel = response.data
       setHotel(hotel)
-      console.log('酒店数据:', hotel)
       
       // 将星级转换为显示格式
       let starRatingDisplay = hotel.starRating
@@ -283,7 +265,6 @@ const EditHotel = () => {
         recreationServices,
         frontDeskServices
       })
-      console.log('酒店设施加载成功')
     } catch (facilityError) {
       console.error('加载酒店设施失败:', facilityError)
     }
@@ -339,7 +320,6 @@ const EditHotel = () => {
           lobby: lobbyImages,
           video: videoItems
         })
-        console.log('酒店图片加载成功')
       }
     } catch (imageError) {
       console.error('加载酒店图片失败:', imageError)
@@ -349,7 +329,6 @@ const EditHotel = () => {
   // 加载酒店房价码分配
   const loadRateCodeAllocations = async (code) => {
     try {
-      console.log('开始加载酒店房价码分配，酒店代码:', code)
       
       // 先加载集团房价码
       let activeRateCodes = []
@@ -358,8 +337,6 @@ const EditHotel = () => {
           metadata: { skipAutoLogout: true }
         })
         activeRateCodes = Array.isArray(rateCodes) ? rateCodes : (rateCodes.data || [])
-        setGroupRateCodes(activeRateCodes)
-        console.log('集团房价码加载成功:', activeRateCodes)
       } catch (rateCodeError) {
         console.error('加载集团房价码失败:', rateCodeError)
       }
@@ -371,7 +348,6 @@ const EditHotel = () => {
           metadata: { skipAutoLogout: true }
         })
         allocations = Array.isArray(allocations) ? allocations : (allocations.data || [])
-        console.log('酒店房价码分配原始数据:', allocations)
       } catch (allocError) {
         console.error('加载房价码分配失败:', allocError)
       }
@@ -380,21 +356,17 @@ const EditHotel = () => {
       const allocationMap = {}
       if (Array.isArray(allocations)) {
         allocations.forEach(alloc => {
-          console.log('分配数据:', alloc, 'rateCode:', alloc.rateCode)
           if (alloc.rateCode) {
             allocationMap[alloc.rateCode] = alloc
           }
         })
       }
-      console.log('分配映射:', allocationMap)
       
       // 基于集团房价码创建数据
       const rateCodeData = []
       if (activeRateCodes && activeRateCodes.length > 0) {
         activeRateCodes.forEach(rateCode => {
-          console.log('处理集团房价码:', rateCode.id, rateCode.rateCode)
           const existingAllocation = allocationMap[rateCode.rateCode]
-          console.log('找到分配:', existingAllocation)
           rateCodeData.push({
             key: rateCode.id.toString(),
             rateCodeId: rateCode.id,
@@ -419,7 +391,6 @@ const EditHotel = () => {
       }
       
       setRateCodeData(rateCodeData)
-      console.log('最终酒店房价码分配数据:', rateCodeData)
     } catch (rateCodeError) {
       console.error('加载酒店房价码分配失败:', rateCodeError)
     }
@@ -437,8 +408,6 @@ const EditHotel = () => {
         // 处理响应格式
         const roomTypes = roomTypesResponse.success ? roomTypesResponse.data : []
         activeRoomTypes = roomTypes.filter(type => type.status === 'active')
-        setGroupRoomTypes(activeRoomTypes)
-        console.log('集团房型加载成功:', activeRoomTypes)
       } catch (roomTypeError) {
         console.error('加载集团房型失败:', roomTypeError)
       }
@@ -486,7 +455,6 @@ const EditHotel = () => {
       }
       
       setRoomTypeData(roomTypeData)
-      console.log('酒店房型分配数据:', roomTypeData)
     } catch (roomTypeError) {
       console.error('加载酒店房型分配失败:', roomTypeError)
     }
@@ -497,7 +465,6 @@ const EditHotel = () => {
     setActiveTabKey(key)
     
     if (!loadedTabs.has(key) && hotel?.hotelCode) {
-      console.log(`加载TAB ${key} 的数据`)
       
       switch (key) {
         case '2':
@@ -564,7 +531,6 @@ const EditHotel = () => {
         metadata: { skipAutoLogout: true }
       })
       
-      console.log('酒店基本信息保存成功')
       return true
     } catch (error) {
       console.error('保存酒店基本信息失败:', error)
@@ -656,7 +622,6 @@ const EditHotel = () => {
         }
       }
       
-      console.log('酒店设施保存成功')
       return true
     } catch (error) {
       console.error('保存酒店设施失败:', error)
@@ -699,7 +664,6 @@ const EditHotel = () => {
         return false
       }
       
-      console.log('酒店房价码分配保存成功')
       return true
     } catch (error) {
       console.error('保存酒店房价码分配失败:', error)
@@ -722,7 +686,6 @@ const EditHotel = () => {
         metadata: { skipAutoLogout: true }
       })
       
-      console.log('酒店房型分配保存成功')
       return true
     } catch (error) {
       console.error('保存酒店房型分配失败:', error)
@@ -1313,7 +1276,6 @@ const EditHotel = () => {
                 data={{ hotelCode: hotel?.hotelCode, imageType: 'logo' }}
                 fileList={hotelImages.logo}
                 onRemove={(file) => {
-                  console.log('Remove file:', file);
                   // 从前端状态中移除图片
                   setHotelImages(prev => ({
                     ...prev,
@@ -1383,7 +1345,6 @@ const EditHotel = () => {
                 data={{ hotelCode: hotel?.hotelCode, imageType: 'external' }}
                 fileList={hotelImages.external}
                 onRemove={(file) => {
-                  console.log('Remove file:', file);
                   // 从前端状态中移除图片
                   setHotelImages(prev => ({
                     ...prev,
@@ -1453,7 +1414,6 @@ const EditHotel = () => {
                 data={{ hotelCode: hotel?.hotelCode, imageType: 'restaurant' }}
                 fileList={hotelImages.restaurant}
                 onRemove={(file) => {
-                  console.log('Remove file:', file);
                   // 从前端状态中移除图片
                   setHotelImages(prev => ({
                     ...prev,
@@ -1523,7 +1483,6 @@ const EditHotel = () => {
                 data={{ hotelCode: hotel?.hotelCode, imageType: 'lobby' }}
                 fileList={hotelImages.lobby}
                 onRemove={(file) => {
-                  console.log('Remove file:', file);
                   // 从前端状态中移除图片
                   setHotelImages(prev => ({
                     ...prev,
@@ -1591,7 +1550,6 @@ const EditHotel = () => {
                 data={{ hotelCode: hotel?.hotelCode, imageType: 'video' }}
                 fileList={hotelImages.video}
                 onRemove={(file) => {
-                  console.log('Remove file:', file);
                   // 从前端状态中移除视频
                   setHotelImages(prev => ({
                     ...prev,

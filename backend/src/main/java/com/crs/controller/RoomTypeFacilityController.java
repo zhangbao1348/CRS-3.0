@@ -2,7 +2,9 @@ package com.crs.controller;
 
 import com.crs.entity.RoomTypeFacility;
 import com.crs.repository.RoomTypeFacilityRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.crs.repository.HotelRepository;
+import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.util.TenantContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -27,12 +29,34 @@ import java.util.Map;
 @RequestMapping("/api/room-type-facilities")
 public class RoomTypeFacilityController {
 
-    @Autowired
-    private RoomTypeFacilityRepository repository;
+    private final RoomTypeFacilityRepository repository;
+    private final HotelRepository hotelRepository;
+    private final HotelRoomTypeRepository hotelRoomTypeRepository;
+
+    public RoomTypeFacilityController(
+            RoomTypeFacilityRepository repository,
+            HotelRepository hotelRepository,
+            HotelRoomTypeRepository hotelRoomTypeRepository) {
+        this.repository = repository;
+        this.hotelRepository = hotelRepository;
+        this.hotelRoomTypeRepository = hotelRoomTypeRepository;
+    }
+
+    private Integer currentTenantId() {
+        Integer tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            throw new IllegalArgumentException("租户上下文缺失");
+        }
+        return tenantId;
+    }
 
     @GetMapping
     public ResponseEntity<?> getByRoomTypeCode(@RequestParam String hotelCode, @RequestParam String roomTypeCode) {
-        List<RoomTypeFacility> facilities = repository.findByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
+        Integer tenantId = currentTenantId();
+        hotelRoomTypeRepository.findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, roomTypeCode)
+                .orElseThrow(() -> new IllegalArgumentException("房型不存在或无权访问"));
+        List<RoomTypeFacility> facilities = repository
+                .findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, roomTypeCode);
         return ResponseEntity.ok(Map.of("success", true, "data", facilities));
     }
 
@@ -45,13 +69,23 @@ public class RoomTypeFacilityController {
             @SuppressWarnings("unchecked")
             List<Map<String, String>> facilities = (List<Map<String, String>>) request.get("facilities");
 
-            // 先删除该房型的所有设施（关联查询原则：使用 CODE）
-            repository.deleteByHotelCodeAndRoomTypeCode(hotelCode, roomTypeCode);
+            Integer tenantId = currentTenantId();
+            var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                    .orElseThrow(() -> new IllegalArgumentException("酒店不存在或无权访问"));
+            var roomType = hotelRoomTypeRepository
+                    .findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, roomTypeCode)
+                    .orElseThrow(() -> new IllegalArgumentException("房型不存在或无权访问"));
+
+            // 先删除该房型的所有设施（租户 + 酒店 CODE + 房型 CODE）。
+            repository.deleteByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, hotelCode, roomTypeCode);
 
             // 批量新增
             if (facilities != null) {
                 for (Map<String, String> f : facilities) {
                     RoomTypeFacility entity = new RoomTypeFacility();
+                    entity.setTenantId(tenantId);
+                    entity.setHotelId(hotel.getId());
+                    entity.setRoomTypeId(roomType.getId());
                     entity.setHotelCode(hotelCode);
                     entity.setRoomTypeCode(roomTypeCode);
                     entity.setFacilityType(f.get("facilityType"));

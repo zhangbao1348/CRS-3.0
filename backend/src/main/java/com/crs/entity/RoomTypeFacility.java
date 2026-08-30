@@ -26,6 +26,12 @@ public class RoomTypeFacility {
     @Column(name = "tenant_id")
     private Integer tenantId;
 
+    @Column(name = "hotel_id", nullable = false)
+    private Integer hotelId;
+
+    @Column(name = "room_type_id", nullable = false)
+    private Integer roomTypeId;
+
     @Column(name = "hotel_code", length = 50)
     private String hotelCode;
 
@@ -66,6 +72,10 @@ public class RoomTypeFacility {
     public void setId(Integer id) { this.id = id; }
     public Integer getTenantId() { return tenantId; }
     public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Integer getHotelId() { return hotelId; }
+    public void setHotelId(Integer hotelId) { this.hotelId = hotelId; }
+    public Integer getRoomTypeId() { return roomTypeId; }
+    public void setRoomTypeId(Integer roomTypeId) { this.roomTypeId = roomTypeId; }
     public String getHotelCode() { return hotelCode; }
     public void setHotelCode(String hotelCode) { this.hotelCode = hotelCode; }
     public String getRoomTypeCode() { return roomTypeCode; }

@@ -1,151 +1,120 @@
 package com.crs.controller;
 
 import com.crs.entity.CancellationPolicy;
-import com.crs.repository.CancellationPolicyRepository;
-import com.crs.repository.GroupRateCodeRepository;
+import com.crs.modules.policy.api.CancellationPolicyMapper;
+import com.crs.modules.policy.api.CancellationPolicyRequest;
+import com.crs.modules.policy.api.CancellationPolicyResponse;
 import com.crs.service.CancellationPolicyService;
+import com.crs.shared.api.ApiException;
 import com.crs.util.CodeValidator;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
- * 取消政策控制器
- * 提供取消政策管理的RESTful API接口
+ * 取消政策控制器。
+ *
+ * <p>控制器只负责 HTTP 合同、参数校验和模型映射，租户隔离及引用校验由服务层完成。</p>
  */
 @RestController
 @RequestMapping("/api/cancellation-policies")
 public class CancellationPolicyController {
-    
-    @Autowired
-    private CancellationPolicyService cancellationPolicyService;
-    
-    @Autowired
-    private CancellationPolicyRepository cancellationPolicyRepository;
-    
-    @Autowired
-    private GroupRateCodeRepository groupRateCodeRepository;
-    
-    
-    /**
-     * 获取所有取消政策
-     * @return 取消政策列表
-     */
+
+    private final CancellationPolicyService cancellationPolicyService;
+    private final CancellationPolicyMapper mapper;
+
+    public CancellationPolicyController(CancellationPolicyService cancellationPolicyService,
+                                        CancellationPolicyMapper mapper) {
+        this.cancellationPolicyService = cancellationPolicyService;
+        this.mapper = mapper;
+    }
+
+    /** 获取当前租户下的全部取消政策。 */
     @GetMapping
-    public ResponseEntity<List<CancellationPolicy>> getAllPolicies() {
-        List<CancellationPolicy> policies = cancellationPolicyService.getAllPolicies();
+    public ResponseEntity<List<CancellationPolicyResponse>> getAllPolicies() {
+        List<CancellationPolicyResponse> policies = cancellationPolicyService.getAllPolicies().stream()
+                .map(mapper::toResponse)
+                .toList();
         return ResponseEntity.ok(policies);
     }
 
-    /**
-     * 兼容性接口：根据 groupId 获取所有取消政策（实际使用当前登录租户 ID）
-     */
+    /** 兼容旧路径；路径 groupId 不参与授权，租户边界取自认证上下文。 */
     @GetMapping("/group/{groupId}")
-    public ResponseEntity<List<CancellationPolicy>> getPoliciesByGroupId(@PathVariable Integer groupId) {
-        // 忽略路径中的 groupId，直接使用当前租户上下文
+    public ResponseEntity<List<CancellationPolicyResponse>> getPoliciesByGroupId(@PathVariable Integer groupId) {
         return getAllPolicies();
     }
-    
-    /**
-     * 根据ID获取取消政策
-     * @param id 政策ID
-     * @return 取消政策
-     */
+
+    /** 按 ID 查询当前租户政策。 */
     @GetMapping("/{id}")
-    public ResponseEntity<?> getPolicyById(@PathVariable Integer id) {
-        return cancellationPolicyService.getById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("取消政策不存在或无权访问"));
+    public ResponseEntity<CancellationPolicyResponse> getPolicyById(@PathVariable Integer id) {
+        CancellationPolicy policy = cancellationPolicyService.getById(id)
+                .orElseThrow(() -> ApiException.notFound(
+                        "CANCELLATION_POLICY_NOT_FOUND", "取消政策不存在或无权访问"));
+        return ResponseEntity.ok(mapper.toResponse(policy));
     }
-    
-    /**
-     * 创建取消政策
-     * @param policy 取消政策
-     * @return 创建的取消政策
-     */
+
+    /** 创建取消政策。 */
     @PostMapping
-    public ResponseEntity<?> createPolicy(@RequestBody CancellationPolicy policy) {
-        try {
-            if (policy.getCode() != null && !CodeValidator.isValid(policy.getCode())) {
-                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
-            }
-            CancellationPolicy created = cancellationPolicyService.create(policy);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<CancellationPolicyResponse> createPolicy(
+            @Valid @RequestBody CancellationPolicyRequest request) {
+        validateCode(request.code());
+        CancellationPolicy created = translateBusinessError(
+                () -> cancellationPolicyService.create(mapper.toEntity(request)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(created));
     }
-    
-    /**
-     * 更新取消政策
-     * @param id 政策ID
-     * @param policy 取消政策
-     * @return 更新后的取消政策
-     */
+
+    /** 更新取消政策。 */
     @PutMapping("/{id}")
-    public ResponseEntity<?> updatePolicy(@PathVariable Integer id, @RequestBody CancellationPolicy policy) {
-        try {
-            if (policy.getCode() != null && !CodeValidator.isValid(policy.getCode())) {
-                return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
-            }
-            CancellationPolicy updated = cancellationPolicyService.update(id, policy);
-            return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+    public ResponseEntity<CancellationPolicyResponse> updatePolicy(
+            @PathVariable Integer id,
+            @Valid @RequestBody CancellationPolicyRequest request) {
+        validateCode(request.code());
+        CancellationPolicy updated = translateBusinessError(
+                () -> cancellationPolicyService.update(id, mapper.toEntity(request)));
+        return ResponseEntity.ok(mapper.toResponse(updated));
     }
-    
-    /**
-     * 删除取消政策
-     * @param id 政策ID
-     * @return 删除结果
-     */
+
+    /** 删除未被当前租户房价码引用的取消政策。 */
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deletePolicy(@PathVariable Integer id) {
-        try {
-            // 检查是否被房价码引用
-            Optional<CancellationPolicy> policyOpt = cancellationPolicyService.getById(id);
-            if (policyOpt.isPresent()) {
-                long refCount = groupRateCodeRepository.countByCancellationRule(policyOpt.get().getCode());
-                if (refCount > 0) {
-                    return ResponseEntity.badRequest().body(Map.of("error", "该取消政策已被 " + refCount + " 个房价码引用，无法删除"));
-                }
-            }
+    public ResponseEntity<String> deletePolicy(@PathVariable Integer id) {
+        translateBusinessError(() -> {
             cancellationPolicyService.delete(id);
-            return ResponseEntity.ok("取消政策删除成功");
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return null;
+        });
+        return ResponseEntity.ok("取消政策删除成功");
+    }
+
+    /** 兼容按代码更新的旧接口。 */
+    @PutMapping("/code/{code}")
+    public ResponseEntity<CancellationPolicyResponse> updatePolicyByCode(
+            @PathVariable String code,
+            @Valid @RequestBody CancellationPolicyRequest request) {
+        validateCode(request.code());
+        CancellationPolicy existing = cancellationPolicyService.getByCode(code)
+                .orElseThrow(() -> ApiException.notFound(
+                        "CANCELLATION_POLICY_NOT_FOUND", "取消政策不存在"));
+        CancellationPolicy updated = translateBusinessError(
+                () -> cancellationPolicyService.update(existing.getId(), mapper.toEntity(request)));
+        return ResponseEntity.ok(mapper.toResponse(updated));
+    }
+
+    private void validateCode(String code) {
+        if (!CodeValidator.isValid(code)) {
+            throw ApiException.badRequest(
+                    "INVALID_CANCELLATION_POLICY_CODE", CodeValidator.ERROR_MESSAGE);
         }
     }
-    
-    // ===== CODE-based endpoints =====
-    
-    /**
-     * 根据政策代码更新取消政策
-     * @param code 政策代码
-     * @param policy 取消政策
-     * @return 更新后的取消政策
-     */
-    @PutMapping("/code/{code}")
-    public ResponseEntity<?> updatePolicyByCode(@PathVariable String code, @RequestBody CancellationPolicy policy) {
-        Integer tenantId = com.crs.util.TenantContext.getTenantId();
-        if (tenantId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("租户上下文丢失");
-        }
-        CancellationPolicy existing = cancellationPolicyRepository.findByTenantIdAndCode(tenantId, code);
-        if (existing == null) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("取消政策不存在");
-        }
+
+    private <T> T translateBusinessError(Supplier<T> operation) {
         try {
-            CancellationPolicy updated = cancellationPolicyService.update(existing.getId(), policy);
-            return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return operation.get();
+        } catch (IllegalArgumentException exception) {
+            throw ApiException.badRequest(
+                    "CANCELLATION_POLICY_OPERATION_REJECTED", exception.getMessage());
         }
     }
 }

@@ -237,6 +237,10 @@ public class UserController {
             response.put("success", true);
             response.put("message", "用户删除成功");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "删除用户失败: " + e.getMessage());
@@ -263,6 +267,10 @@ public class UserController {
                 response.put("message", "用户不存在");
                 return ResponseEntity.notFound().build();
             }
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "更新用户状态失败: " + e.getMessage());
@@ -287,6 +295,10 @@ public class UserController {
                 response.put("message", "用户不存在");
                 return ResponseEntity.notFound().build();
             }
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "重置密码失败: " + e.getMessage());

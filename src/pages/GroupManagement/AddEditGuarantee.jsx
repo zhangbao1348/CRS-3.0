@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Form, Input, Select, Button, Card, Row, Col, message } from 'antd'
+import { App, Form, Input, Select, Button, Card, Row, Col } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
@@ -13,6 +13,7 @@ const { Option } = Select
 
 const AddEditGuarantee = () => {
   const [form] = Form.useForm()
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [guaranteeType, setGuaranteeType] = useState('')
   const [guaranteeSubType, setGuaranteeSubType] = useState('')
@@ -88,8 +89,10 @@ const AddEditGuarantee = () => {
         navigate('/group-management/group-guarantee')
       }, 1000)
     } catch (error) {
-      console.error('保存失败:', error)
-      message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
+      if (!error?.errorFields) {
+        const detail = typeof error === 'string' ? error : (error?.error || error?.message || '未知错误')
+        message.error('保存失败: ' + detail)
+      }
     } finally {
       setLoading(false)
     }
@@ -128,7 +131,7 @@ const AddEditGuarantee = () => {
                 label="担保政策代码"
                 rules={[
                   { required: true, message: '请输入担保政策代码' },
-                  { pattern: /^[A-Za-z0-9_]+$/, message: '担保政策代码只能包含英文字母、数字和下划线' }
+                  { pattern: /^[A-Za-z0-9_]+$/, message: '担保政策代码仅允许输入英文字母、数字和下划线' }
                 ]}
               >
                 <Input placeholder="请输入担保政策代码" disabled={isEditing} />
@@ -164,11 +167,11 @@ const AddEditGuarantee = () => {
               <Col span={12}>
                 <Form.Item
                   name="guaranteeSubType"
-                  label="担保类型"
-                  rules={[{ required: true, message: '请选择担保类型' }]}
+                  label="担保子类型"
+                  rules={[{ required: true, message: '请选择担保子类型' }]}
                 >
                   <Select 
-                    placeholder="请选择担保类型"
+                    placeholder="请选择担保子类型"
                     onChange={(value) => setGuaranteeSubType(value)}
                   >
                     <Option value="一律担保">一律担保</Option>
@@ -193,7 +196,10 @@ const AddEditGuarantee = () => {
                   <Form.Item
                     name="latestArrivalTime"
                     label="最晚到店时间"
-                    rules={[{ required: true, message: '请输入最晚到店时间' }]}
+                    rules={[
+                      { required: true, message: '请输入最晚到店时间' },
+                      { pattern: /^([01]\d|2[0-3]):[0-5]\d$/, message: '请输入正确的 24 小时制时间，例如 18:00' }
+                    ]}
                   >
                     <Input placeholder="请输入最晚到店时间，如：22:00" />
                   </Form.Item>
@@ -217,7 +223,7 @@ const AddEditGuarantee = () => {
                 name="status"
                 label="状态"
                 initialValue="启用"
-                rules={[{ required: true, message: '请选择状态' }]}
+                rules={[{ required: true, message: '请选择政策状态' }]}
               >
                 <Select placeholder="请选择状态">
                   {statusOptions.map(option => (

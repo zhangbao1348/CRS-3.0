@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 税率设置仓库接口
@@ -12,6 +13,9 @@ import java.util.List;
  */
 @Repository
 public interface TaxSettingRepository extends JpaRepository<TaxSetting, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<TaxSetting> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /**
      * 根据租户ID查询所有税率设置

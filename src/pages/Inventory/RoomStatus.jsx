@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react'
-import { Select, Button, Modal, DatePicker, message, Row, Col, Card, Tabs, Spin, Radio, Table, Tag } from 'antd'
+import { useState, useEffect, useCallback, useContext } from 'react'
+import { App, Select, Button, Modal, DatePicker, Row, Col, Card, Tabs, Spin, Radio, Table, Tag } from 'antd'
 import { LeftOutlined, RightOutlined, EditOutlined, HistoryOutlined, HomeOutlined, AppstoreOutlined, TagOutlined, LinkOutlined, BlockOutlined, GlobalOutlined, DollarOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { ratePlanApi, hotelRoomTypeApi } from '../../utils/api'
 import { useHotelContext } from '../../contexts/HotelContext'
 import { AuthContext } from '../../contexts/AuthContext'
+import { PageScaffold } from '../../components/ui'
 
 const { RangePicker } = DatePicker
 const { Option } = Select
 
 const RoomStatus = () => {
+  const { message } = App.useApp()
   const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
@@ -136,7 +138,7 @@ const RoomStatus = () => {
 
   useEffect(() => {
     if (isSelectionValid()) fetchData()
-  }, [selectedMonth, activeTab, selectedRoomType, selectedRateCode, selectedChannel, selectedChannelForRT, selectedRoomTypeForCh, selectedMarket, selectedRateCategory, hotelCode])
+  }, [fetchData, isSelectionValid])
 
   const handlePrevMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').subtract(1, 'month').format('YYYY-MM'))
   const handleNextMonth = () => setSelectedMonth(dayjs(selectedMonth + '-01').add(1, 'month').format('YYYY-MM'))
@@ -254,8 +256,6 @@ const RoomStatus = () => {
             for (let i = 1; i <= daysInMonth; i++) {
               const dateStr = `${selectedMonth}-${String(i).padStart(2, '0')}`
               const data = statusData[dateStr]
-              // 没有记录时默认为"开"
-              const isOpen = data ? data.isOpen : true
               const isClosed = data && !data.isOpen
               const wd = new Date(year, mon - 1, i).getDay()
               const isWeekend = wd === 0 || wd === 6
@@ -293,7 +293,7 @@ const RoomStatus = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         {activeTab === 'room_type' && (
           <Col span={8}>
-            <Select placeholder="请选择房型" style={{ width: '100%' }} value={selectedRoomType}
+            <Select aria-label="房型" placeholder="请选择房型" style={{ width: '100%' }} value={selectedRoomType}
               onChange={setSelectedRoomType} allowClear showSearch optionFilterProp="children">
               {roomTypes.map(rt => (
                 <Option key={rt.roomTypeCode} value={rt.roomTypeCode}>
@@ -305,7 +305,7 @@ const RoomStatus = () => {
         )}
         {activeTab === 'rate' && (
           <Col span={8}>
-            <Select placeholder="请选择房价码" style={{ width: '100%' }} value={selectedRateCode}
+            <Select aria-label="房价码" placeholder="请选择房价码" style={{ width: '100%' }} value={selectedRateCode}
               onChange={setSelectedRateCode} allowClear showSearch optionFilterProp="children">
               {ratePlans.map(rp => (
                 <Option key={rp.rateCode} value={rp.rateCode}>
@@ -317,7 +317,7 @@ const RoomStatus = () => {
         )}
         {activeTab === 'channel' && (
           <Col span={8}>
-            <Select placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannel}
+            <Select aria-label="渠道" placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannel}
               onChange={setSelectedChannel} allowClear showSearch optionFilterProp="children">
               {channelCodes.map(c => (
                 <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>
@@ -328,7 +328,7 @@ const RoomStatus = () => {
         {activeTab === 'channel_room_type' && (
           <>
             <Col span={6}>
-              <Select placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannelForRT}
+              <Select aria-label="渠道" placeholder="请选择渠道" style={{ width: '100%' }} value={selectedChannelForRT}
                 onChange={setSelectedChannelForRT} allowClear showSearch optionFilterProp="children">
                 {channelCodes.map(c => (
                   <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>
@@ -336,7 +336,7 @@ const RoomStatus = () => {
               </Select>
             </Col>
             <Col span={6}>
-              <Select placeholder="请选择房型" style={{ width: '100%' }} value={selectedRoomTypeForCh}
+              <Select aria-label="房型" placeholder="请选择房型" style={{ width: '100%' }} value={selectedRoomTypeForCh}
                 onChange={setSelectedRoomTypeForCh} allowClear showSearch optionFilterProp="children">
                 {roomTypes.map(rt => (
                   <Option key={rt.roomTypeCode} value={rt.roomTypeCode}>
@@ -349,7 +349,7 @@ const RoomStatus = () => {
         )}
         {activeTab === 'market' && (
           <Col span={8}>
-            <Select placeholder="请选择市场码" style={{ width: '100%' }} value={selectedMarket}
+            <Select aria-label="市场码" placeholder="请选择市场码" style={{ width: '100%' }} value={selectedMarket}
               onChange={setSelectedMarket} allowClear showSearch optionFilterProp="children">
               {marketCodes.map(c => (
                 <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>
@@ -359,7 +359,7 @@ const RoomStatus = () => {
         )}
         {activeTab === 'rate_category' && (
           <Col span={8}>
-            <Select placeholder="请选择房价大类" style={{ width: '100%' }} value={selectedRateCategory}
+            <Select aria-label="房价大类" placeholder="请选择房价大类" style={{ width: '100%' }} value={selectedRateCategory}
               onChange={setSelectedRateCategory} allowClear showSearch optionFilterProp="children">
               {rateCategories.map(c => (
                 <Option key={c.code} value={c.code}>{c.name}（{c.code}）</Option>
@@ -372,9 +372,13 @@ const RoomStatus = () => {
   }
 
   return (
-    <div className="fade-in">
-      <h1 className="page-title">房态管理</h1>
-      <Card style={{ marginBottom: 16 }}>
+    <PageScaffold
+      className="fade-in calendar-control-page"
+      eyebrow="AVAILABILITY STATUS"
+      title="房态管理"
+      description="按酒店、房型、价格和渠道维度维护开关房状态；历史日期遵循系统可编辑时限。"
+    >
+      <Card className="ui-panel ui-dimension-tabs">
         <Tabs activeKey={activeTab} onChange={k => { setActiveTab(k); setStatusData({}) }}
           items={[
             { key: 'hotel', label: <span><HomeOutlined /> 酒店级房态</span> },
@@ -386,9 +390,9 @@ const RoomStatus = () => {
             { key: 'rate_category', label: <span><DollarOutlined /> 房价大类房态</span> }
           ]} />
       </Card>
-      <Card>
+      <Card className="ui-panel">
         {renderFilters()}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: 16, gap: 16 }}>
+        <div className="calendar-control-page__toolbar">
           <Button icon={<LeftOutlined />} onClick={handlePrevMonth}>上月</Button>
           <span style={{ fontSize: 16, fontWeight: 500, minWidth: 100, textAlign: 'center' }}>{selectedMonth}</span>
           <Button icon={<RightOutlined />} onClick={handleNextMonth}>下月</Button>
@@ -469,7 +473,7 @@ const RoomStatus = () => {
             ]} />
         </Modal>
       </Card>
-    </div>
+    </PageScaffold>
   )
 }
 

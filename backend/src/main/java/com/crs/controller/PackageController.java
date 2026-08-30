@@ -205,7 +205,8 @@ public class PackageController {
             Optional<Package> pkgOpt = packageService.getPackageById(id);
             if (pkgOpt.isPresent()) {
                 String packageCode = pkgOpt.get().getCode();
-                long refCount = groupRateCodeRepository.countByPackagesContaining(packageCode);
+                Integer tenantId = com.crs.util.TenantContext.getTenantId();
+                long refCount = groupRateCodeRepository.countByGroupIdAndPackagesContaining(tenantId, packageCode);
                 if (refCount > 0) {
                     return ResponseEntity.badRequest().body(Map.of("error", "该包价已被 " + refCount + " 个房价码引用，无法删除"));
                 }

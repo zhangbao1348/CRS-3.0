@@ -116,6 +116,8 @@ build/
 .venv/
 venv/
 ENV/
+__pycache__/
+*.py[cod]
 
 # Project specific files
 .agents/

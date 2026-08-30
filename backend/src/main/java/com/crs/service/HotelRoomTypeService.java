@@ -3,6 +3,7 @@ package com.crs.service;
 import com.crs.entity.HotelRoomType;
 import com.crs.repository.HotelRoomTypeRepository;
 import com.crs.repository.HotelRepository;
+import com.crs.repository.GroupRoomTypeHotelRepository;
 import com.crs.util.TenantContext;
 import org.springframework.stereotype.Service;
 
@@ -18,12 +19,15 @@ public class HotelRoomTypeService {
     
     private final HotelRoomTypeRepository hotelRoomTypeRepository;
     private final HotelRepository hotelRepository;
+    private final GroupRoomTypeHotelRepository groupRoomTypeHotelRepository;
     
     public HotelRoomTypeService(
             HotelRoomTypeRepository hotelRoomTypeRepository,
-            HotelRepository hotelRepository) {
+            HotelRepository hotelRepository,
+            GroupRoomTypeHotelRepository groupRoomTypeHotelRepository) {
         this.hotelRoomTypeRepository = hotelRoomTypeRepository;
         this.hotelRepository = hotelRepository;
+        this.groupRoomTypeHotelRepository = groupRoomTypeHotelRepository;
     }
     
     /**
@@ -57,14 +61,7 @@ public class HotelRoomTypeService {
             throw new RuntimeException("Tenant not found");
         }
         
-        var roomType = hotelRoomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Hotel room type not found"));
-        
-        // 检查酒店是否属于当前租户
-        hotelRepository.findByHotelCodeAndTenantId(roomType.getHotelCode(), tenantId)
-                .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
-        
-        return Optional.of(roomType);
+        return hotelRoomTypeRepository.findByIdAndTenantId(id, tenantId);
     }
     
     /**
@@ -114,6 +111,21 @@ public class HotelRoomTypeService {
         // 验证现有房型所有权
         HotelRoomType existingHotelRoomType = getHotelRoomTypeById(id)
                 .orElseThrow(() -> new RuntimeException("Hotel room type not found or access denied"));
+
+        if (existingHotelRoomType.getGroupRoomTypeCode() != null
+                && !existingHotelRoomType.getGroupRoomTypeCode().isBlank()) {
+            boolean editable = groupRoomTypeHotelRepository
+                    .findByTenantIdAndGroupRoomTypeCodeAndHotelCode(
+                            tenantId,
+                            existingHotelRoomType.getGroupRoomTypeCode(),
+                            existingHotelRoomType.getHotelCode())
+                    .map(allocation -> Boolean.TRUE.equals(allocation.getAllocated())
+                            && Boolean.TRUE.equals(allocation.getRoomInfoEditable()))
+                    .orElse(false);
+            if (!editable) {
+                throw new RuntimeException("该房型由集团下发，当前未开放房型信息修改权限");
+            }
+        }
         
         // 验证目标酒店所有权
         hotelRepository.findByHotelCodeAndTenantId(hotelRoomType.getHotelCode(), tenantId)
@@ -161,14 +173,10 @@ public class HotelRoomTypeService {
             throw new RuntimeException("Tenant not found");
         }
         
-        var roomType = hotelRoomTypeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Hotel room type not found"));
-        
-        // 检查酒店是否属于当前租户
-        hotelRepository.findByHotelCodeAndTenantId(roomType.getHotelCode(), tenantId)
-                .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
-        
-        hotelRoomTypeRepository.deleteById(id);
+        HotelRoomType roomType = hotelRoomTypeRepository.findByIdAndTenantId(id, tenantId)
+                .orElseThrow(() -> new RuntimeException("Hotel room type not found or access denied"));
+
+        hotelRoomTypeRepository.delete(roomType);
     }
     
     /**

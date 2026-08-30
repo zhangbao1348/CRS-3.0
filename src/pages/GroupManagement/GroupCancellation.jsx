@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select, Popconfirm } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
-  EditOutlined, 
-  EyeOutlined,
-  CloseCircleOutlined
+  EditOutlined,
+  CloseCircleOutlined,
+  DeleteOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../../utils/api'
@@ -13,6 +13,7 @@ import api from '../../utils/api'
 const { Option } = Select
 
 const GroupCancellation = () => {
+  const { message } = App.useApp()
   const [cancellationPolicies, setCancellationPolicies] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchName, setSearchName] = useState('')
@@ -45,6 +46,17 @@ const GroupCancellation = () => {
   
   const handleEditCancellation = (record) => {
     navigate('/group-management/add-edit-cancellation', { state: { record } })
+  }
+
+  /** 删除前二次确认，服务端负责校验房价码引用。 */
+  const handleDeleteCancellation = async (record) => {
+    try {
+      await api.delete(`/cancellation-policies/${record.id}`)
+      message.success('取消政策删除成功')
+      loadCancellationPolicies()
+    } catch (error) {
+      message.error(error?.error || error?.message || '取消政策删除失败')
+    }
   }
   
   // 搜索过滤
@@ -109,6 +121,16 @@ const GroupCancellation = () => {
       render: (_, record) => (
         <Space size="middle">
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditCancellation(record)}>编辑</Button>
+          <Popconfirm
+            title="确认删除该取消政策？"
+            description="已被房价码引用的政策将被系统拒绝删除。"
+            okText="确定"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDeleteCancellation(record)}
+          >
+            <Button danger type="link" size="small" icon={<DeleteOutlined />} aria-label={`删除取消政策 ${record.name}`}>删除</Button>
+          </Popconfirm>
         </Space>
       )
     }
@@ -150,10 +172,8 @@ const GroupCancellation = () => {
               onChange={setSearchType}
             >
               <Option value="免费取消">免费取消</Option>
-              <Option value="部分费用">部分费用</Option>
+              <Option value="限时扣费">限时扣费</Option>
               <Option value="不可取消">不可取消</Option>
-              <Option value="特殊取消">特殊取消</Option>
-              <Option value="提前取消">提前取消</Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>

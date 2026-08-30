@@ -1,5 +1,5 @@
-import React, { useContext, useEffect } from 'react'
-import { Layout, Menu, Select, message, Dropdown, Avatar } from 'antd'
+import React, { Suspense, useContext, useEffect } from 'react'
+import { Layout, Menu, Select, message, Dropdown, Avatar, Spin, Button } from 'antd'
 import { 
   MenuFoldOutlined, 
   MenuUnfoldOutlined,
@@ -65,6 +65,7 @@ const MENU_PATH_ALIAS_RULES = [
 
 const MainLayout = ({ children }) => {
   const [collapsed, setCollapsed] = React.useState(false)
+  const [compactViewport, setCompactViewport] = React.useState(false)
   const [systemType] = React.useState('crs')
   const location = useLocation()
   const navigate = useNavigate()
@@ -93,6 +94,18 @@ const MainLayout = ({ children }) => {
   const toggleCollapsed = () => {
     setCollapsed(!collapsed)
   }
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)')
+    const syncViewport = (event) => {
+      const compact = event.matches
+      setCompactViewport(compact)
+      setCollapsed(compact)
+    }
+    syncViewport(mediaQuery)
+    mediaQuery.addEventListener('change', syncViewport)
+    return () => mediaQuery.removeEventListener('change', syncViewport)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -149,14 +162,8 @@ const MainLayout = ({ children }) => {
 
   // 将后端菜单数据转换为前端格式
   const convertMenuData = (backendMenus) => {
-    console.log('Backend menus:', backendMenus)
     // 过滤当前系统的菜单
     let systemMenus = backendMenus.filter(m => m.systemType === systemType)
-    console.log('System menus:', systemMenus)
-    
-    // 检查库存管理菜单
-    const inventoryMenus = systemMenus.filter(m => m.menuName.includes('库存') || m.path.includes('inventory'))
-    console.log('Inventory menus:', inventoryMenus)
     
     // 构建菜单树结构
     const buildMenuTree = () => {
@@ -165,11 +172,6 @@ const MainLayout = ({ children }) => {
       
       // 找到所有一级菜单（parent_code为crs-system的菜单）
       const rootMenus = systemMenus.filter(m => m.parentCode === 'crs-system')
-      console.log('Root menus:', rootMenus)
-      
-      // 检查一级菜单中的库存管理菜单
-      const rootInventoryMenus = rootMenus.filter(m => m.menuName.includes('库存') || m.path.includes('inventory'))
-      console.log('Root inventory menus:', rootInventoryMenus)
       
       // 递归构建菜单树
       const buildMenu = (menu) => {
@@ -178,7 +180,6 @@ const MainLayout = ({ children }) => {
         
         // 通过parent_code查找子菜单
         const parentCodeChildren = systemMenus.filter(child => child.parentCode === menu.menuCode)
-        console.log(`Menu ${menu.menuName} (code: ${menu.menuCode}) parentCodeChildren:`, parentCodeChildren)
         if (parentCodeChildren.length > 0) {
           children.push(...parentCodeChildren)
         }
@@ -202,7 +203,6 @@ const MainLayout = ({ children }) => {
       // 构建菜单树
       const tree = rootMenus.map(menu => buildMenu(menu))
       
-      console.log('Built menu tree:', tree)
       return tree
     }
     
@@ -442,41 +442,25 @@ const MainLayout = ({ children }) => {
   const menuItems = generateMenuItems(menuData)
   const menuState = getMenuState(menuData, location.pathname)
   const [openMenuKeys, setOpenMenuKeys] = React.useState(menuState.openKeys)
+  const openMenuKeysSignature = menuState.openKeys.join('\u0000')
 
   useEffect(() => {
-    setOpenMenuKeys(menuState.openKeys)
-  }, [location.pathname])
+    setOpenMenuKeys(openMenuKeysSignature ? openMenuKeysSignature.split('\u0000') : [])
+  }, [openMenuKeysSignature])
 
   return (
-    <Layout>
+    <Layout className={`crs-shell${collapsed ? ' is-collapsed' : ''}${compactViewport ? ' is-compact' : ''}`}>
       <Sider
         trigger={null}
         collapsible
         collapsed={collapsed}
+        collapsedWidth={compactViewport ? 0 : 80}
         width={200}
         theme="light"
-        style={{
-          background: '#003366',
-          boxShadow: 'none',
-          borderRight: 'none'
-        }}
+        className="crs-shell__sider"
       >
-        <div className="logo" style={{
-          height: 64,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#003366',
-          margin: 0,
-          padding: 0
-        }}>
-          <div style={{
-            fontSize: 18,
-            fontWeight: 600,
-            color: '#fff',
-            marginBottom: collapsed ? 0 : 8
-          }}>
+        <div className="logo crs-shell__logo">
+          <div className="crs-shell__logo-title">
             {collapsed ? (systemType === 'crm' ? 'CRM' : systemType === 'mini' ? '小程序' : 'CRS') : (systemType === 'crm' ? 'CRM系统' : systemType === 'mini' ? '小程序系统' : 'CRS系统')}
           </div>
           {/* 暂时隐藏系统切换控件 */}
@@ -501,55 +485,35 @@ const MainLayout = ({ children }) => {
           selectedKeys={menuState.selectedKeys}
           openKeys={openMenuKeys}
           onOpenChange={setOpenMenuKeys}
-          style={{ 
-            height: '100%', 
-            borderRight: 0
-          }}
+          className="crs-shell__menu"
           items={menuItems}
           subMenuOpenDelay={0.2}
           subMenuCloseDelay={0.1}
           theme="dark"
         />
       </Sider>
-      <Layout>
-        <Header
-          style={{
-            padding: 0,
-            background: '#003366',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div
-              className="trigger"
-              style={{
-                padding: '0 24px',
-                fontSize: 18,
-                cursor: 'pointer',
-                transition: 'color 0.3s',
-                color: '#fff'
-              }}
+      <Layout className="crs-shell__main">
+        <Header className="crs-shell__header">
+          <div className="crs-shell__header-start">
+            <Button
+              type="text"
+              className="trigger crs-shell__trigger"
+              aria-label={collapsed ? '展开主导航' : '收起主导航'}
               onClick={toggleCollapsed}
             >
               {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </div>
-            <div style={{
-              fontSize: 16,
-              fontWeight: 500,
-              color: '#fff'
-            }}>
+            </Button>
+            <div className="crs-shell__breadcrumb" title={getPathFriendlyName(location.pathname)}>
               {getPathFriendlyName(location.pathname)}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px' }}>
+          <div className="crs-shell__header-end">
             {/* 没有归属租户的用户显示租户切换控件 */}
             {systemType !== 'crm' && user?.tenantId === null && (
               <Select
                 value={selectedTenant}
                 onChange={changeTenant}
-                style={{ width: 200, marginRight: 16 }}
+                className="crs-shell__context-select crs-shell__context-select--tenant"
                 size="middle"
                 placeholder="切换租户"
                 showSearch
@@ -568,7 +532,7 @@ const MainLayout = ({ children }) => {
               <Select
                 value={selectedHotel}
                 onChange={changeHotel}
-                style={{ width: 280, marginRight: 16 }}
+                className="crs-shell__context-select crs-shell__context-select--hotel"
                 size="middle"
                 placeholder="切换酒店"
                 showSearch
@@ -590,36 +554,27 @@ const MainLayout = ({ children }) => {
                 ))}
               </Select>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', color: '#fff', marginRight: 16 }}>
-              <span style={{ marginRight: 8 }}>欢迎，</span>
-              <span style={{ fontWeight: 500 }}>{user?.name || user?.username || '用户'}</span>
+            <div className="crs-shell__user">
+              <span className="crs-shell__user-label">欢迎，</span>
+              <span className="crs-shell__user-name">{user?.name || user?.username || '用户'}</span>
             </div>
             <Dropdown 
               menu={{ items: userMenuItems }}
               placement="bottomRight"
               arrow
             >
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                cursor: 'pointer',
-                color: '#fff',
-                padding: '4px 8px',
-                borderRadius: 4,
-                transition: 'background-color 0.3s'
-              }} 
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <Avatar size="small" icon={<UserOutlined />} style={{ marginRight: 8, backgroundColor: '#1890ff' }} />
+              <div className="crs-shell__account" role="button" tabIndex={0} aria-label="打开个人账户菜单">
+                <Avatar size="small" icon={<UserOutlined />} className="crs-shell__avatar" />
                 <span>我的</span>
               </div>
             </Dropdown>
           </div>
         </Header>
-        <Content>
-          <div className="page-container" style={{ overflow: 'auto' }}>
-            {children}
+        <Content className="crs-shell__content">
+          <div className="page-container">
+            <Suspense fallback={<div className="crs-shell__loading"><Spin size="large" /><span>正在加载业务模块</span></div>}>
+              {children}
+            </Suspense>
           </div>
         </Content>
       </Layout>

@@ -17,6 +17,9 @@ import com.crs.entity.Package;
  */
 @Repository
 public interface PackageRepository extends JpaRepository<Package, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<Package> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /**
      * 获取指定租户下的所有增值包价配置。

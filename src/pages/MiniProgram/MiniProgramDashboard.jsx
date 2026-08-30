@@ -1,9 +1,7 @@
-import React from 'react'
-import { Card, Row, Col, Button, Space } from 'antd'
+import { Card, Row, Col } from 'antd'
 import { 
   CalendarOutlined, 
   HomeOutlined, 
-  UserOutlined, 
   GiftOutlined,
   BuildOutlined
 } from '@ant-design/icons'

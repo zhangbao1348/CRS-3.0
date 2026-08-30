@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Button, Card, Row, Col, message, InputNumber, TimePicker } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Form, Input, Select, Button, Card, Row, Col, InputNumber, TimePicker } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../../utils/api'
@@ -9,6 +9,7 @@ const { Option } = Select
 
 const AddEditCancellation = () => {
   const [form] = Form.useForm()
+  const { message } = App.useApp()
   const [loading, setLoading] = useState(false)
   const [cancellationType, setCancellationType] = useState('')
   const navigate = useNavigate()
@@ -93,8 +94,10 @@ const AddEditCancellation = () => {
         navigate('/group-management/group-cancellation')
       }, 1000)
     } catch (error) {
-      console.error('保存失败:', error)
-      message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
+      if (!error?.errorFields) {
+        const detail = typeof error === 'string' ? error : (error?.error || error?.message || '未知错误')
+        message.error('保存失败: ' + detail)
+      }
     } finally {
       setLoading(false)
     }
@@ -133,7 +136,7 @@ const AddEditCancellation = () => {
                 label="取消政策代码"
                 rules={[
                   { required: true, message: '请输入取消政策代码' },
-                  { pattern: /^[A-Za-z0-9_]+$/, message: '取消政策代码只能包含英文字母、数字和下划线' }
+                  { pattern: /^[A-Za-z0-9_]+$/, message: '取消政策代码仅允许输入英文字母、数字和下划线' }
                 ]}
               >
                 <Input placeholder="请输入取消政策代码" disabled={isEditing} />
@@ -172,9 +175,12 @@ const AddEditCancellation = () => {
                 <Form.Item
                   name="cancellationDays"
                   noStyle
-                  rules={[{ required: true, message: '请输入天数' }]}
+                  rules={[
+                    { required: true, message: '请输入天数' },
+                    { type: 'integer', min: 1, message: '提前天数必须是大于 0 的整数，请重新输入' }
+                  ]}
                 >
-                  <InputNumber min={1} placeholder="天数" style={{ width: '100%' }} />
+                  <InputNumber min={1} precision={0} placeholder="天数" style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col>
@@ -223,7 +229,7 @@ const AddEditCancellation = () => {
                 name="status"
                 label="状态"
                 initialValue="启用"
-                rules={[{ required: true, message: '请选择状态' }]}
+                rules={[{ required: true, message: '请选择政策状态' }]}
               >
                 <Select placeholder="请选择状态">
                   {statusOptions.map(option => (

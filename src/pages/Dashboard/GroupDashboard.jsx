@@ -1,23 +1,20 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Row, Col, Statistic, Table, Tag, List, Spin, Empty, Badge, Typography, Tooltip, Space, Radio, Progress, Avatar, Select } from 'antd'
+import { useState, useEffect } from 'react'
+import { Card, Row, Col, Statistic, Table, Tag, List, Spin, Empty, Badge, Typography, Space, Radio, Avatar, Select } from 'antd'
 import {
   BankOutlined,
   ThunderboltOutlined,
   LineChartOutlined,
   AlertOutlined,
-  DollarOutlined,
   TrophyOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   GlobalOutlined,
   TeamOutlined,
-  ArrowRightOutlined,
-  HistoryOutlined
+  ApartmentOutlined
 } from '@ant-design/icons'
-import { Area, Pie } from '@ant-design/plots'
+import { Area } from '@ant-design/plots'
 import { dashboardApi } from '../../utils/api'
 import { useNavigate } from 'react-router-dom'
 import { useHotelContext } from '../../contexts/HotelContext'
+import { useTenantContext } from '../../contexts/TenantContext'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -31,10 +28,13 @@ const GroupDashboard = () => {
   const [selectedPacingHotel, setSelectedPacingHotel] = useState(null)
   const navigate = useNavigate()
   const { changeHotel } = useHotelContext()
+  const { selectedTenant, loading: tenantLoading } = useTenantContext()
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (selectedTenant) {
+      fetchData()
+    }
+  }, [selectedTenant])
 
   const fetchData = async (hotelCode = null) => {
     if (hotelCode) setPacingLoading(true)
@@ -43,39 +43,13 @@ const GroupDashboard = () => {
     setError(null)
     try {
       const res = await dashboardApi.getGroupDashboard(hotelCode)
-      
-      // 注入集团排行榜模拟数据
-      const hotelRanking = [
-        { key: '1', name: '上海静安中心店', revenue: 1250000, occ: 92, rank: 1 },
-        { key: '2', name: '北京国贸大酒店', revenue: 980000, occ: 85, rank: 2 },
-        { key: '3', name: '深圳南山旗舰店', revenue: 860000, occ: 78, rank: 3 },
-        { key: '4', name: '广州天河店', revenue: 720000, occ: 75, rank: 4 },
-        { key: '5', name: '成都春熙路店', revenue: 650000, occ: 88, rank: 5 }
-      ]
-
-      // 注入 30 天全域趋势数据
-      const fullTrendData = Array.from({ length: 30 }, (_, i) => {
-        const date = new Date()
-        date.setDate(date.getDate() - (29 - i))
-        return {
-          date: date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }),
-          orders: Math.floor(Math.random() * 200) + 500,
-          revenue: Math.floor(Math.random() * 50000) + 150000
-        }
-      })
-
-      // 跨店异常预警模拟
-      const groupExceptions = [
-        { id: 1, hotel: '北京国贸店', type: '库存超卖', detail: '未来 3 天豪华套房库存 -5', level: 'error', time: '5分钟前' },
-        { id: 2, hotel: '上海静安店', type: '待确认订单', detail: '25 笔渠道订单等待同步', level: 'warning', time: '12分钟前' },
-        { id: 3, hotel: '深圳南山店', type: '价格倒挂', detail: '美团价格显著低于直销', level: 'warning', time: '45分钟前' }
-      ]
+      const payload = res?.data || res || {}
 
       if (hotelCode) {
         // 仅更新流速数据
-        setData(prev => ({ ...prev, groupPacing: res.groupPacing }))
+        setData(prev => ({ ...prev, groupPacing: payload.groupPacing || [] }))
       } else {
-        setData({ ...res, hotelRanking, fullTrendData, groupExceptions })
+        setData(payload)
       }
     } catch (err) {
       setError('加载集团数据失败')
@@ -90,18 +64,36 @@ const GroupDashboard = () => {
     fetchData(val)
   }
 
-  if (loading) return <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><Spin size="large" /></div>
+  if (loading || tenantLoading || !selectedTenant) return <div style={{ height: '80vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><Spin size="large" /></div>
   if (error) return <Empty description={error} />
 
-  const { stats, hotelRanking, groupPacing = [], fullTrendData, groupExceptions, hotelOverview = [] } = data
+  const {
+    stats = {},
+    groupPacing = [],
+    bookingTrend = [],
+    inventoryAlerts = [],
+    hotelOverview = []
+  } = data || {}
 
-  const displayTrendData = trendDays === '7' ? fullTrendData.slice(-7) : fullTrendData
+  const hotelRanking = [...hotelOverview]
+    .sort((a, b) => Number(b.monthRevenue || 0) - Number(a.monthRevenue || 0))
+    .slice(0, 5)
+    .map((hotel, index) => ({ ...hotel, rank: index + 1 }))
+  const groupExceptions = inventoryAlerts.map((item, index) => ({
+    id: `${item.hotelCode}-${item.roomTypeCode}-${item.date}-${index}`,
+    hotel: item.hotelCode,
+    type: '低库存预警',
+    detail: `${item.date} ${item.roomTypeCode} 剩余 ${item.availableRooms ?? 0} 间`,
+    level: Number(item.availableRooms) <= 0 ? 'error' : 'warning'
+  }))
+
+  const displayTrendData = trendDays === '7' ? bookingTrend.slice(-7) : bookingTrend
 
   // 全域趋势图配置 (v2)
   const trendConfig = {
     data: displayTrendData,
     xField: 'date',
-    yField: 'revenue',
+    yField: 'count',
     smooth: true,
     style: {
       fill: 'linear-gradient(-90deg, white 0%, #1890ff 100%)',
@@ -109,7 +101,7 @@ const GroupDashboard = () => {
       lineWidth: 3,
       stroke: '#1890ff'
     },
-    axis: { y: { label: { formatter: (v) => `¥${(v / 10000).toFixed(1)}w` } } },
+    axis: { y: { label: { formatter: (v) => `${v} 单` } } },
   }
 
   const cardStyle = { borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', background: '#fff' }
@@ -124,7 +116,7 @@ const GroupDashboard = () => {
         </div>
         <Space size="large">
           <Statistic title="全域本月总营收" value={stats?.monthRevenue} precision={2} prefix="¥" valueStyle={{ color: '#cf1322', fontSize: 28 }} />
-          <Statistic title="今日总订单" value={stats?.todayNewOrders} valueStyle={{ color: '#1890ff' }} suffix={<Text type="secondary" style={{ fontSize: 14 }}>+12% <ArrowUpOutlined style={{ color: '#52c41a' }} /></Text>} />
+          <Statistic title="今日总订单" value={stats.todayNewOrders || 0} valueStyle={{ color: '#1890ff' }} />
         </Space>
       </div>
 
@@ -133,9 +125,9 @@ const GroupDashboard = () => {
         <Col span={24}>
           <Row gutter={16}>
             {[
-              { title: '今日全域入住', value: stats?.todayCheckIn, icon: <TeamOutlined />, color: '#52c41a' },
-              { title: '全域平均出租率', value: 78.5, icon: <LineChartOutlined />, color: '#1890ff', suffix: '%' },
-              { title: '全域平均 ADR', value: 520, icon: <DollarOutlined />, color: '#faad14', prefix: '¥' },
+              { title: '今日全域入住', value: stats.todayCheckIn || 0, icon: <TeamOutlined />, color: '#52c41a' },
+              { title: '活跃门店', value: stats.activeHotelCount || 0, icon: <ApartmentOutlined />, color: '#1890ff' },
+              { title: '待处理人工订单', value: stats.pendingManual || 0, icon: <AlertOutlined />, color: '#faad14' },
               { title: '待处理异常', value: groupExceptions.length, icon: <AlertOutlined />, color: '#ff4d4f' }
             ].map((kpi, idx) => (
               <Col span={6} key={idx}>
@@ -156,7 +148,7 @@ const GroupDashboard = () => {
         {/* 2. 全域预订趋势 */}
         <Col span={16}>
           <Card 
-            title={<span><LineChartOutlined style={{ color: '#1890ff' }} /> 全域预订金额趋势</span>}
+            title={<span><LineChartOutlined style={{ color: '#1890ff' }} /> 全域订单趋势</span>}
             extra={
               <Radio.Group value={trendDays} onChange={e => setTrendDays(e.target.value)} size="small">
                 <Radio.Button value="7">近7天</Radio.Button>
@@ -185,9 +177,9 @@ const GroupDashboard = () => {
                     <Avatar size="small" style={{ backgroundColor: item.rank <= 3 ? '#faad14' : '#f0f0f0', color: item.rank <= 3 ? '#fff' : '#8c8c8c' }}>{item.rank}</Avatar>
                     <div style={{ flex: 1 }}>
                       <Text strong style={{ fontSize: 13 }}>{item.name}</Text>
-                      <div style={{ fontSize: 11, color: '#8c8c8c' }}>出租率 {item.occ}%</div>
-                    </div>
-                    <Text strong style={{ color: '#cf1322' }}>¥{(item.revenue / 10000).toFixed(1)}w</Text>
+                    <div style={{ fontSize: 11, color: '#8c8c8c' }}>剩余库存 {item.todayAvailableRooms ?? 0} 间</div>
+                  </div>
+                    <Text strong style={{ color: '#cf1322' }}>¥{(Number(item.monthRevenue || 0) / 10000).toFixed(1)}w</Text>
                   </div>
                 </List.Item>
               )}
@@ -207,7 +199,7 @@ const GroupDashboard = () => {
                 onChange={handlePacingHotelChange}
                 value={selectedPacingHotel}
               >
-                <Option value={null}>集团全域平均</Option>
+                <Option value="">集团全域平均</Option>
                 {hotelOverview.map(h => (
                   <Option key={h.hotelCode} value={h.hotelCode}>{h.hotelName}</Option>
                 ))}
@@ -258,7 +250,7 @@ const GroupDashboard = () => {
                     description={
                       <div>
                         <div style={{ fontSize: 12 }}>{item.detail}</div>
-                        <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}><HistoryOutlined /> {item.time}</div>
+                        <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>{item.hotel}</div>
                       </div>
                     }
                   />
@@ -287,7 +279,7 @@ const GroupDashboard = () => {
         </Col>
       </Row>
 
-      <style jsx>{`
+      <style>{`
         .fade-in { animation: fadeIn 0.8s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .hover-scale:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }

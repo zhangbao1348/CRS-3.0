@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 取消政策数据访问接口 (CancellationPolicyRepository)
@@ -13,6 +14,9 @@ import java.util.List;
  */
 @Repository
 public interface CancellationPolicyRepository extends JpaRepository<CancellationPolicy, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<CancellationPolicy> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /**
      * 获取指定租户下的所有取消政策。

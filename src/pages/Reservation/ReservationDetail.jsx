@@ -1,12 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Card, Typography, Descriptions, Table, Tag, Button, Space, Modal, Tabs, message } from 'antd'
-import { CloseCircleOutlined, HistoryOutlined } from '@ant-design/icons'
+import { App as AntApp, Card, Typography, Descriptions, Table, Tag, Button, Space, Modal, Tabs, Input, Select } from 'antd'
+import { CloseCircleOutlined, HistoryOutlined, SwapOutlined, ToolOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { reservationApi } from '../../utils/api'
 
 const { Text } = Typography
 
+const statusLabels = {
+  pending: '待确认',
+  pending_payment: '待支付',
+  confirmed: '已确认',
+  checked_in: '已入住',
+  checked_out: '已离店',
+  no_show: '未到'
+}
+
+const normalStatusTransitions = {
+  pending: ['confirmed'],
+  pending_payment: ['confirmed'],
+  confirmed: ['checked_in', 'no_show'],
+  checked_in: ['checked_out']
+}
+
 const ReservationDetail = () => {
+  const { message } = AntApp.useApp()
   const [searchParams] = useSearchParams()
   const reservationId = searchParams.get('id')
 
@@ -17,6 +34,16 @@ const ReservationDetail = () => {
   const [historyModalVisible, setHistoryModalVisible] = useState(false)
   const [logModalVisible, setLogModalVisible] = useState(false)
   const [selectedApiLog, setSelectedApiLog] = useState(null)
+  const [cancelModalVisible, setCancelModalVisible] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [statusModalVisible, setStatusModalVisible] = useState(false)
+  const [targetStatus, setTargetStatus] = useState(null)
+  const [statusSubmitting, setStatusSubmitting] = useState(false)
+  const [manualModalVisible, setManualModalVisible] = useState(false)
+  const [manualReason, setManualReason] = useState('')
+  const [manualTargetStatus, setManualTargetStatus] = useState(null)
+  const [manualSubmitting, setManualSubmitting] = useState(false)
 
   const fetchDetail = async () => {
     if (!reservationId) {
@@ -28,8 +55,7 @@ const ReservationDetail = () => {
       const data = await reservationApi.getDetail(reservationId)
       setOrderDetail(data)
     } catch (error) {
-      console.error('获取订单详情失败:', error)
-      message.error('获取订单详情失败')
+      message.error(error?.response?.data?.error || '获取订单详情失败')
     } finally {
       setLoading(false)
     }
@@ -87,13 +113,65 @@ const ReservationDetail = () => {
 
   const handleCancelOrder = async () => {
     if (!reservationId) return
+    const reason = cancelReason.trim()
+    if (!reason) {
+      message.warning('请填写取消原因')
+      return
+    }
+    setCancelSubmitting(true)
     try {
-      await reservationApi.cancel(reservationId, { cancelReason: 'CRS手动取消' })
+      await reservationApi.cancel(reservationId, { cancelReason: reason })
       message.success('订单取消成功')
-      fetchDetail()
+      setCancelModalVisible(false)
+      setCancelReason('')
+      await fetchDetail()
     } catch (error) {
-      console.error('取消订单失败:', error)
-      message.error('取消订单失败')
+      message.error(error?.response?.data?.error || '取消订单失败')
+    } finally {
+      setCancelSubmitting(false)
+    }
+  }
+
+  const handleStatusUpdate = async () => {
+    if (!reservationId || !targetStatus) {
+      message.warning('请选择目标状态')
+      return
+    }
+    setStatusSubmitting(true)
+    try {
+      await reservationApi.updateStatus(reservationId, { reservationStatus: targetStatus })
+      message.success('订单状态更新成功')
+      setStatusModalVisible(false)
+      setTargetStatus(null)
+      await fetchDetail()
+    } catch (error) {
+      message.error(error?.response?.data?.error || '订单状态更新失败')
+    } finally {
+      setStatusSubmitting(false)
+    }
+  }
+
+  const handleManualIntervene = async () => {
+    const reason = manualReason.trim()
+    if (!reason) {
+      message.warning('请填写人工干预原因')
+      return
+    }
+    setManualSubmitting(true)
+    try {
+      await reservationApi.manualIntervene(reservationId, {
+        reason,
+        reservationStatus: manualTargetStatus || undefined
+      })
+      message.success('人工干预已记录')
+      setManualModalVisible(false)
+      setManualReason('')
+      setManualTargetStatus(null)
+      await fetchDetail()
+    } catch (error) {
+      message.error(error?.response?.data?.error || '人工干预失败')
+    } finally {
+      setManualSubmitting(false)
     }
   }
 
@@ -111,6 +189,9 @@ const ReservationDetail = () => {
   const policyInfo = orderDetail.policyInfo || {}
   const remarkInfo = orderDetail.remarkInfo || {}
   const operationHistory = orderDetail.operationHistory || []
+  const cancellableStatuses = ['confirmed', 'pending', 'pending_payment']
+  const canCancel = cancellableStatuses.includes(orderInfo.reservationStatus)
+  const availableStatusTransitions = normalStatusTransitions[orderInfo.reservationStatus] || []
 
   // 组装当前选中日期的各项 Tab 的数据源
   const getFeeDataSource = () => {
@@ -229,6 +310,15 @@ const ReservationDetail = () => {
                 </div>
               </Descriptions.Item>
               <Descriptions.Item label="订单创建时间">{orderInfo.createTime}</Descriptions.Item>
+              {orderInfo.reservationStatus === 'cancelled' && (
+                <Descriptions.Item label="取消时间">{orderInfo.cancelledAt || '-'}</Descriptions.Item>
+              )}
+              {orderInfo.reservationStatus === 'cancelled' && (
+                <Descriptions.Item label="取消操作人">{orderInfo.cancelledBy || '-'}</Descriptions.Item>
+              )}
+              {orderInfo.reservationStatus === 'cancelled' && (
+                <Descriptions.Item label="取消原因" span={2}>{orderInfo.cancelReason || '-'}</Descriptions.Item>
+              )}
             </Descriptions>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginTop: 4 }}>
@@ -236,11 +326,25 @@ const ReservationDetail = () => {
               {orderInfo.status}
             </Tag>
             <Space>
+              <Button
+                icon={<SwapOutlined />}
+                onClick={() => setStatusModalVisible(true)}
+                disabled={availableStatusTransitions.length === 0}
+              >
+                更新状态
+              </Button>
+              <Button
+                icon={<ToolOutlined />}
+                onClick={() => setManualModalVisible(true)}
+                disabled={orderInfo.reservationStatus === 'cancelled'}
+              >
+                人工干预
+              </Button>
               <Button 
                 type="default" 
                 icon={<CloseCircleOutlined />} 
-                onClick={handleCancelOrder}
-                disabled={orderInfo.reservationStatus === 'cancelled'}
+                onClick={() => setCancelModalVisible(true)}
+                disabled={!canCancel}
               >
                 取消订单
               </Button>
@@ -255,6 +359,109 @@ const ReservationDetail = () => {
           </div>
         </div>
       </Card>
+
+      <Modal
+        title="取消订单"
+        open={cancelModalVisible}
+        okText="确认取消"
+        cancelText="返回"
+        okButtonProps={{ danger: true, loading: cancelSubmitting }}
+        onOk={handleCancelOrder}
+        onCancel={() => {
+          if (!cancelSubmitting) {
+            setCancelModalVisible(false)
+            setCancelReason('')
+          }
+        }}
+        destroyOnHidden
+      >
+        <Text type="secondary">取消后将释放对应日期的库存，并记录当前登录用户与操作原因。</Text>
+        <div style={{ marginTop: 16 }}>
+          <Text strong><Text type="danger">* </Text>取消原因</Text>
+          <Input.TextArea
+            aria-label="取消原因"
+            value={cancelReason}
+            onChange={(event) => setCancelReason(event.target.value)}
+            placeholder="请填写取消原因"
+            maxLength={500}
+            showCount
+            autoSize={{ minRows: 3, maxRows: 6 }}
+            style={{ marginTop: 8 }}
+          />
+        </div>
+      </Modal>
+
+      <Modal
+        title="更新订单状态"
+        open={statusModalVisible}
+        okText="确认更新"
+        cancelText="返回"
+        confirmLoading={statusSubmitting}
+        onOk={handleStatusUpdate}
+        onCancel={() => {
+          if (!statusSubmitting) {
+            setStatusModalVisible(false)
+            setTargetStatus(null)
+          }
+        }}
+        destroyOnHidden
+      >
+        <Text type="secondary">状态变更将写入订单操作历史，且只能按正常业务状态机流转。</Text>
+        <Select
+          aria-label="目标状态"
+          value={targetStatus}
+          onChange={setTargetStatus}
+          placeholder="请选择目标状态"
+          options={availableStatusTransitions.map(value => ({ value, label: statusLabels[value] }))}
+          style={{ width: '100%', marginTop: 16 }}
+        />
+      </Modal>
+
+      <Modal
+        title="人工干预"
+        open={manualModalVisible}
+        okText="确认干预"
+        cancelText="返回"
+        confirmLoading={manualSubmitting}
+        onOk={handleManualIntervene}
+        onCancel={() => {
+          if (!manualSubmitting) {
+            setManualModalVisible(false)
+            setManualReason('')
+            setManualTargetStatus(null)
+          }
+        }}
+        destroyOnHidden
+      >
+        <Text type="secondary">用于处理正常状态机无法覆盖的特殊情况。原因必填，目标状态选填。</Text>
+        <div style={{ marginTop: 16 }}>
+          <Text strong><Text type="danger">* </Text>干预原因</Text>
+          <Input.TextArea
+            aria-label="干预原因"
+            value={manualReason}
+            onChange={(event) => setManualReason(event.target.value)}
+            placeholder="请说明干预原因"
+            maxLength={500}
+            showCount
+            autoSize={{ minRows: 3, maxRows: 6 }}
+            style={{ marginTop: 8 }}
+          />
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <Text strong>强制调整状态（选填）</Text>
+          <Select
+            aria-label="强制目标状态"
+            allowClear
+            value={manualTargetStatus}
+            onChange={setManualTargetStatus}
+            placeholder="不调整状态"
+            options={Object.entries(statusLabels)
+              .filter(([value]) => value !== orderInfo.reservationStatus)
+              .map(([value, label]) => ({ value, label }))}
+            style={{ width: '100%', marginTop: 8 }}
+          />
+        </div>
+      </Modal>
 
       {/* 酒店及房间信息 */}
       <Card title="酒店及房间信息" style={{ marginBottom: 24 }}>
@@ -315,7 +522,7 @@ const ReservationDetail = () => {
         
         <div style={{ marginTop: 16 }}>
           <Text strong style={{ marginBottom: 8, display: 'block' }}>订单备注信息</Text>
-          <Descriptions size="small" column={1} bordered labelStyle={{ width: '150px' }}>
+          <Descriptions size="small" column={1} bordered styles={{ label: { width: '150px' } }}>
             <Descriptions.Item label="客人备注">
               {remarkInfo.guestRemark || remarkInfo.specialRequest || '-'}
             </Descriptions.Item>

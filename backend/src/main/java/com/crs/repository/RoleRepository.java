@@ -25,4 +25,6 @@ public interface RoleRepository extends JpaRepository<Role, Integer> {
     List<Role> findByStatus(Role.Status status);
     
     Role findByRoleCode(String roleCode);
+
+    boolean existsByRoleCode(String roleCode);
 }

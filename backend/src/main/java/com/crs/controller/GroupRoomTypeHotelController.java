@@ -98,7 +98,7 @@ public class GroupRoomTypeHotelController {
     @GetMapping("/group/{groupRoomTypeId}")
     public ResponseEntity<?> getGroupRoomTypeHotels(@PathVariable Integer groupRoomTypeId) {
         try {
-            var grt = groupRoomTypeRepository.findById(groupRoomTypeId)
+            var grt = groupRoomTypeRepository.findByIdAndGroupId(groupRoomTypeId, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Group room type not found"));
             List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getGroupRoomTypeHotelsByCode(grt.getRoomTypeCode());
             List<AllocationDTO> allocationDTOs = allocations.stream()
@@ -117,7 +117,7 @@ public class GroupRoomTypeHotelController {
     public ResponseEntity<Map<String, Object>> getHotelRoomTypeAllocations(@PathVariable Integer hotelId) {
         Map<String, Object> response = new HashMap<>();
         try {
-            var hotel = hotelRepository.findById(hotelId)
+            var hotel = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
             List<GroupRoomTypeHotel> allocations = groupRoomTypeHotelService.getHotelRoomTypeAllocationsByCode(hotel.getHotelCode());
             List<AllocationDTO> allocationDTOs = allocations.stream()
@@ -152,9 +152,9 @@ public class GroupRoomTypeHotelController {
             Boolean allocated = allocationData.getOrDefault("allocated", false);
             Boolean roomInfoEditable = allocationData.getOrDefault("roomInfoEditable", false);
             
-            var groupRoomType = groupRoomTypeRepository.findById(groupRoomTypeId)
+            var groupRoomType = groupRoomTypeRepository.findByIdAndGroupId(groupRoomTypeId, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Group room type not found"));
-            var hotel = hotelRepository.findById(hotelId)
+            var hotel = hotelRepository.findByIdAndTenantId(hotelId, getCurrentTenantId())
                     .orElseThrow(() -> new RuntimeException("Hotel not found"));
                     
             GroupRoomTypeHotel allocation = groupRoomTypeHotelService.updateRoomTypeAllocationByCode(

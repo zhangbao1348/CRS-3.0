@@ -18,6 +18,9 @@ public interface RateTypeRepository extends JpaRepository<RateType, Integer> {
      * 根据租户ID查询所有房价大类
      */
     List<RateType> findByTenantId(Integer tenantId);
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<RateType> findByIdAndTenantId(Integer id, Integer tenantId);
     
     /**
      * 根据租户ID和状态查询房价大类

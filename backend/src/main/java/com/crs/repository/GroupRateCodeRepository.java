@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * GroupRateCodeRepository 数据访问层 (Repository) 接口
@@ -27,6 +28,9 @@ public interface GroupRateCodeRepository extends JpaRepository<GroupRateCode, In
 
     List<GroupRateCode> findByGroupId(Integer groupId);
 
+    /** 按主键与集团双重约束查询，防止裸 ID 跨集团访问。 */
+    Optional<GroupRateCode> findByIdAndGroupId(Integer id, Integer groupId);
+
     /** @deprecated 存在安全隐患，请改用 findByRateCodeAndGroupId */
     @Deprecated
     GroupRateCode findByRateCode(String rateCode);
@@ -41,16 +45,28 @@ public interface GroupRateCodeRepository extends JpaRepository<GroupRateCode, In
 
     long countByMarketCode(String marketCode);
 
+    long countByGroupIdAndMarketCode(Integer groupId, String marketCode);
+
     long countBySourceCode(String sourceCode);
+
+    long countByGroupIdAndSourceCode(Integer groupId, String sourceCode);
 
     long countByRateCategory(String rateCategory);
 
+    long countByGroupIdAndRateCategory(Integer groupId, String rateCategory);
+
     long countByGuaranteeRule(String guaranteeRule);
+
+    long countByGroupIdAndGuaranteeRule(Integer groupId, String guaranteeRule);
 
     long countByCancellationRule(String cancellationRule);
 
-    @Query("SELECT COUNT(g) FROM GroupRateCode g WHERE g.packages LIKE %:packageCode%")
-    long countByPackagesContaining(@Param("packageCode") String packageCode);
+    /** 按集团边界统计取消政策引用，防止其他租户数据影响当前租户操作。 */
+    long countByGroupIdAndCancellationRule(Integer groupId, String cancellationRule);
+
+    @Query("SELECT COUNT(g) FROM GroupRateCode g WHERE g.groupId = :groupId AND g.packages LIKE %:packageCode%")
+    long countByGroupIdAndPackagesContaining(@Param("groupId") Integer groupId,
+                                             @Param("packageCode") String packageCode);
 
     long countByGroupIdAndParentRateCode(Integer groupId, String parentRateCode);
 

@@ -22,6 +22,15 @@ public class ChannelRateCodeMapping {
     
     @Column(name = "tenant_id")
     private Integer tenantId;
+
+    @Column(name = "channel_id", nullable = false)
+    private Integer channelId;
+
+    @Column(name = "hotel_id", nullable = false)
+    private Integer hotelId;
+
+    @Column(name = "rate_code_id", nullable = false)
+    private Integer rateCodeId;
     
     @Column(name = "channel_code", length = 50)
     private String channelCode;
@@ -70,6 +79,12 @@ public class ChannelRateCodeMapping {
     public void setId(Integer id) { this.id = id; }
     public Integer getTenantId() { return tenantId; }
     public void setTenantId(Integer tenantId) { this.tenantId = tenantId; }
+    public Integer getChannelId() { return channelId; }
+    public void setChannelId(Integer channelId) { this.channelId = channelId; }
+    public Integer getHotelId() { return hotelId; }
+    public void setHotelId(Integer hotelId) { this.hotelId = hotelId; }
+    public Integer getRateCodeId() { return rateCodeId; }
+    public void setRateCodeId(Integer rateCodeId) { this.rateCodeId = rateCodeId; }
     public String getChannelCode() { return channelCode; }
     public void setChannelCode(String channelCode) { this.channelCode = channelCode; }
     public String getChannelName() { return channelName; }

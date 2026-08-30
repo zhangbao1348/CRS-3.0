@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Tag, Radio, Table, Switch, message, Spin, Modal, DatePicker, Tooltip } from 'antd'
-import { PlusOutlined, CloseOutlined, SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
+import { App, Form, Input, Select, Checkbox, Button, Space, Card, Row, Col, Radio, Spin, DatePicker, Tooltip } from 'antd'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import axios from 'axios'
 import dayjs from 'dayjs'
@@ -9,6 +9,21 @@ import { getCurrentTenantId } from '../../utils/tenantUtils'
 import { useHotelContext } from '../../contexts/HotelContext'
 
 const { Option } = Select
+
+const getErrorMessage = (error, fallback) => {
+  const payload = error?.response?.data
+  return payload?.message || payload?.error || (typeof payload === 'string' ? payload : '') || error?.message || fallback
+}
+
+// 统一兼容 axios 响应、业务响应包装和分页响应，避免异常响应触发渲染白屏。
+const normalizeListResponse = (response) => {
+  if (Array.isArray(response)) return response
+  if (Array.isArray(response?.data)) return response.data
+  if (Array.isArray(response?.data?.data)) return response.data.data
+  if (Array.isArray(response?.content)) return response.content
+  if (Array.isArray(response?.data?.content)) return response.data.content
+  return []
+}
 
 // 日期格式化函数
 const formatDate = (date) => {
@@ -36,41 +51,21 @@ const formatDate = (date) => {
 }
 
 const AddRatePlan = () => {
+  const { message } = App.useApp()
   // 路由管理
   const navigate = useNavigate()
   const location = useLocation()
   const { id } = useParams()
   
   // 获取当前酒店
-  const { selectedHotel, selectedHotelId } = useHotelContext()
+  const { selectedHotel } = useHotelContext()
   
   // 状态管理
   const [form] = Form.useForm()
-  const [includedPackages, setIncludedPackages] = useState([])
   const [selectedPackages, setSelectedPackages] = useState([])
   
   // 适用房型选中状态
   const [selectedApplicableRoomTypes, setSelectedApplicableRoomTypes] = useState([])
-  
-  // 适用房型全选状态
-  const [selectAllRoomTypes, setSelectAllRoomTypes] = useState({
-    standard: false,
-    king: false,
-    twin: false,
-    suite: false,
-    executive: false,
-    family: false
-  })
-  
-  // 房型大类与房型的映射关系
-  const roomTypeMap = {
-    standard: ['standard'],
-    king: ['king', 'city-view-king', 'sea-view-king'],
-    twin: ['twin', 'city-view-twin', 'sea-view-twin'],
-    suite: ['suite', 'deluxe-suite', 'presidential-suite'],
-    executive: ['executive', 'executive-suite'],
-    family: ['family', 'family-suite']
-  }
   
   // 优惠券和促销规则状态
   const [couponRule, setCouponRule] = useState('unlimited')
@@ -113,8 +108,6 @@ const AddRatePlan = () => {
   const [rateCategories, setRateCategories] = useState([])
   const [loadingRateCategories, setLoadingRateCategories] = useState(false)
   
-  // 集团房型状态
-  const [groupRoomTypes, setGroupRoomTypes] = useState([])
   const [loadingRoomTypes, setLoadingRoomTypes] = useState(false)
   const [roomTypesByCategory, setRoomTypesByCategory] = useState({})
   
@@ -141,9 +134,8 @@ const AddRatePlan = () => {
       const excludeId = isEditing && currentId ? currentId : null
       
       const response = await ratePlanApi.getSelectableParentRateCodes(groupId, targetDerivativeLevel, excludeId)
-      setParentRateCodes(response || [])
-    } catch (error) {
-      console.error('获取父级价格计划失败:', error)
+      setParentRateCodes(normalizeListResponse(response))
+    } catch {
       message.error('获取父级价格计划失败')
       setParentRateCodes([])
     } finally {
@@ -156,9 +148,8 @@ const AddRatePlan = () => {
     try {
       setLoadingMarketCodes(true)
       const response = await axios.get('/api/market-codes/third-level')
-      setMarketCodes(response.data)
-    } catch (error) {
-      console.error('获取第三级市场码失败:', error)
+      setMarketCodes(normalizeListResponse(response))
+    } catch {
       setMarketCodes([])
       message.error('获取市场码数据失败，请稍后重试')
     } finally {
@@ -171,9 +162,8 @@ const AddRatePlan = () => {
     try {
       setLoadingSourceCodes(true)
       const response = await axios.get('/api/source-codes/third-level')
-      setSourceCodes(response.data)
-    } catch (error) {
-      console.error('获取第三级来源码失败:', error)
+      setSourceCodes(normalizeListResponse(response))
+    } catch {
       setSourceCodes([])
       message.error('获取来源码数据失败，请稍后重试')
     } finally {
@@ -186,9 +176,8 @@ const AddRatePlan = () => {
     try {
       setLoadingPackages(true)
       const response = await axios.get('/api/packages')
-      setPackages(response.data)
-    } catch (error) {
-      console.error('获取包价数据失败:', error)
+      setPackages(normalizeListResponse(response))
+    } catch {
       setPackages([])
       message.error('获取包价数据失败，请稍后重试')
     } finally {
@@ -205,14 +194,9 @@ const AddRatePlan = () => {
         throw new Error('请先选择酒店')
       }
       
-      const groupId = getCurrentTenantId()
-      const categoriesResponse = await axios.get(`/api/room-type-categories/group/${groupId}`)
-      
       // 获取酒店房型
       const response = await hotelRoomTypeApi.getHotelRoomTypesByCode(selectedHotel)
-      const roomTypes = response?.data || []
-      
-      setGroupRoomTypes(roomTypes)
+      const roomTypes = normalizeListResponse(response)
       
       // 按房型大类分组，直接使用后端返回的 categoryName
       const grouped = roomTypes.reduce((acc, roomType) => {
@@ -224,9 +208,7 @@ const AddRatePlan = () => {
         return acc
       }, {})
       setRoomTypesByCategory(grouped)
-    } catch (error) {
-      console.error('获取酒店房型数据失败:', error)
-      setGroupRoomTypes([])
+    } catch {
       setRoomTypesByCategory({})
       message.error('获取酒店房型数据失败，请稍后重试')
     } finally {
@@ -249,10 +231,9 @@ const AddRatePlan = () => {
         axios.get(`/api/cancellation-policies?tenantId=${groupId}`)
       ])
       
-      setGuaranteePolicies(guaranteeResponse.data)
-      setCancellationPolicies(cancellationResponse.data)
-    } catch (error) {
-      console.error('获取政策数据失败:', error)
+      setGuaranteePolicies(normalizeListResponse(guaranteeResponse))
+      setCancellationPolicies(normalizeListResponse(cancellationResponse))
+    } catch {
       setGuaranteePolicies([])
       setCancellationPolicies([])
       message.error('获取政策数据失败，请稍后重试')
@@ -266,9 +247,8 @@ const AddRatePlan = () => {
     try {
       setLoadingRateCategories(true)
       const response = await axios.get('/api/rate-types/active')
-      setRateCategories(response.data || [])
-    } catch (error) {
-      console.error('获取房价大类数据失败:', error)
+      setRateCategories(normalizeListResponse(response))
+    } catch {
       setRateCategories([])
     } finally {
       setLoadingRateCategories(false)
@@ -281,9 +261,7 @@ const AddRatePlan = () => {
     const fetchFullRatePlan = async (ratePlanId) => {
       try {
         const response = await ratePlanApi.getRatePlanById(ratePlanId)
-        console.log('完整响应:', response)
         const fullRecord = response?.data || response
-        console.log('完整数据:', fullRecord)
         
         // 设置状态
         if (fullRecord.rateType) {
@@ -307,8 +285,7 @@ const AddRatePlan = () => {
           try {
             const packages = typeof fullRecord.packages === 'string' ? JSON.parse(fullRecord.packages) : fullRecord.packages
             setSelectedPackages(packages)
-          } catch (error) {
-            console.error('解析包价数据失败:', error)
+          } catch {
             setSelectedPackages([])
           }
         }
@@ -318,8 +295,7 @@ const AddRatePlan = () => {
           try {
             const roomTypes = typeof fullRecord.applicableRoomTypes === 'string' ? JSON.parse(fullRecord.applicableRoomTypes) : fullRecord.applicableRoomTypes
             setSelectedApplicableRoomTypes(roomTypes)
-          } catch (error) {
-            console.error('解析适用房型数据失败:', error)
+          } catch {
             setSelectedApplicableRoomTypes([])
           }
         }
@@ -346,8 +322,7 @@ const AddRatePlan = () => {
           try {
             const personalMembershipData = typeof fullRecord.personalMembership === 'string' ? JSON.parse(fullRecord.personalMembership) : fullRecord.personalMembership
             setPersonalMembership(personalMembershipData)
-          } catch (error) {
-            console.error('解析个人会员数据失败:', error)
+          } catch {
             setPersonalMembership([])
           }
         }
@@ -356,8 +331,7 @@ const AddRatePlan = () => {
           try {
             const companyMembershipData = typeof fullRecord.companyMembership === 'string' ? JSON.parse(fullRecord.companyMembership) : fullRecord.companyMembership
             setCompanyMembership(companyMembershipData)
-          } catch (error) {
-            console.error('解析企业会员数据失败:', error)
+          } catch {
             setCompanyMembership([])
           }
         }
@@ -381,8 +355,7 @@ const AddRatePlan = () => {
         if (fullRecord.checkinEndTime) {
           setCheckinEndTime(dayjs(fullRecord.checkinEndTime))
         }
-      } catch (error) {
-        console.error('获取完整价格计划数据失败:', error)
+      } catch {
         message.error('获取价格计划数据失败')
       }
     }
@@ -407,9 +380,7 @@ const AddRatePlan = () => {
         if (permData) {
           setPermissions(permData)
         }
-      }).catch(err => {
-        console.error('获取权限信息失败:', err)
-      })
+      }).catch(() => message.error('获取价格计划权限失败'))
     }
   }, [id, location.state, form])
 
@@ -446,80 +417,12 @@ const AddRatePlan = () => {
     setSelectedPackages(value)
   }
   
-  // 处理房型大类全选
-  const handleRoomTypeSelectAll = (category, checked) => {
-    let newSelected = [...selectedApplicableRoomTypes]
-    
-    if (checked) {
-      // 全选：添加该大类下的所有房型
-      roomTypeMap[category].forEach(roomType => {
-        if (!newSelected.includes(roomType)) {
-          newSelected.push(roomType)
-        }
-      })
-    } else {
-      // 取消全选：移除该大类下的所有房型
-      newSelected = newSelected.filter(roomType => !roomTypeMap[category].includes(roomType))
-    }
-    
-    setSelectedApplicableRoomTypes(newSelected)
-    
-    // 更新所有分类的全选状态
-    const newSelectAll = {}
-    Object.keys(roomTypeMap).forEach(cat => {
-      const allSelected = roomTypeMap[cat].every(roomType => 
-        newSelected.includes(roomType)
-      )
-      newSelectAll[cat] = allSelected
-    })
-    setSelectAllRoomTypes(newSelectAll)
-  }
-  
-  // 处理单个房型选择
-  const handleSingleRoomTypeChange = (roomType, checked) => {
-    let newSelected = [...selectedApplicableRoomTypes]
-    
-    if (checked) {
-      if (!newSelected.includes(roomType)) {
-        newSelected.push(roomType)
-      }
-    } else {
-      newSelected = newSelected.filter(rt => rt !== roomType)
-    }
-    
-    setSelectedApplicableRoomTypes(newSelected)
-    
-    // 更新全选状态
-    updateSelectAllStatus()
-  }
-  
-  // 更新全选状态
-  const updateSelectAllStatus = () => {
-    const newSelectAll = { ...selectAllRoomTypes }
-    
-    Object.keys(roomTypeMap).forEach(category => {
-      const allSelected = roomTypeMap[category].every(roomType => 
-        selectedApplicableRoomTypes.includes(roomType)
-      )
-      newSelectAll[category] = allSelected
-    })
-    
-    setSelectAllRoomTypes(newSelectAll)
-  }
-
-  // 添加包价
-  const handleAddPackage = () => {
-    // 模拟添加包价逻辑
-    console.log('添加包价')
-  }
-
   // 检查酒店CODE数据
   const checkHotelCode = async (hotelId) => {
     try {
       const response = await hotelApi.checkHotelCode(hotelId)
       return response?.data?.exists || false
-    } catch (error) {
-      console.error('检查酒店CODE失败:', error)
+    } catch {
       return false
     }
   }
@@ -529,8 +432,6 @@ const AddRatePlan = () => {
     try {
       setLoading(true)
       const values = await form.validateFields()
-      console.log('表单数据:', values)
-      
       // 检查是否选择了酒店
       if (!selectedHotel) {
         message.error('请先选择酒店')
@@ -550,7 +451,7 @@ const AddRatePlan = () => {
         rateCode: values.rateCode,
         rateName: values.rateName,
         description: values.description || '',
-        status: values.status === 'active' ? 'active' : 'inactive',
+        status: values.status === 'inactive' ? 'inactive' : 'active',
         rateCategory: values.rateCategory || null,
         marketCode: values.marketCode || null,
         sourceCode: values.sourceCode || null,
@@ -581,8 +482,6 @@ const AddRatePlan = () => {
         checkinEndTime: checkinEndTime ? formatDate(checkinEndTime) : null,
       }
       
-      console.log('提交数据:', submitData)
-      
       // 调用后端API
       if (isEditing && currentId) {
         // 编辑模式
@@ -599,8 +498,7 @@ const AddRatePlan = () => {
         navigate('/rate-management/rate-plan')
       }, 1000)
     } catch (error) {
-      console.error('保存失败:', error)
-      message.error('保存失败: ' + (error.response?.data || error.message || '未知错误'))
+      message.error(`保存失败：${getErrorMessage(error, '未知错误')}`)
     } finally {
       setLoading(false)
     }
@@ -715,7 +613,7 @@ const AddRatePlan = () => {
                 <Select 
                   placeholder="请选择类型"
                   onChange={(value) => setRateType(value)}
-                  disabled={isGroupDistributed}
+                  disabled={isEditing || isGroupDistributed}
                 >
                   <Option value="basic">基础价格计划</Option>
                   <Option value="derivative">衍生价格计划</Option>
@@ -726,7 +624,6 @@ const AddRatePlan = () => {
           
           {/* 包价/早餐 */}
           <Form.Item
-            name="packages"
             label="包价/早餐"
           >
             <div style={{ marginBottom: 8 }}>
@@ -744,28 +641,6 @@ const AddRatePlan = () => {
                   </Option>
                 ))}
               </Select>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                style={{ marginLeft: 8 }}
-                onClick={handleAddPackage}
-                size="middle"
-              />
-            </div>
-            <div style={{ marginTop: 8 }}>
-              {includedPackages.map(pkg => (
-                <Tag
-                  key={pkg.id}
-                  closable
-                  onClose={() => {
-                    setIncludedPackages(includedPackages.filter(item => item.id !== pkg.id))
-                    setSelectedPackages(selectedPackages.filter(code => code !== pkg.code))
-                  }}
-                  style={{ marginRight: 8, marginBottom: 8 }}
-                >
-                  {pkg.code} - {pkg.name} (集团包价)
-                </Tag>
-              ))}
             </div>
           </Form.Item>
           
@@ -835,6 +710,7 @@ const AddRatePlan = () => {
                   <Form.Item
                     name="parentRateCode"
                     label="父级价格计划"
+                    rules={[{ required: true, message: '请选择父级价格计划' }]}
                   >
                     <Select 
                       placeholder="请选择父级价格计划"
@@ -853,6 +729,12 @@ const AddRatePlan = () => {
                   <Form.Item
                     name="discount"
                     label="折扣"
+                    rules={[
+                      { required: true, message: '请输入折扣' },
+                      { validator: (_, value) => Number(value) > 0 && Number(value) <= 100
+                        ? Promise.resolve()
+                        : Promise.reject(new Error('折扣必须大于 0 且不超过 100')) }
+                    ]}
                   >
                     <Input addonAfter="%" placeholder="请输入折扣" type="number" disabled={isFieldDisabled('priceInfoEditable')} />
                   </Form.Item>

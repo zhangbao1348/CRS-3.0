@@ -52,8 +52,7 @@ public class HotelService {
      * @return 酒店信息
      */
     public Optional<Hotel> getHotelById(Integer id) {
-        return hotelRepository.findById(id)
-                .filter(h -> h.getTenantId() != null && h.getTenantId().equals(getCurrentTenantId()));
+        return hotelRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     /**
@@ -92,7 +91,11 @@ public class HotelService {
      */
     public Hotel createHotel(Hotel hotel) {
         Integer tenantId = getCurrentTenantId();
+        // 创建用例必须忽略客户端主键和审计字段，防止 save() 退化为跨记录 merge。
+        hotel.setId(null);
         hotel.setTenantId(tenantId);
+        hotel.setCreatedAt(new java.util.Date());
+        hotel.setUpdatedAt(new java.util.Date());
         
         if (hotelRepository.existsByHotelCodeAndTenantId(hotel.getHotelCode(), tenantId)) {
             throw new RuntimeException("Hotel code already exists in this tenant");
@@ -169,7 +172,8 @@ public class HotelService {
     public void deleteHotel(Integer id) {
         Hotel existing = getHotelById(id)
                 .orElseThrow(() -> new RuntimeException("Hotel not found or access denied"));
-        hotelRepository.delete(existing);
+        existing.setStatus(Hotel.Status.inactive);
+        hotelRepository.save(existing);
     }
     
     /**

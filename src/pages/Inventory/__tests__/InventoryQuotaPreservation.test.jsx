@@ -204,7 +204,7 @@ jest.mock('antd', () => {
   const React = require('react')
 
   const Select = (props) => {
-    const { children, onChange, value, ...rest } = props
+    const { children, onChange, value } = props
     return React.createElement('select', {
       'data-testid': 'mock-select',
       onChange: (e) => onChange && onChange(e.target.value),
@@ -227,11 +227,11 @@ jest.mock('antd', () => {
     return [formRef]
   }
   const Input = (props) => React.createElement('input', props)
-  const DatePicker = (props) => React.createElement('input', { type: 'date' })
-  DatePicker.RangePicker = (props) => React.createElement('div', null, 'RangePicker')
+  const DatePicker = () => React.createElement('input', { type: 'date' })
+  DatePicker.RangePicker = () => React.createElement('div', null, 'RangePicker')
   const message = { success: jest.fn(), error: jest.fn(), warning: jest.fn() }
   const Spin = (props) => React.createElement('div', null, props.children)
-  const Table = (props) => React.createElement('table', { 'data-testid': 'antd-table' })
+  const Table = () => React.createElement('table', { 'data-testid': 'antd-table' })
   const Tag = (props) => React.createElement('span', null, props.children)
   const Row = (props) => React.createElement('div', null, props.children)
   const Col = (props) => React.createElement('div', null, props.children)
@@ -249,9 +249,8 @@ jest.mock('@ant-design/icons', () => {
   }
 })
 
-// Now import React, testing utilities, and the component
-import React from 'react'
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
+// Now import testing utilities and the component
+import { render, fireEvent, act } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import InventoryQuotaCalendar from '../InventoryQuotaCalendar'
 import api from '../../../utils/api'

@@ -5,11 +5,12 @@ import com.crs.entity.RatePlan;
 import com.crs.repository.GroupRateCodeRepository;
 import com.crs.repository.RatePlanRepository;
 import com.crs.util.TenantContext;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -19,11 +20,14 @@ import java.util.stream.Collectors;
 @Service
 public class GroupRateCodeService {
     
-    @Autowired
-    private GroupRateCodeRepository groupRateCodeRepository;
-    
-    @Autowired
-    private RatePlanRepository ratePlanRepository;
+    private final GroupRateCodeRepository groupRateCodeRepository;
+    private final RatePlanRepository ratePlanRepository;
+
+    public GroupRateCodeService(GroupRateCodeRepository groupRateCodeRepository,
+                                RatePlanRepository ratePlanRepository) {
+        this.groupRateCodeRepository = groupRateCodeRepository;
+        this.ratePlanRepository = ratePlanRepository;
+    }
     
     /**
      * 获取所有集团房价码
@@ -110,8 +114,7 @@ public class GroupRateCodeService {
      * @return 集团房价码对象
      */
     public GroupRateCode getGroupRateCodeById(Integer id) {
-        return groupRateCodeRepository.findById(id)
-                .filter(rc -> rc.getGroupId() != null && rc.getGroupId().equals(getCurrentTenantId()))
+        return groupRateCodeRepository.findByIdAndGroupId(id, getCurrentTenantId())
                 .orElse(null);
     }
     
@@ -151,11 +154,16 @@ public class GroupRateCodeService {
     @Transactional
     public GroupRateCode createGroupRateCode(GroupRateCode groupRateCode) {
         Integer tenantId = getCurrentTenantId();
+        // 创建用例必须生成新主键并使用服务端审计时间。
+        groupRateCode.setId(null);
         groupRateCode.setGroupId(tenantId);
+        groupRateCode.setCreatedAt(new java.util.Date());
+        groupRateCode.setUpdatedAt(new java.util.Date());
         
         if (groupRateCodeRepository.findByRateCodeAndGroupId(groupRateCode.getRateCode(), tenantId) != null) {
             throw new IllegalArgumentException("房价码代码已存在");
         }
+        validateParentChain(groupRateCode.getRateCode(), groupRateCode.getParentRateCode(), tenantId);
         
         return groupRateCodeRepository.save(groupRateCode);
     }
@@ -172,12 +180,24 @@ public class GroupRateCodeService {
         if (existingRateCode == null) {
             throw new IllegalArgumentException("集团房价码不存在或无权访问");
         }
+
+        if (groupRateCode.getRateCode() != null
+                && !existingRateCode.getRateCode().equals(groupRateCode.getRateCode())) {
+            throw new IllegalArgumentException("房价代码保存后不可修改");
+        }
+        if (groupRateCode.getRateType() != null
+                && !java.util.Objects.equals(existingRateCode.getRateType(), groupRateCode.getRateType())) {
+            throw new IllegalArgumentException("房价类型保存后不可修改");
+        }
+        groupRateCode.setRateCode(existingRateCode.getRateCode());
+        groupRateCode.setRateType(existingRateCode.getRateType());
         
         // 检查房价码代码是否已被其他记录使用
         GroupRateCode existingByRateCode = groupRateCodeRepository.findByRateCodeAndGroupId(groupRateCode.getRateCode(), existingRateCode.getGroupId());
         if (existingByRateCode != null && !existingByRateCode.getId().equals(id)) {
             throw new IllegalArgumentException("房价码代码已存在");
         }
+        validateParentChain(existingRateCode.getRateCode(), groupRateCode.getParentRateCode(), existingRateCode.getGroupId());
         
         // 更新所有字段
         existingRateCode.setRateCode(groupRateCode.getRateCode());
@@ -214,6 +234,25 @@ public class GroupRateCodeService {
         existingRateCode.setCheckinEndTime(groupRateCode.getCheckinEndTime());
         
         return groupRateCodeRepository.save(existingRateCode);
+    }
+
+    /** 校验父级存在且不会形成自引用或间接循环。 */
+    private void validateParentChain(String currentCode, String parentCode, Integer groupId) {
+        if (parentCode == null || parentCode.isBlank()) {
+            return;
+        }
+        Set<String> visited = new HashSet<>();
+        String cursor = parentCode;
+        while (cursor != null && !cursor.isBlank()) {
+            if (cursor.equals(currentCode) || !visited.add(cursor)) {
+                throw new IllegalArgumentException("房价码父级关系不能形成循环");
+            }
+            GroupRateCode parent = groupRateCodeRepository.findByRateCodeAndGroupId(cursor, groupId);
+            if (parent == null) {
+                throw new IllegalArgumentException("父级房价码不存在或无权访问: " + cursor);
+            }
+            cursor = parent.getParentRateCode();
+        }
     }
     
     /**

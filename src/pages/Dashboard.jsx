@@ -1,4 +1,3 @@
-import React from 'react'
 import { useHotelContext } from '../contexts/HotelContext'
 import GroupDashboard from './Dashboard/GroupDashboard'
 import HotelDashboard from './Dashboard/HotelDashboard'

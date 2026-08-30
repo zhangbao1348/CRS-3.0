@@ -4,10 +4,12 @@ import com.crs.entity.Hotel;
 import com.crs.entity.RatePlan;
 import com.crs.entity.RoomType;
 import com.crs.repository.*;
+import com.crs.modules.report.application.ReportSummaryService;
 import com.crs.service.ReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -20,7 +22,7 @@ import java.util.stream.Collectors;
 public class ReportServiceImpl implements ReportService {
 
     @Autowired
-    private ReportDailyReservationSummaryRepository summaryRepository;
+    private ReportSummaryService reportSummaryService;
 
     @Autowired
     private HotelRepository hotelRepository;
@@ -67,82 +69,11 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public void initializeSummaryData(Integer tenantId, LocalDate startDate, LocalDate endDate) {
-        // 1. 先清理目标时间段内的旧汇总数据
-        summaryRepository.deleteByTenantIdAndReportDateBetween(tenantId, startDate, endDate);
-
-        // 2. 从原始 reservation 表中按天和多维叶子节点进行聚合拉取
-        // 注意：created_at 是 datetime 字段，因此需要使用 DATE() 函数转换
-        String aggSql = 
-            "SELECT " +
-            "    r.tenant_id, " +
-            "    DATE(r.created_at) as report_date, " +
-            "    COALESCE(r.hotel_code, 'JJHZ001') as hotel_code, " +
-            "    COALESCE(r.channel_code, 'DIRECT') as channel_code, " +
-            "    COALESCE(r.market_code, 'DOM') as market_code, " +
-            "    COALESCE(rp.rate_category, 'ROOM') as rate_category_code, " +
-            "    COALESCE(r.rate_plan_code, 'BAR') as rate_plan_code, " +
-            "    COALESCE(r.room_type_code, 'ST1') as room_type_code, " +
-            "    COALESCE(r.reservation_status, 'confirmed') as reservation_status, " +
-            "    COUNT(r.id) as order_count, " +
-            "    SUM(r.room_count * r.nights) as room_nights, " +
-            "    SUM(r.total_price) as total_revenue, " +
-            "    SUM(CASE WHEN r.rate_plan_code = 'BAR' THEN r.room_count * r.nights * 500 ELSE 0 END) as points_redeemed " +
-            "FROM reservation r " +
-            "LEFT JOIN rate_plans rp ON r.rate_plan_code = rp.rate_code AND r.hotel_code = rp.hotel_code AND r.tenant_id = rp.tenant_id " +
-            "WHERE r.tenant_id = ? " +
-            "  AND r.created_at >= ? " +
-            "  AND r.created_at < ? " +
-            "  AND r.reservation_status IN ('confirmed', 'checked_in', 'completed', 'cancelled') " +
-            "GROUP BY " +
-            "    r.tenant_id, " +
-            "    DATE(r.created_at), " +
-            "    COALESCE(r.hotel_code, 'JJHZ001'), " +
-            "    COALESCE(r.channel_code, 'DIRECT'), " +
-            "    COALESCE(r.market_code, 'DOM'), " +
-            "    COALESCE(rp.rate_category, 'ROOM'), " +
-            "    COALESCE(r.rate_plan_code, 'BAR'), " +
-            "    COALESCE(r.room_type_code, 'ST1'), " +
-            "    COALESCE(r.reservation_status, 'confirmed')";
-
-        // 将 LocalDates 转换为用于 SQL 的 Timestamps
-        java.sql.Timestamp startTs = java.sql.Timestamp.valueOf(startDate.atStartOfDay());
-        java.sql.Timestamp endTs = java.sql.Timestamp.valueOf(endDate.plusDays(1).atStartOfDay());
-
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(aggSql, tenantId, startTs, endTs);
-
-        // 3. 批量将聚合结果写入到日聚合表
-        String insertSql = 
-            "INSERT INTO report_daily_reservation_summary (" +
-            "    tenant_id, report_date, hotel_code, channel_code, market_code, " +
-            "    rate_category_code, rate_plan_code, room_type_code, reservation_status, " +
-            "    order_count, room_nights, total_revenue, points_redeemed, created_at, updated_at" +
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-
-        List<Object[]> batchArgs = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            batchArgs.add(new Object[]{
-                row.get("tenant_id"),
-                row.get("report_date"),
-                row.get("hotel_code"),
-                row.get("channel_code"),
-                row.get("market_code"),
-                row.get("rate_category_code"),
-                row.get("rate_plan_code"),
-                row.get("room_type_code"),
-                row.get("reservation_status"),
-                row.get("order_count"),
-                row.get("room_nights"),
-                row.get("total_revenue"),
-                row.get("points_redeemed")
-            });
-        }
-
-        if (!batchArgs.isEmpty()) {
-            jdbcTemplate.batchUpdate(insertSql, batchArgs);
-        }
+        reportSummaryService.rebuild(tenantId, startDate, endDate);
     }
 
     @Override
+    @Transactional(readOnly = true, timeout = 10)
     public Map<String, Object> queryReservationReport(
             Integer tenantId, LocalDate startDate, LocalDate endDate,
             String hotelCode, String channelCode, String marketCode,
@@ -153,11 +84,11 @@ public class ReportServiceImpl implements ReportService {
             Boolean enableCompare, LocalDate compareStartDate, LocalDate compareEndDate) {
 
         // 1. 获取名称字典映射以替换前端编码
-        Map<String, String> hotelNames = hotelRepository.findAll().stream()
+        Map<String, String> hotelNames = hotelRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(Hotel::getHotelCode, Hotel::getChineseName, (a, b) -> a));
-        Map<String, String> roomTypeNames = roomTypeRepository.findAll().stream()
+        Map<String, String> roomTypeNames = roomTypeRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(RoomType::getCode, RoomType::getName, (a, b) -> a));
-        Map<String, String> ratePlanNames = ratePlanRepository.findAll().stream()
+        Map<String, String> ratePlanNames = ratePlanRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(RatePlan::getRateCode, RatePlan::getRateName, (a, b) -> a));
 
         // 2. 执行本期和对比期的数据查询
@@ -561,19 +492,17 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
+    @Transactional(readOnly = true, timeout = 10)
     public List<Map<String, Object>> queryOccupancyReport(
             Integer tenantId, String hotelCode, LocalDate monthDate, String statisticMethod) {
         
         LocalDate startDate = monthDate.withDayOfMonth(1);
         LocalDate endDate = monthDate.withDayOfMonth(monthDate.lengthOfMonth());
         
-        // 自动初始化对账
-        initializeSummaryData(tenantId, startDate, endDate);
-        
         // 获取基础字典映射
-        Map<String, String> hotelNames = hotelRepository.findAll().stream()
+        Map<String, String> hotelNames = hotelRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(Hotel::getHotelCode, Hotel::getChineseName, (a, b) -> a));
-        Map<String, String> roomTypeNames = roomTypeRepository.findAll().stream()
+        Map<String, String> roomTypeNames = roomTypeRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(RoomType::getCode, RoomType::getName, (a, b) -> a));
 
         // 查出当月所有 pms_inventory 数据
@@ -752,18 +681,16 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
+    @Transactional(readOnly = true, timeout = 10)
     public List<Map<String, Object>> queryRevenueReport(
             Integer tenantId, String hotelCode, LocalDate monthDate, String statisticMethod) {
         
         LocalDate startDate = monthDate.withDayOfMonth(1);
         LocalDate endDate = monthDate.withDayOfMonth(monthDate.lengthOfMonth());
         
-        // 自动初始化对账
-        initializeSummaryData(tenantId, startDate, endDate);
-        
-        Map<String, String> hotelNames = hotelRepository.findAll().stream()
+        Map<String, String> hotelNames = hotelRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(Hotel::getHotelCode, Hotel::getChineseName, (a, b) -> a));
-        Map<String, String> roomTypeNames = roomTypeRepository.findAll().stream()
+        Map<String, String> roomTypeNames = roomTypeRepository.findByTenantId(tenantId).stream()
                 .collect(Collectors.toMap(RoomType::getCode, RoomType::getName, (a, b) -> a));
 
         // 查出当月所有预订汇总数据

@@ -3,6 +3,10 @@ package com.crs.controller;
 import com.crs.entity.ChannelCode;
 import com.crs.repository.ChannelCodeRepository;
 import com.crs.repository.ChannelHotelMappingRepository;
+import com.crs.repository.ChannelPublishRecordRepository;
+import com.crs.repository.ChannelRateCodeMappingRepository;
+import com.crs.repository.ChannelRoomTypeMappingRepository;
+import com.crs.repository.TenantChannelRepository;
 import com.crs.service.ChannelCodeService;
 import com.crs.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +33,18 @@ public class ChannelCodeController {
 
     @Autowired
     private ChannelHotelMappingRepository channelHotelMappingRepository;
+
+    @Autowired
+    private ChannelRoomTypeMappingRepository channelRoomTypeMappingRepository;
+
+    @Autowired
+    private ChannelRateCodeMappingRepository channelRateCodeMappingRepository;
+
+    @Autowired
+    private ChannelPublishRecordRepository channelPublishRecordRepository;
+
+    @Autowired
+    private TenantChannelRepository tenantChannelRepository;
 
     private Integer getCurrentTenantId() {
         Integer tenantId = com.crs.util.TenantContext.getTenantId();
@@ -130,14 +146,21 @@ public class ChannelCodeController {
     @PostMapping
     public ResponseEntity<?> createChannelCode(@RequestBody ChannelCode channelCode) {
         try {
-            if (channelCode.getCode() != null && !CodeValidator.isValid(channelCode.getCode())) {
+            if (channelCode.getCode() == null || channelCode.getName() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "渠道码编码和名称为必填项"));
+            }
+            if (!CodeValidator.isValid(channelCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
+            }
+            if (!channelCodeService.isCodeUnique(null, channelCode.getCode(), null)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "渠道码编码已存在"));
             }
             ChannelCode createdChannelCode = channelCodeService.createChannelCode(channelCode);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdChannelCode);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -150,6 +173,9 @@ public class ChannelCodeController {
             if (channelCode.getCode() != null && !CodeValidator.isValid(channelCode.getCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
+            if (!channelCodeService.isCodeUnique(null, channelCode.getCode(), id)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "渠道码编码已存在"));
+            }
             channelCode.setId(id);
             ChannelCode updatedChannelCode = channelCodeService.updateChannelCode(channelCode);
             if (updatedChannelCode != null) {
@@ -158,8 +184,7 @@ public class ChannelCodeController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -175,15 +200,15 @@ public class ChannelCodeController {
     public ResponseEntity<?> deleteChannelCode(@PathVariable Integer id) {
         try {
             // 获取渠道码对象以取得其业务编码
-            ChannelCode channelCode = channelCodeRepository.findById(id).orElse(null);
+            ChannelCode channelCode = channelCodeRepository.findByTenantIdAndId(getCurrentTenantId(), id);
             if (channelCode == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "渠道码不存在"));
             }
             
-            // 检查是否被渠道映射引用 (使用业务编码)
-            long refCount = channelHotelMappingRepository.countByTenantIdAndChannelCode(getCurrentTenantId(), channelCode.getCode());
+            // 检查当前节点及子节点的配置、映射和发布引用。
+            long refCount = countSubtreeReferences(channelCode);
             if (refCount > 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "该渠道码已被引用，无法删除"));
+                return ResponseEntity.badRequest().body(Map.of("error", "该渠道码或其子节点已被 " + refCount + " 处渠道业务引用，无法删除"));
             }
             channelCodeService.deleteChannelCode(id);
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
@@ -213,6 +238,21 @@ public class ChannelCodeController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
+    }
+
+    /** 计算整个子树的渠道业务引用，避免删除父节点绕过引用约束。 */
+    private long countSubtreeReferences(ChannelCode node) {
+        Integer tenantId = getCurrentTenantId();
+        String code = node.getCode();
+        long count = channelHotelMappingRepository.countByTenantIdAndChannelCode(tenantId, code)
+                + channelRoomTypeMappingRepository.countByTenantIdAndChannelCode(tenantId, code)
+                + channelRateCodeMappingRepository.countByTenantIdAndChannelCode(tenantId, code)
+                + channelPublishRecordRepository.countByTenantIdAndChannelCode(tenantId, code)
+                + (tenantChannelRepository.existsByTenantIdAndChannelCode(tenantId, code) ? 1 : 0);
+        for (ChannelCode child : channelCodeService.getChannelCodesByParentId(tenantId, node.getId())) {
+            count += countSubtreeReferences(child);
+        }
+        return count;
     }
 
     /**

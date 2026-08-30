@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Tabs, Tag, Row, Col, Typography, Spin, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { Card, Tabs, Tag, Row, Col, Spin, message } from 'antd'
 import { LinkOutlined, CheckCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { tenantChannelApi } from '../../utils/api'
@@ -7,8 +7,6 @@ import ctripLogo from '../../assets/images/channels/ctrip.webp'
 import meituanLogo from '../../assets/images/channels/meituan.webp'
 import feizhuLogo from '../../assets/images/channels/feizhu.jpeg'
 import hongsejialiLogo from '../../assets/images/channels/hongsejiali.png'
-
-const { TabPane } = Tabs
 
 // 本地LOGO映射（渠道代码 -> 本地图片）
 const localLogoMap = {
@@ -28,8 +26,8 @@ const channelStyleMap = {
 
 // 渠道代码 -> 设置页面路由映射
 const channelRouteMap = {
-  'FLIGGY': '/channel-management/fliggy-setting',
-  'CTRIP': '/channel-management/ctrip-setting'
+  'FLIGGY': '/channel-management/channel-setting/FLIGGY',
+  'CTRIP': '/channel-management/channel-setting/CTRIP'
 }
 
 const ChannelList = () => {
@@ -106,7 +104,7 @@ const ChannelList = () => {
             cursor: route ? 'pointer' : 'default',
             backgroundColor: '#ffffff'
           }}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
         >
           <div style={{
             width: 160,
@@ -185,18 +183,24 @@ const ChannelList = () => {
       </h1>
 
       <Spin spinning={loading}>
-        <Tabs defaultActiveKey="connected" type="card" size="large" style={{ marginBottom: 24 }}>
-          <TabPane tab="已连接渠道" key="connected">
-            <Row gutter={[16, 16]}>
-              {channels.connected.map(renderChannelCard)}
-            </Row>
-          </TabPane>
-          <TabPane tab="可连接渠道" key="available">
-            <Row gutter={[16, 16]}>
-              {channels.available.map(renderChannelCard)}
-            </Row>
-          </TabPane>
-        </Tabs>
+        <Tabs
+          defaultActiveKey="connected"
+          type="card"
+          size="large"
+          style={{ marginBottom: 24 }}
+          items={[
+            {
+              key: 'connected',
+              label: '已连接渠道',
+              children: <Row gutter={[16, 16]}>{channels.connected.map(renderChannelCard)}</Row>
+            },
+            {
+              key: 'available',
+              label: '可连接渠道',
+              children: <Row gutter={[16, 16]}>{channels.available.map(renderChannelCard)}</Row>
+            }
+          ]}
+        />
       </Spin>
     </div>
   )

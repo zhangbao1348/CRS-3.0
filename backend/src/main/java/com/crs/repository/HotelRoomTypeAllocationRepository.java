@@ -3,6 +3,7 @@ package com.crs.repository;
 import com.crs.entity.HotelRoomTypeAllocation;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 酒店房型分配数据访问接口 (HotelRoomTypeAllocationRepository)
@@ -16,6 +17,9 @@ import java.util.List;
  * </ul>
  */
 public interface HotelRoomTypeAllocationRepository extends JpaRepository<HotelRoomTypeAllocation, Integer> {
+
+    /** 按主键与租户双重约束查询。 */
+    Optional<HotelRoomTypeAllocation> findByIdAndTenantId(Integer id, Integer tenantId);
 
     // =====================================================================
     // 合规方法：必须包含 tenantId（符合多租户隔离规范）

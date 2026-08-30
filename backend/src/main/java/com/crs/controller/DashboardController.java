@@ -296,14 +296,27 @@ public class DashboardController {
                 m.put("channel", row[0]);
                 m.put("bookings", row[1]);
                 BigDecimal revenue = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+                m.put("revenue", revenue);
                 long totalNights = row[3] != null ? ((Number)row[3]).longValue() : 0;
                 BigDecimal adr = totalNights > 0 ? revenue.divide(BigDecimal.valueOf(totalNights), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
                 m.put("adr", adr);
                 return m;
             }).collect(Collectors.toList());
+            BigDecimal channelRevenueTotal = channelMatrix.stream()
+                    .map(row -> (BigDecimal) row.get("revenue"))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            for (Map<String, Object> channel : channelMatrix) {
+                BigDecimal revenue = (BigDecimal) channel.get("revenue");
+                double ratio = channelRevenueTotal.signum() > 0
+                        ? revenue.multiply(BigDecimal.valueOf(100))
+                                .divide(channelRevenueTotal, 1, RoundingMode.HALF_UP).doubleValue()
+                        : 0.0;
+                channel.put("ratio", ratio);
+            }
             data.put("channelMatrix", channelMatrix);
 
             // === 模块 F: 预订流速监测 (Pacing) ===
+            data.put("pacingData", calculatePacingData(tenantId, hotel.getHotelCode(), today, List.of(hotel)));
             List<Object[]> pickupRaw = reservationRepo.getRecentPickupStatsByHotel(tenantId, hotel.getHotelCode(), getDaysAgo(7));
             // 简单算法：今日 vs 过去3天均值
             long todayPickup = 0;

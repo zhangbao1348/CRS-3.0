@@ -20,15 +20,11 @@ const api = axios.create({
 })
 
 const generateUuid = () => {
-  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0,
-      v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+  return crypto.randomUUID().replaceAll('-', '')
 };
 
-api.interceptors.request.use(
-  (config) => {
+export const applyRequestContext = (config) => {
+    config.headers = config.headers || {}
     const token = localStorage.getItem('crs_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -52,10 +48,24 @@ api.interceptors.request.use(
     }
     
     return config
-  },
+}
+
+// 统一 API 实例与历史直接 axios 调用共享同一认证/租户上下文。
+api.interceptors.request.use(
+  applyRequestContext,
   (error) => {
     return Promise.reject(error)
   }
+)
+
+axios.interceptors.request.use(
+  (config) => {
+    if (typeof config.url === 'string' && config.url.startsWith('/api/')) {
+      return applyRequestContext(config)
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
 )
 
 api.interceptors.response.use(
@@ -118,6 +128,11 @@ export const menuApi = {
   createMenu: (data) => api.post('/menus', data),
   updateMenu: (id, data) => api.put(`/menus/${id}`, data),
   deleteMenu: (id) => api.delete(`/menus/${id}`)
+}
+
+export const groupSettingsApi = {
+  get: (options = {}) => api.get('/group-settings', options),
+  save: (data, options = {}) => api.put('/group-settings', data, options)
 }
 
 export const userApi = {
@@ -201,13 +216,16 @@ export const packageApi = {
       ...options
     }),
   saveDailyPrices: (packageCode, data, options = {}) =>
-    api.post(`/packages/code/${packageCode}/daily-prices`, data, options)
+    api.post(`/packages/code/${packageCode}/daily-prices`, data, options),
+  deletePackage: (id, options = {}) => api.delete(`/packages/${id}`, options)
 }
 
 export const groupFacilityApi = {
   getAllGroupFacilities: (options = {}) => api.get('/group-facilities', options),
   getGroupFacilityById: (id, options = {}) => api.get(`/group-facilities/${id}`, options),
-  getGroupFacilitiesByType: (type, options = {}) => api.get(`/group-facilities/type/${type}`, options)
+  getGroupFacilitiesByType: (type, options = {}) => api.get(`/group-facilities/type/${type}`, options),
+  createGroupFacility: (data, options = {}) => api.post('/group-facilities', data, options),
+  updateGroupFacility: (id, data, options = {}) => api.put(`/group-facilities/${id}`, data, options)
 }
 
 export const hotelFacilityApi = {
@@ -463,6 +481,24 @@ export const tenantChannelApi = {
   }
 }
 
+export const channelMappingApi = {
+  listHotels: (params = {}, options = {}) => api.get('/channel-mappings/hotels', { params, ...options }),
+  createHotel: (data, options = {}) => api.post('/channel-mappings/hotels', data, options),
+  updateHotel: (id, data, options = {}) => api.put(`/channel-mappings/hotels/${id}`, data, options),
+  deleteHotel: (id, options = {}) => api.delete(`/channel-mappings/hotels/${id}`, options),
+  toggleHotel: (id, options = {}) => api.put(`/channel-mappings/hotels/${id}/toggle-status`, null, options),
+  listRoomTypes: (params = {}, options = {}) => api.get('/channel-mappings/room-types', { params, ...options }),
+  createRoomType: (data, options = {}) => api.post('/channel-mappings/room-types', data, options),
+  updateRoomType: (id, data, options = {}) => api.put(`/channel-mappings/room-types/${id}`, data, options),
+  deleteRoomType: (id, options = {}) => api.delete(`/channel-mappings/room-types/${id}`, options),
+  toggleRoomType: (id, options = {}) => api.put(`/channel-mappings/room-types/${id}/toggle-status`, null, options),
+  listRateCodes: (params = {}, options = {}) => api.get('/channel-mappings/rate-codes', { params, ...options }),
+  createRateCode: (data, options = {}) => api.post('/channel-mappings/rate-codes', data, options),
+  updateRateCode: (id, data, options = {}) => api.put(`/channel-mappings/rate-codes/${id}`, data, options),
+  deleteRateCode: (id, options = {}) => api.delete(`/channel-mappings/rate-codes/${id}`, options),
+  toggleRateCode: (id, options = {}) => api.put(`/channel-mappings/rate-codes/${id}/toggle-status`, null, options)
+}
+
 export const channelPublishApi = {
   getRateCodesWithRoomTypes: (hotelId, options = {}) =>
     api.get('/channel-publish/rate-codes', { params: { hotelId }, ...options }),
@@ -471,7 +507,13 @@ export const channelPublishApi = {
   getPublishedRecords: (tenantId, hotelCode, channelCode, options = {}) =>
     api.get('/channel-publish/records', { params: { tenantId, hotelCode, channelCode }, ...options }),
   batchPublish: (data, options = {}) =>
-    api.post('/channel-publish/batch', data, options)
+    api.post('/channel-publish/batch', data, options),
+  getGroupRateCodeRecords: (rateCode, options = {}) =>
+    api.get('/channel-publish/group-rate-code/records', { params: { rateCode }, ...options }),
+  saveGroupRateCodePublish: (data, options = {}) =>
+    api.post('/channel-publish/group-rate-code/save', data, options),
+  cancelGroupRateCodePublish: (data, options = {}) =>
+    api.post('/channel-publish/group-rate-code/cancel', data, options)
 }
 
 export const reservationApi = {
@@ -521,6 +563,14 @@ export const traceApi = {
   reportError: (data) => api.post('/trace/report', data),
   getTraceLogs: (params) => api.get('/trace/logs', { params }),
   getTraceDetail: (traceId) => api.get(`/trace/logs/${traceId}`)
+}
+
+export const archiveApi = {
+  getAllArchives: () => api.get('/archives'),
+  getArchiveById: (id) => api.get(`/archives/${id}`),
+  createArchive: (data) => api.post('/archives', data),
+  updateArchive: (id, data) => api.put(`/archives/${id}`, data),
+  deleteArchive: (id) => api.delete(`/archives/${id}`)
 }
 
 export default api

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, Radio, Button, Tabs, Card, Checkbox, Table, message, Spin } from 'antd'
+import { useState, useEffect } from 'react'
+import { Form, Input, Select, Radio, Button, Tabs, Card, Checkbox, message, Spin } from 'antd'
 import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { tenantChannelApi, channelPublishApi } from '../../utils/api'
@@ -20,8 +20,6 @@ const ChannelSetting = () => {
   const [publishing, setPublishing] = useState(false)
   const [priceCodeSearch, setPriceCodeSearch] = useState('')
   const [rateCodes, setRateCodes] = useState([])
-  const [publishedRecords, setPublishedRecords] = useState([])
-
   const { selectedHotel } = useHotelContext()
 
   const filteredRateCodes = rateCodes.filter(rc =>
@@ -167,7 +165,6 @@ const ChannelSetting = () => {
         }
       }
       await channelPublishApi.batchPublish({
-        tenantId: 1,
         hotelCode: selectedHotel,
         channelCode: channelCode,
         rateCodeRoomTypesMap

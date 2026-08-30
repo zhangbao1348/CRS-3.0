@@ -1,343 +1,37 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Table, 
   Button, 
   Space, 
-  Card, 
   Row, 
   Col, 
   Input, 
   Select, 
   Modal, 
   Form, 
-  Switch,
   Checkbox,
   Tag,
   Popconfirm,
-  message,
+  App,
   Divider
 } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
-  EyeOutlined,
   DeleteOutlined,
   UserOutlined,
   LockOutlined,
   UnlockOutlined,
-  SafetyOutlined
 } from '@ant-design/icons'
 import { userApi, tenantApi, roleApi } from '../../utils/api'
-
-// 演示模式标志
-const DEMO_MODE = false
-
-// 模拟用户数据
-const mockUsers = [
-  {
-    id: 1,
-    username: 'admin',
-    name: '系统管理员',
-    email: 'admin@example.com',
-    phone: '13800138000',
-    tenantId: null,
-    tenantName: '平台',
-    roleIds: [1],
-    roleNames: ['超级管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-01 00:00:00'
-  },
-  {
-    id: 2,
-    username: 'demo',
-    name: '演示用户',
-    email: 'demo@example.com',
-    phone: '13800138001',
-    tenantId: 1,
-    tenantName: '万豪国际集团',
-    roleIds: [2],
-    roleNames: ['集团管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-02 00:00:00'
-  },
-  {
-    id: 3,
-    username: 'hotel1',
-    name: '酒店管理员',
-    email: 'hotel1@example.com',
-    phone: '13800138002',
-    tenantId: 1,
-    tenantName: '万豪国际集团',
-    roleIds: [3],
-    roleNames: ['酒店管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-03 00:00:00'
-  },
-  {
-    id: 4,
-    username: 'user1',
-    name: '普通用户',
-    email: 'user1@example.com',
-    phone: '13800138003',
-    tenantId: 2,
-    tenantName: '希尔顿酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-04 00:00:00'
-  },
-  {
-    id: 5,
-    username: 'user2',
-    name: '测试用户',
-    email: 'user2@example.com',
-    phone: '13800138004',
-    tenantId: 3,
-    tenantName: '洲际酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '停用',
-    statusValue: 'inactive',
-    createdAt: '2025-01-05 00:00:00'
-  },
-  {
-    id: 6,
-    username: 'user3',
-    name: '新用户',
-    email: 'user3@example.com',
-    phone: '13800138005',
-    tenantId: 4,
-    tenantName: '凯悦酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-06 00:00:00'
-  },
-  {
-    id: 7,
-    username: 'user4',
-    name: '老用户',
-    email: 'user4@example.com',
-    phone: '13800138006',
-    tenantId: 5,
-    tenantName: '雅高酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-07 00:00:00'
-  },
-  {
-    id: 8,
-    username: 'user5',
-    name: 'VIP用户',
-    email: 'user5@example.com',
-    phone: '13800138007',
-    tenantId: 1,
-    tenantName: '万豪国际集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-08 00:00:00'
-  },
-  {
-    id: 9,
-    username: 'user6',
-    name: '临时用户',
-    email: 'user6@example.com',
-    phone: '13800138008',
-    tenantId: 2,
-    tenantName: '希尔顿酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '停用',
-    statusValue: 'inactive',
-    createdAt: '2025-01-09 00:00:00'
-  },
-  {
-    id: 10,
-    username: 'user7',
-    name: '高级用户',
-    email: 'user7@example.com',
-    phone: '13800138009',
-    tenantId: 3,
-    tenantName: '洲际酒店集团',
-    roleIds: [3],
-    roleNames: ['酒店管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-10 00:00:00'
-  },
-  {
-    id: 11,
-    username: 'user8',
-    name: '中级用户',
-    email: 'user8@example.com',
-    phone: '13800138010',
-    tenantId: 4,
-    tenantName: '凯悦酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-11 00:00:00'
-  },
-  {
-    id: 12,
-    username: 'user9',
-    name: '初级用户',
-    email: 'user9@example.com',
-    phone: '13800138011',
-    tenantId: 5,
-    tenantName: '雅高酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-12 00:00:00'
-  },
-  {
-    id: 13,
-    username: 'user10',
-    name: '试用用户',
-    email: 'user10@example.com',
-    phone: '13800138012',
-    tenantId: 1,
-    tenantName: '万豪国际集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-13 00:00:00'
-  },
-  {
-    id: 14,
-    username: 'user11',
-    name: '正式用户',
-    email: 'user11@example.com',
-    phone: '13800138013',
-    tenantId: 2,
-    tenantName: '希尔顿酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-14 00:00:00'
-  },
-  {
-    id: 15,
-    username: 'user12',
-    name: '资深用户',
-    email: 'user12@example.com',
-    phone: '13800138014',
-    tenantId: 3,
-    tenantName: '洲际酒店集团',
-    roleIds: [3],
-    roleNames: ['酒店管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-15 00:00:00'
-  },
-  {
-    id: 16,
-    username: 'user13',
-    name: '专家用户',
-    email: 'user13@example.com',
-    phone: '13800138015',
-    tenantId: 4,
-    tenantName: '凯悦酒店集团',
-    roleIds: [2],
-    roleNames: ['集团管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-16 00:00:00'
-  },
-  {
-    id: 17,
-    username: 'user14',
-    name: '大师用户',
-    email: 'user14@example.com',
-    phone: '13800138016',
-    tenantId: 5,
-    tenantName: '雅高酒店集团',
-    roleIds: [3],
-    roleNames: ['酒店管理员'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-17 00:00:00'
-  },
-  {
-    id: 18,
-    username: 'user15',
-    name: '王者用户',
-    email: 'user15@example.com',
-    phone: '13800138017',
-    tenantId: 1,
-    tenantName: '万豪国际集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-18 00:00:00'
-  },
-  {
-    id: 19,
-    username: 'user16',
-    name: '钻石用户',
-    email: 'user16@example.com',
-    phone: '13800138018',
-    tenantId: 2,
-    tenantName: '希尔顿酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-19 00:00:00'
-  },
-  {
-    id: 20,
-    username: 'user17',
-    name: '白金用户',
-    email: 'user17@example.com',
-    phone: '13800138019',
-    tenantId: 3,
-    tenantName: '洲际酒店集团',
-    roleIds: [4],
-    roleNames: ['普通用户'],
-    status: '启用',
-    statusValue: 'active',
-    createdAt: '2025-01-20 00:00:00'
-  }
-]
-
-// 模拟租户数据
-const mockTenants = [
-  { id: 1, tenantCode: 'MARRIOT', tenantName: '万豪国际集团' },
-  { id: 2, tenantCode: 'HILTON', tenantName: '希尔顿酒店集团' },
-  { id: 3, tenantCode: 'IHG', tenantName: '洲际酒店集团' },
-  { id: 4, tenantCode: 'HYATT', tenantName: '凯悦酒店集团' },
-  { id: 5, tenantCode: 'ACCOR', tenantName: '雅高酒店集团' }
-]
-
-// 模拟角色数据
-const mockRoles = [
-  { id: 1, roleCode: 'SUPER_ADMIN', roleName: '超级管理员', tenantId: null, tenantName: '平台' },
-  { id: 2, roleCode: 'GROUP_ADMIN', roleName: '集团管理员', tenantId: null, tenantName: '平台' },
-  { id: 3, roleCode: 'HOTEL_ADMIN', roleName: '酒店管理员', tenantId: null, tenantName: '平台' },
-  { id: 4, roleCode: 'USER', roleName: '普通用户', tenantId: null, tenantName: '平台' }
-]
+import { FilterPanel, PageScaffold, TablePanel } from '../../components/ui'
 
 const { Option } = Select
 const { Group: CheckboxGroup } = Checkbox
 
 const UserManagement = () => {
+  const { message } = App.useApp()
   const [users, setUsers] = useState([])
   const [tenants, setTenants] = useState([])
   const [roles, setRoles] = useState([])
@@ -350,6 +44,17 @@ const UserManagement = () => {
   const [form] = Form.useForm()
   const [passwordForm] = Form.useForm()
 
+  const filteredUsers = useMemo(() => users.filter(user => {
+    const username = searchParams.username.trim().toLowerCase()
+    const name = searchParams.name.trim().toLowerCase()
+    const tenantMatches = searchParams.tenantId === undefined
+      || (searchParams.tenantId === '' ? user.tenantId == null : user.tenantId === searchParams.tenantId)
+    return (!username || user.username?.toLowerCase().includes(username))
+      && (!name || user.name?.toLowerCase().includes(name))
+      && (!searchParams.status || user.statusValue === searchParams.status)
+      && tenantMatches
+  }), [searchParams, users])
+
   useEffect(() => {
     fetchUsers()
     fetchAllTenants()
@@ -359,27 +64,21 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setUsers(mockUsers)
+      const response = await userApi.getAllUsers()
+      if (response.success) {
+        const usersData = response.data.map(user => ({
+          ...user,
+          status: user.status === 'active' ? '启用' : '停用',
+          statusValue: user.status,
+          key: user.id
+        }))
+        setUsers(usersData)
       } else {
-        // 非演示模式下从后端获取数据
-        const response = await userApi.getAllUsers(searchParams.tenantId)
-        if (response.success) {
-          const usersData = response.data.map(user => ({
-            ...user,
-            status: user.status === 'active' ? '启用' : '停用',
-            statusValue: user.status,
-            key: user.id
-          }))
-          setUsers(usersData)
-        } else {
-          message.error(response.message || '获取用户列表失败')
-        }
+        setUsers([])
+        message.error(response.message || '获取用户列表失败')
       }
     } catch (error) {
-      console.error('获取用户列表失败:', error)
-      message.error('获取用户列表失败，请稍后重试')
+      message.error(error?.message || '获取用户列表失败，请稍后重试')
     } finally {
       setLoading(false)
     }
@@ -387,36 +86,28 @@ const UserManagement = () => {
 
   const fetchAllTenants = async () => {
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setTenants(mockTenants)
-      } else {
-        // 非演示模式下从后端获取数据
-        const response = await tenantApi.getAllTenants()
-        if (response.success) {
-          setTenants(response.data)
-        }
+      const response = await tenantApi.getAllTenants()
+      if (response.success) {
+        setTenants(response.data)
       }
     } catch (error) {
-      console.error('获取租户列表失败:', error)
+      message.error(error?.message || '获取租户列表失败')
     }
   }
 
   const fetchAllRoles = async () => {
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setRoles(mockRoles)
-      } else {
-        // 非演示模式下从后端获取数据
-        const response = await roleApi.getAllRoles()
-        if (response.success) {
-          setRoles(response.data)
-        }
+      const response = await roleApi.getAllRoles()
+      if (response.success) {
+        setRoles(response.data)
       }
     } catch (error) {
-      console.error('获取角色列表失败:', error)
+      message.error(error?.message || '获取角色列表失败')
     }
+  }
+
+  const handleResetFilters = () => {
+    setSearchParams({ name: '', username: '', status: '', tenantId: undefined })
   }
 
   const handleAdd = () => {
@@ -454,8 +145,7 @@ const UserManagement = () => {
         message.error(response.message || '删除用户失败')
       }
     } catch (error) {
-      console.error('删除用户失败:', error)
-      message.error('删除用户失败，请稍后重试')
+      message.error(error?.message || '删除用户失败，请稍后重试')
     }
   }
 
@@ -470,8 +160,7 @@ const UserManagement = () => {
         message.error(response.message || '更新用户状态失败')
       }
     } catch (error) {
-      console.error('更新用户状态失败:', error)
-      message.error('更新用户状态失败，请稍后重试')
+      message.error(error?.message || '更新用户状态失败，请稍后重试')
     }
   }
 
@@ -503,8 +192,9 @@ const UserManagement = () => {
         message.error(response.message || '保存失败，请稍后重试')
       }
     } catch (error) {
-      console.error('保存用户失败:', error)
-      message.error('保存失败，请稍后重试')
+      if (!error?.errorFields) {
+        message.error(error?.message || '保存失败，请稍后重试')
+      }
     }
   }
 
@@ -519,8 +209,9 @@ const UserManagement = () => {
         message.error(response.message || '重置密码失败')
       }
     } catch (error) {
-      console.error('重置密码失败:', error)
-      message.error('重置密码失败，请稍后重试')
+      if (!error?.errorFields) {
+        message.error(error?.message || '重置密码失败，请稍后重试')
+      }
     }
   }
 
@@ -561,19 +252,20 @@ const UserManagement = () => {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
-      width: 200
+      width: 180
     },
     {
       title: '手机号',
       dataIndex: 'phone',
       key: 'phone',
-      width: 130
+      width: 130,
+      responsive: ['xxl']
     },
     {
       title: '角色',
       dataIndex: 'roleNames',
       key: 'roleNames',
-      width: 200,
+      width: 150,
       render: (roleNames) => (
         <Space wrap size={[0, 4]}>
           {roleNames?.map((role, index) => (
@@ -589,7 +281,7 @@ const UserManagement = () => {
       dataIndex: 'status',
       key: 'status',
       width: 80,
-      render: (status, record) => (
+      render: (status) => (
         <Tag color={status === '启用' ? 'green' : 'red'}>
           {status}
         </Tag>
@@ -599,15 +291,16 @@ const UserManagement = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 170
+      width: 170,
+      responsive: ['xxl']
     },
     {
       title: '操作',
       key: 'action',
-      width: 280,
+      width: 230,
       fixed: 'right',
       render: (_, record) => (
-        <Space size="middle">
+        <Space size={[4, 4]} wrap>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
@@ -638,34 +331,41 @@ const UserManagement = () => {
   ]
 
   return (
-    <div className="fade-in">
-      <h1 className="page-title">
-        <UserOutlined />
-        用户管理
-      </h1>
-      
-      <Card style={{ marginBottom: 24 }}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={6}>
+    <PageScaffold
+      className="fade-in"
+      eyebrow="ACCESS ADMINISTRATION"
+      title={<><UserOutlined /> 用户管理</>}
+      description="维护用户身份、集团归属、角色和启停状态；密码操作与资料编辑分开处理。"
+      actions={<Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增用户</Button>}
+    >
+      <FilterPanel extra={<Button onClick={handleResetFilters}>重置条件</Button>}>
+        <div className="ui-filter-grid">
+          <label className="ui-field">
+            <span className="ui-field__label">用户名</span>
             <Input 
-              placeholder="用户名" 
+              aria-label="用户名"
+              placeholder="请输入用户名"
               prefix={<SearchOutlined />} 
               allowClear 
               value={searchParams.username}
               onChange={(e) => setSearchParams({ ...searchParams, username: e.target.value })}
             />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
+          </label>
+          <label className="ui-field">
+            <span className="ui-field__label">姓名</span>
             <Input 
-              placeholder="姓名" 
+              aria-label="姓名"
+              placeholder="请输入姓名"
               allowClear 
               value={searchParams.name}
               onChange={(e) => setSearchParams({ ...searchParams, name: e.target.value })}
             />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
+          </label>
+          <label className="ui-field">
+            <span className="ui-field__label">状态</span>
             <Select 
-              placeholder="状态" 
+              aria-label="状态"
+              placeholder="全部状态"
               allowClear 
               style={{ width: '100%' }}
               value={searchParams.status}
@@ -674,39 +374,34 @@ const UserManagement = () => {
               <Option value="active">启用</Option>
               <Option value="inactive">禁用</Option>
             </Select>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
+          </label>
+          <label className="ui-field">
+            <span className="ui-field__label">归属集团</span>
             <Select 
-              placeholder="归属" 
+              aria-label="归属集团"
+              placeholder="全部归属"
               allowClear 
               style={{ width: '100%' }}
               value={searchParams.tenantId}
               onChange={(value) => setSearchParams({ ...searchParams, tenantId: value })}
             >
-              <Option value={null}>平台</Option>
+              <Option value="">平台</Option>
               {tenants.map(tenant => (
                 <Option key={tenant.id} value={tenant.id}>{tenant.tenantName}</Option>
               ))}
             </Select>
-          </Col>
-          <Col xs={24} sm={24} md={16} lg={12}>
-            <Space>
-              <Button type="default" onClick={fetchUsers}>重置</Button>
-              <Button type="primary" icon={<SearchOutlined />} onClick={fetchUsers}>搜索</Button>
-            </Space>
-          </Col>
-        </Row>
-      </Card>
+          </label>
+        </div>
+      </FilterPanel>
 
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button type="primary" icon={<PlusOutlined />} size="large" onClick={handleAdd}>
-          新增用户
-        </Button>
-      </div>
-
-      <Table
+      <TablePanel
+        title="用户列表"
+        description={`当前筛选结果 ${filteredUsers.length} 个用户`}
+        actions={<Button type="primary" icon={<SearchOutlined />} onClick={fetchUsers}>执行查询</Button>}
+      >
+        <Table
         columns={columns}
-        dataSource={users}
+        dataSource={filteredUsers}
         rowKey="id"
         loading={loading}
         pagination={{
@@ -715,8 +410,9 @@ const UserManagement = () => {
           showQuickJumper: true,
           showTotal: (total, range) => `${range[0]}-${range[1]} 共 ${total} 条`
         }}
-        scroll={{ x: 1600 }}
-      />
+        scroll={{ x: 1000 }}
+        />
+      </TablePanel>
 
       <Modal
         title={editingUser ? '编辑用户' : '新增用户'}
@@ -741,7 +437,7 @@ const UserManagement = () => {
                 name="tenantId"
               >
                 <Select placeholder="选择归属（不选则为平台用户）" allowClear>
-                  <Option value={null}>平台</Option>
+                  <Option value="">平台</Option>
                   {tenants.map(tenant => (
                     <Option key={tenant.id} value={tenant.id}>{tenant.tenantName}</Option>
                   ))}
@@ -795,7 +491,10 @@ const UserManagement = () => {
                 <Form.Item
                   label="密码"
                   name="password"
-                  rules={[{ required: true, message: '请输入密码' }]}
+                  rules={[
+                    { required: true, message: '请输入密码' },
+                    { min: 6, message: '密码长度至少6位' }
+                  ]}
                 >
                   <Input.Password placeholder="请输入密码" />
                 </Form.Item>
@@ -871,7 +570,7 @@ const UserManagement = () => {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </PageScaffold>
   )
 }
 

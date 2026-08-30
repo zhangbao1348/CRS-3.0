@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useContext, useRef } from 'react'
-import { Button, Checkbox, DatePicker, Input, Card, Row, Col, Modal, Form, Select, message, Spin, Empty, Table, Tag } from 'antd'
+import { App, Button, Checkbox, DatePicker, Input, Card, Row, Col, Modal, Form, Select, Spin, Empty, Table, Tag } from 'antd'
 import { DollarOutlined, HistoryOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api, { ratePlanApi, hotelRoomTypeApi } from '../../utils/api'
@@ -19,6 +19,7 @@ const OP_TYPE_MAP = {
 }
 
 const RackRate = () => {
+  const { message } = App.useApp()
   const { selectedHotel: hotelCode } = useHotelContext()
   const { user } = useContext(AuthContext)
   const tableScrollRef = useRef(null)

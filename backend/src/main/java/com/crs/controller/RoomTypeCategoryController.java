@@ -4,6 +4,7 @@ import com.crs.entity.RoomTypeCategory;
 import com.crs.repository.GroupRoomTypeRepository;
 import com.crs.service.RoomTypeCategoryService;
 import com.crs.util.CodeValidator;
+import com.crs.util.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -128,7 +129,10 @@ public class RoomTypeCategoryController {
     @PostMapping
     public ResponseEntity<?> createRoomTypeCategory(@RequestBody RoomTypeCategory roomTypeCategory) {
         try {
-            if (roomTypeCategory.getCategoryCode() != null && !CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
+            if (roomTypeCategory.getCategoryCode() == null || roomTypeCategory.getCategoryName() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "房型大类代码和名称为必填项"));
+            }
+            if (!CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
             if (!roomTypeCategoryService.isCodeUnique(roomTypeCategory.getCategoryCode(), null)) {
@@ -150,7 +154,10 @@ public class RoomTypeCategoryController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updateRoomTypeCategory(@PathVariable Integer id, @RequestBody RoomTypeCategory roomTypeCategory) {
         try {
-            if (roomTypeCategory.getCategoryCode() != null && !CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
+            if (roomTypeCategory.getCategoryCode() == null || roomTypeCategory.getCategoryName() == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "房型大类代码和名称为必填项"));
+            }
+            if (!CodeValidator.isValid(roomTypeCategory.getCategoryCode())) {
                 return ResponseEntity.badRequest().body(Map.of("error", CodeValidator.ERROR_MESSAGE));
             }
             if (!roomTypeCategoryService.isCodeUnique(roomTypeCategory.getCategoryCode(), id)) {
@@ -177,8 +184,13 @@ public class RoomTypeCategoryController {
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteRoomTypeCategory(@PathVariable Integer id) {
         try {
+            RoomTypeCategory existing = roomTypeCategoryService.getRoomTypeCategoryById(id);
+            if (existing == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "房型大类不存在或无权访问"));
+            }
             // 检查是否被集团房型引用
-            long refCount = groupRoomTypeRepository.countByRoomTypeCategoryId(id);
+            Integer tenantId = TenantContext.getTenantId();
+            long refCount = groupRoomTypeRepository.countByGroupIdAndRoomTypeCategoryId(tenantId, id);
             if (refCount > 0) {
                 return ResponseEntity.badRequest().body(Map.of("error", "该房型大类已被 " + refCount + " 个集团房型引用，无法删除"));
             }

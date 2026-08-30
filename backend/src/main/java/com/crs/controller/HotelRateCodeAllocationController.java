@@ -66,8 +66,7 @@ public class HotelRateCodeAllocationController {
     public ResponseEntity<List<Map<String, Object>>> getAllocationsByHotelId(@PathVariable Integer hotelId) {
         try {
             Integer currentTenantId = getCurrentTenantId();
-            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
-                    .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+            Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, currentTenantId);
             
             if (!hotelOpt.isPresent()) {
                 return ResponseEntity.status(403).build();
@@ -129,8 +128,7 @@ public class HotelRateCodeAllocationController {
                 hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCodeParam, currentTenantId).orElse(null);
             }
             if (hotel == null && hotelId != null) {
-                hotel = hotelRepository.findById(hotelId)
-                        .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId))
+                hotel = hotelRepository.findByIdAndTenantId(hotelId, currentTenantId)
                         .orElse(null);
             }
 
@@ -141,8 +139,7 @@ public class HotelRateCodeAllocationController {
             // 优先通过 rateCodeId 查找，其次通过 rateCode 字符串查找
             GroupRateCode rateCode = null;
             if (rateCodeId != null) {
-                rateCode = groupRateCodeRepository.findById(rateCodeId)
-                        .filter(rc -> rc.getGroupId() != null && rc.getGroupId().equals(currentTenantId))
+                rateCode = groupRateCodeRepository.findByIdAndGroupId(rateCodeId, currentTenantId)
                         .orElse(null);
             }
             if (rateCode == null && rateCodeStr != null && !rateCodeStr.isEmpty()) {
@@ -244,8 +241,7 @@ public class HotelRateCodeAllocationController {
             @RequestBody Map<String, Object> allocationData) {
         try {
             Integer currentTenantId = getCurrentTenantId();
-            Optional<HotelRateCodeAllocation> existingOpt = allocationRepository.findById(id)
-                    .filter(a -> a.getTenantId() != null && a.getTenantId().equals(currentTenantId));
+            Optional<HotelRateCodeAllocation> existingOpt = allocationRepository.findByIdAndTenantId(id, currentTenantId);
             
             if (!existingOpt.isPresent()) {
                 return ResponseEntity.status(403).build();
@@ -288,8 +284,7 @@ public class HotelRateCodeAllocationController {
     public ResponseEntity<Void> deleteAllocationsByHotelId(@PathVariable Integer hotelId) {
         try {
             Integer currentTenantId = getCurrentTenantId();
-            Optional<Hotel> hotelOpt = hotelRepository.findById(hotelId)
-                    .filter(h -> h.getTenantId() != null && h.getTenantId().equals(currentTenantId));
+            Optional<Hotel> hotelOpt = hotelRepository.findByIdAndTenantId(hotelId, currentTenantId);
             
             if (!hotelOpt.isPresent()) {
                 return ResponseEntity.status(403).build();

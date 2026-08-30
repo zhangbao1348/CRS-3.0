@@ -37,8 +37,7 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     
     @Override
     public Optional<TaxSetting> getById(Integer tenantId, Integer id) {
-        return taxSettingRepository.findById(id)
-                .filter(ts -> ts.getTenantId() != null && ts.getTenantId().equals(getCurrentTenantId()));
+        return taxSettingRepository.findByIdAndTenantId(id, getCurrentTenantId());
     }
     
     @Override
@@ -49,9 +48,11 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     @Override
     public TaxSetting create(Integer tenantId, TaxSetting taxSetting) {
         Integer currentTenantId = getCurrentTenantId();
+        validateTaxSetting(taxSetting);
         if (!isTaxCodeUnique(currentTenantId, taxSetting.getTaxCode(), null)) {
-            throw new IllegalArgumentException("税率编码已存在");
+            throw new IllegalArgumentException("该税率CODE已存在");
         }
+        taxSetting.setId(null);
         taxSetting.setTenantId(currentTenantId);
         return taxSettingRepository.save(taxSetting);
     }
@@ -65,14 +66,12 @@ public class TaxSettingServiceImpl implements TaxSettingService {
         }
         
         TaxSetting existing = existingOpt.get();
-        
-        if (!isTaxCodeUnique(currentTenantId, taxSetting.getTaxCode(), id)) {
-            throw new IllegalArgumentException("税率编码已存在");
+
+        if (taxSetting.getTaxCode() != null && !existing.getTaxCode().equals(taxSetting.getTaxCode())) {
+            throw new IllegalArgumentException("税率编码保存后不可修改");
         }
-        
-        if (taxSetting.getTaxCode() != null) {
-            existing.setTaxCode(taxSetting.getTaxCode());
-        }
+        taxSetting.setTaxCode(existing.getTaxCode());
+        validateTaxSetting(taxSetting);
         if (taxSetting.getLegalName() != null) {
             existing.setLegalName(taxSetting.getLegalName());
         }
@@ -99,6 +98,25 @@ public class TaxSettingServiceImpl implements TaxSettingService {
     public boolean isTaxCodeUnique(Integer tenantId, String taxCode, Integer excludeId) {
         TaxSetting existing = taxSettingRepository.findByTenantIdAndTaxCode(getCurrentTenantId(), taxCode);
         return existing == null || (excludeId != null && existing.getId().equals(excludeId));
+    }
+
+    /** 与页面规则一致的服务端税率完整性校验。 */
+    private void validateTaxSetting(TaxSetting taxSetting) {
+        if (taxSetting.getTaxCode() == null || taxSetting.getTaxCode().isBlank()) {
+            throw new IllegalArgumentException("税率CODE不能为空");
+        }
+        if (taxSetting.getLegalName() == null || taxSetting.getLegalName().isBlank()) {
+            throw new IllegalArgumentException("税率名称不能为空");
+        }
+        if (taxSetting.getRateAmount() == null
+                || taxSetting.getRateAmount().compareTo(BigDecimal.ZERO) < 0
+                || taxSetting.getRateAmount().compareTo(new BigDecimal("100")) > 0
+                || taxSetting.getRateAmount().scale() > 2) {
+            throw new IllegalArgumentException("税率必须在 0% 到 100% 之间，最多保留两位小数");
+        }
+        if (!"active".equals(taxSetting.getStatus()) && !"inactive".equals(taxSetting.getStatus())) {
+            throw new IllegalArgumentException("税率状态无效");
+        }
     }
     
     @Override

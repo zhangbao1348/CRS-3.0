@@ -6,8 +6,11 @@ import com.crs.entity.ChannelRateCodeMapping;
 import com.crs.repository.ChannelHotelMappingRepository;
 import com.crs.repository.ChannelRoomTypeMappingRepository;
 import com.crs.repository.ChannelRateCodeMappingRepository;
+import com.crs.repository.HotelRepository;
+import com.crs.repository.HotelRoomTypeRepository;
+import com.crs.repository.RatePlanRepository;
+import com.crs.repository.TenantChannelRepository;
 import com.crs.service.ChannelMappingService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,20 +25,29 @@ import java.util.Optional;
 @Transactional
 public class ChannelMappingServiceImpl implements ChannelMappingService {
     
-    @Autowired
-    private ChannelHotelMappingRepository hotelMappingRepository;
-    
-    @Autowired
-    private ChannelRoomTypeMappingRepository roomTypeMappingRepository;
-    
-    @Autowired
-    private ChannelRateCodeMappingRepository rateCodeMappingRepository;
-    
-    @Autowired
-    private com.crs.repository.HotelRepository hotelRepository;
-    
-    @Autowired
-    private com.crs.repository.TenantChannelRepository tenantChannelRepository;
+    private final ChannelHotelMappingRepository hotelMappingRepository;
+    private final ChannelRoomTypeMappingRepository roomTypeMappingRepository;
+    private final ChannelRateCodeMappingRepository rateCodeMappingRepository;
+    private final HotelRepository hotelRepository;
+    private final TenantChannelRepository tenantChannelRepository;
+    private final HotelRoomTypeRepository hotelRoomTypeRepository;
+    private final RatePlanRepository ratePlanRepository;
+
+    public ChannelMappingServiceImpl(ChannelHotelMappingRepository hotelMappingRepository,
+                                     ChannelRoomTypeMappingRepository roomTypeMappingRepository,
+                                     ChannelRateCodeMappingRepository rateCodeMappingRepository,
+                                     HotelRepository hotelRepository,
+                                     TenantChannelRepository tenantChannelRepository,
+                                     HotelRoomTypeRepository hotelRoomTypeRepository,
+                                     RatePlanRepository ratePlanRepository) {
+        this.hotelMappingRepository = hotelMappingRepository;
+        this.roomTypeMappingRepository = roomTypeMappingRepository;
+        this.rateCodeMappingRepository = rateCodeMappingRepository;
+        this.hotelRepository = hotelRepository;
+        this.tenantChannelRepository = tenantChannelRepository;
+        this.hotelRoomTypeRepository = hotelRoomTypeRepository;
+        this.ratePlanRepository = ratePlanRepository;
+    }
     
     private void validateTenantAccess(String channelCode, String hotelCode) {
         Integer tenantId = com.crs.util.TenantContext.getTenantId();
@@ -89,26 +101,25 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelHotelMapping createHotelMapping(ChannelHotelMapping mapping) {
-        mapping.setTenantId(getCurrentTenantId());
-        return hotelMappingRepository.save(mapping);
+        Integer tenantId = getCurrentTenantId();
+        ChannelHotelMapping target = new ChannelHotelMapping();
+        copyHotelMapping(mapping, target, tenantId, null);
+        return hotelMappingRepository.save(target);
     }
     
     @Override
     public ChannelHotelMapping updateHotelMapping(Integer id, ChannelHotelMapping mapping) {
         Integer tenantId = getCurrentTenantId();
-        ChannelHotelMapping existing = hotelMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(tenantId))
+        ChannelHotelMapping existing = hotelMappingRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("酒店映射不存在或无权访问"));
         
-        mapping.setId(id);
-        mapping.setTenantId(tenantId);
-        return hotelMappingRepository.save(mapping);
+        copyHotelMapping(mapping, existing, tenantId, id);
+        return hotelMappingRepository.save(existing);
     }
     
     @Override
     public void deleteHotelMapping(Integer id) {
-        ChannelHotelMapping existing = hotelMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelHotelMapping existing = hotelMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("酒店映射不存在或无权访问"));
         
         hotelMappingRepository.delete(existing);
@@ -116,8 +127,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelHotelMapping toggleHotelMappingStatus(Integer id) {
-        ChannelHotelMapping mapping = hotelMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelHotelMapping mapping = hotelMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("酒店映射不存在或无权访问"));
         
         mapping.setStatus("active".equals(mapping.getStatus()) ? "inactive" : "active");
@@ -147,26 +157,25 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelRoomTypeMapping createRoomTypeMapping(ChannelRoomTypeMapping mapping) {
-        mapping.setTenantId(getCurrentTenantId());
-        return roomTypeMappingRepository.save(mapping);
+        Integer tenantId = getCurrentTenantId();
+        ChannelRoomTypeMapping target = new ChannelRoomTypeMapping();
+        copyRoomTypeMapping(mapping, target, tenantId, null);
+        return roomTypeMappingRepository.save(target);
     }
     
     @Override
     public ChannelRoomTypeMapping updateRoomTypeMapping(Integer id, ChannelRoomTypeMapping mapping) {
         Integer tenantId = getCurrentTenantId();
-        ChannelRoomTypeMapping existing = roomTypeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(tenantId))
+        ChannelRoomTypeMapping existing = roomTypeMappingRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("房型映射不存在或无权访问"));
                 
-        mapping.setId(id);
-        mapping.setTenantId(tenantId);
-        return roomTypeMappingRepository.save(mapping);
+        copyRoomTypeMapping(mapping, existing, tenantId, id);
+        return roomTypeMappingRepository.save(existing);
     }
     
     @Override
     public void deleteRoomTypeMapping(Integer id) {
-        ChannelRoomTypeMapping existing = roomTypeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelRoomTypeMapping existing = roomTypeMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("房型映射不存在或无权访问"));
         
         roomTypeMappingRepository.delete(existing);
@@ -174,8 +183,7 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelRoomTypeMapping toggleRoomTypeMappingStatus(Integer id) {
-        ChannelRoomTypeMapping mapping = roomTypeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelRoomTypeMapping mapping = roomTypeMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("房型映射不存在或无权访问"));
         
         mapping.setStatus("active".equals(mapping.getStatus()) ? "inactive" : "active");
@@ -205,26 +213,25 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelRateCodeMapping createRateCodeMapping(ChannelRateCodeMapping mapping) {
-        mapping.setTenantId(getCurrentTenantId());
-        return rateCodeMappingRepository.save(mapping);
+        Integer tenantId = getCurrentTenantId();
+        ChannelRateCodeMapping target = new ChannelRateCodeMapping();
+        copyRateCodeMapping(mapping, target, tenantId, null);
+        return rateCodeMappingRepository.save(target);
     }
     
     @Override
     public ChannelRateCodeMapping updateRateCodeMapping(Integer id, ChannelRateCodeMapping mapping) {
         Integer tenantId = getCurrentTenantId();
-        ChannelRateCodeMapping existing = rateCodeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(tenantId))
+        ChannelRateCodeMapping existing = rateCodeMappingRepository.findByIdAndTenantId(id, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("房价映射不存在或无权访问"));
         
-        mapping.setId(id);
-        mapping.setTenantId(tenantId);
-        return rateCodeMappingRepository.save(mapping);
+        copyRateCodeMapping(mapping, existing, tenantId, id);
+        return rateCodeMappingRepository.save(existing);
     }
     
     @Override
     public void deleteRateCodeMapping(Integer id) {
-        ChannelRateCodeMapping existing = rateCodeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelRateCodeMapping existing = rateCodeMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("房价映射不存在或无权访问"));
         
         rateCodeMappingRepository.delete(existing);
@@ -232,11 +239,126 @@ public class ChannelMappingServiceImpl implements ChannelMappingService {
     
     @Override
     public ChannelRateCodeMapping toggleRateCodeMappingStatus(Integer id) {
-        ChannelRateCodeMapping mapping = rateCodeMappingRepository.findById(id)
-                .filter(m -> m.getTenantId() != null && m.getTenantId().equals(getCurrentTenantId()))
+        ChannelRateCodeMapping mapping = rateCodeMappingRepository.findByIdAndTenantId(id, getCurrentTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("房价映射不存在或无权访问"));
         
         mapping.setStatus("active".equals(mapping.getStatus()) ? "inactive" : "active");
         return rateCodeMappingRepository.save(mapping);
+    }
+
+    /** 解析可信渠道、酒店并对白名单字段进行复制。 */
+    private void copyHotelMapping(ChannelHotelMapping source, ChannelHotelMapping target,
+                                  Integer tenantId, Integer currentId) {
+        requireText(source.getChannelHotelCode(), "渠道酒店代码不能为空");
+        var references = resolveReferences(source.getChannelCode(), source.getHotelCode(), tenantId);
+        boolean duplicate = hotelMappingRepository
+                .findByTenantIdAndChannelCodeAndHotelCode(tenantId, source.getChannelCode(), source.getHotelCode())
+                .stream().anyMatch(item -> !item.getId().equals(currentId));
+        if (duplicate) {
+            throw new IllegalArgumentException("该渠道与酒店的映射已存在");
+        }
+        target.setTenantId(tenantId);
+        target.setChannelId(references.channel().getId());
+        target.setChannelCode(references.channel().getChannelCode());
+        target.setChannelName(references.channel().getChannelName());
+        target.setHotelId(references.hotel().getId());
+        target.setHotelCode(references.hotel().getHotelCode());
+        target.setHotelName(references.hotel().getChineseName());
+        target.setChannelHotelCode(source.getChannelHotelCode().trim());
+        target.setStatus(normalizeStatus(source.getStatus()));
+    }
+
+    /** 房型来源字段由租户内酒店房型主数据回填，客户端只能提供渠道侧映射。 */
+    private void copyRoomTypeMapping(ChannelRoomTypeMapping source, ChannelRoomTypeMapping target,
+                                     Integer tenantId, Integer currentId) {
+        requireText(source.getChannelRoomTypeCode(), "渠道房型代码不能为空");
+        resolveReferences(source.getChannelCode(), source.getHotelCode(), tenantId);
+        var roomType = hotelRoomTypeRepository
+                .findByTenantIdAndHotelCodeAndRoomTypeCode(tenantId, source.getHotelCode(), source.getRoomTypeCode())
+                .orElseThrow(() -> new IllegalArgumentException("酒店房型不存在或无权访问"));
+        boolean duplicate = roomTypeMappingRepository
+                .findByTenantIdAndChannelCodeAndHotelCodeAndRoomTypeCode(
+                        tenantId, source.getChannelCode(), source.getHotelCode(), source.getRoomTypeCode())
+                .stream().anyMatch(item -> !item.getId().equals(currentId));
+        if (duplicate) {
+            throw new IllegalArgumentException("该渠道、酒店和房型的映射已存在");
+        }
+        var references = resolveReferences(source.getChannelCode(), source.getHotelCode(), tenantId);
+        target.setTenantId(tenantId);
+        target.setChannelId(references.channel().getId());
+        target.setHotelId(references.hotel().getId());
+        target.setRoomTypeId(roomType.getId());
+        target.setChannelCode(references.channel().getChannelCode());
+        target.setChannelName(references.channel().getChannelName());
+        target.setHotelCode(references.hotel().getHotelCode());
+        target.setHotelName(references.hotel().getChineseName());
+        target.setRoomTypeCode(roomType.getRoomTypeCode());
+        target.setRoomTypeName(roomType.getRoomTypeName());
+        target.setChannelRoomTypeCode(source.getChannelRoomTypeCode().trim());
+        target.setChannelRoomTypeName(source.getChannelRoomTypeName());
+        target.setStatus(normalizeStatus(source.getStatus()));
+    }
+
+    /** 房价来源字段由价格计划主数据回填，避免客户端伪造名称或跨酒店引用。 */
+    private void copyRateCodeMapping(ChannelRateCodeMapping source, ChannelRateCodeMapping target,
+                                     Integer tenantId, Integer currentId) {
+        requireText(source.getChannelRateCode(), "渠道房价代码不能为空");
+        resolveReferences(source.getChannelCode(), source.getHotelCode(), tenantId);
+        var ratePlan = ratePlanRepository
+                .findByTenantIdAndHotelCodeAndRateCode(tenantId, source.getHotelCode(), source.getRateCode())
+                .orElseThrow(() -> new IllegalArgumentException("价格计划不存在或无权访问"));
+        boolean duplicate = rateCodeMappingRepository
+                .findByTenantIdAndChannelCodeAndHotelCodeAndRateCode(
+                        tenantId, source.getChannelCode(), source.getHotelCode(), source.getRateCode())
+                .stream().anyMatch(item -> !item.getId().equals(currentId));
+        if (duplicate) {
+            throw new IllegalArgumentException("该渠道、酒店和房价码的映射已存在");
+        }
+        var references = resolveReferences(source.getChannelCode(), source.getHotelCode(), tenantId);
+        target.setTenantId(tenantId);
+        target.setChannelId(references.channel().getId());
+        target.setHotelId(references.hotel().getId());
+        target.setRateCodeId(ratePlan.getId());
+        target.setChannelCode(references.channel().getChannelCode());
+        target.setChannelName(references.channel().getChannelName());
+        target.setHotelCode(references.hotel().getHotelCode());
+        target.setHotelName(references.hotel().getChineseName());
+        target.setRateCode(ratePlan.getRateCode());
+        target.setRateCodeName(ratePlan.getRateName());
+        target.setChannelRateCode(source.getChannelRateCode().trim());
+        target.setChannelRateName(source.getChannelRateName());
+        target.setMarkup(source.getMarkup());
+        target.setStatus(normalizeStatus(source.getStatus()));
+    }
+
+    private MappingReferences resolveReferences(String channelCode, String hotelCode, Integer tenantId) {
+        requireText(channelCode, "渠道代码不能为空");
+        requireText(hotelCode, "酒店代码不能为空");
+        var channel = tenantChannelRepository.findByTenantIdAndChannelCode(tenantId, channelCode);
+        if (channel == null) {
+            throw new IllegalArgumentException("渠道不存在或无权访问");
+        }
+        var hotel = hotelRepository.findByHotelCodeAndTenantId(hotelCode, tenantId)
+                .orElseThrow(() -> new IllegalArgumentException("酒店不存在或无权访问"));
+        return new MappingReferences(channel, hotel);
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return "active";
+        }
+        if (!"active".equals(status) && !"inactive".equals(status)) {
+            throw new IllegalArgumentException("映射状态不合法");
+        }
+        return status;
+    }
+
+    private void requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private record MappingReferences(com.crs.entity.TenantChannel channel, com.crs.entity.Hotel hotel) {
     }
 }

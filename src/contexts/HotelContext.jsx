@@ -1,9 +1,10 @@
-import React, { createContext, useState, useContext, useEffect } from 'react'
+import { createContext, useState, useContext, useEffect, useCallback } from 'react'
 import { hotelApi } from '../utils/api'
 import { useTenantContext } from './TenantContext.jsx'
 
 const HotelContext = createContext()
 const SELECTED_HOTEL_KEY_PREFIX = 'crs_selected_hotel_'
+const getHotelStorageKey = (tenantId) => `${SELECTED_HOTEL_KEY_PREFIX}${tenantId}`
 
 export const useHotelContext = () => {
   const context = useContext(HotelContext)
@@ -22,9 +23,7 @@ export const HotelProvider = ({ children }) => {
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false)
   const { selectedTenant } = useTenantContext()
 
-  const getHotelStorageKey = (tenantId) => `${SELECTED_HOTEL_KEY_PREFIX}${tenantId}`
-
-  const fetchHotels = async () => {
+  const fetchHotels = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -59,43 +58,28 @@ export const HotelProvider = ({ children }) => {
         }
         setHasInitializedSelection(true)
       } else {
-        // 添加模拟酒店数据
-        const mockHotels = [
-          { id: 1, chineseName: '北京环球影城大酒店', hotelCode: 'BJS001' },
-          { id: 2, chineseName: '上海迪士尼乐园酒店', hotelCode: 'SHA001' },
-          { id: 3, chineseName: '广州长隆酒店', hotelCode: 'GZ001' },
-          { id: 4, chineseName: '深圳华侨城洲际大酒店', hotelCode: 'SZ001' },
-          { id: 5, chineseName: '杭州西子湖四季酒店', hotelCode: 'HZ001' }
-        ]
-        setHotels(mockHotels)
-        setSelectedHotel(mockHotels[0].hotelCode)
-        setSelectedHotelId(mockHotels[0].id)
+        setHotels([])
+        setSelectedHotel(null)
+        setSelectedHotelId(null)
+        setError(response.message || '获取酒店列表失败')
         setHasInitializedSelection(true)
       }
     } catch (err) {
       setError('获取酒店列表失败')
       console.error('获取酒店列表失败:', err)
-      // 添加模拟酒店数据
-      const mockHotels = [
-        { id: 1, chineseName: '北京环球影城大酒店', hotelCode: 'BJS001' },
-        { id: 2, chineseName: '上海迪士尼乐园酒店', hotelCode: 'SHA001' },
-        { id: 3, chineseName: '广州长隆酒店', hotelCode: 'GZ001' },
-        { id: 4, chineseName: '深圳华侨城洲际大酒店', hotelCode: 'SZ001' },
-        { id: 5, chineseName: '杭州西子湖四季酒店', hotelCode: 'HZ001' }
-      ]
-      setHotels(mockHotels)
-      setSelectedHotel(mockHotels[0].hotelCode)
-      setSelectedHotelId(mockHotels[0].id)
+      setHotels([])
+      setSelectedHotel(null)
+      setSelectedHotelId(null)
       setHasInitializedSelection(true)
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedTenant])
 
   useEffect(() => {
     setHasInitializedSelection(false)
     fetchHotels()
-  }, [selectedTenant])
+  }, [fetchHotels])
 
   const changeHotel = (hotelCode) => {
     setSelectedHotel(hotelCode || null)
@@ -115,7 +99,7 @@ export const HotelProvider = ({ children }) => {
     } else {
       localStorage.removeItem(storageKey)
     }
-  }, [selectedHotel, selectedTenant])
+  }, [hasInitializedSelection, selectedHotel, selectedTenant])
 
   const value = {
     hotels,

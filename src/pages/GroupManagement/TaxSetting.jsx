@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, message } from 'antd'
+import { useState, useEffect } from 'react'
+import { App, Table, Button, Space, Card, Row, Col, Input, Select } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
@@ -12,11 +12,13 @@ const { Option } = Select
 
 const TaxSetting = () => {
   const navigate = useNavigate()
+  const { message } = App.useApp()
   const [taxList, setTaxList] = useState([])
   const [loading, setLoading] = useState(false)
   const [enumLoading, setEnumLoading] = useState(true)
   const [rawTaxData, setRawTaxData] = useState([])
   const [statusOptions, setStatusOptions] = useState([])
+  const [filters, setFilters] = useState({ taxCode: '', legalName: '', status: '' })
 
   // 获取状态枚举选项
   const fetchEnums = async () => {
@@ -27,7 +29,7 @@ const TaxSetting = () => {
         setStatusOptions(response)
       }
     } catch (error) {
-      console.error('获取枚举选项失败:', error)
+      message.error(error?.error || '获取状态选项失败')
     } finally {
       setEnumLoading(false)
     }
@@ -37,18 +39,15 @@ const TaxSetting = () => {
   const fetchTaxSettings = async () => {
     setLoading(true)
     try {
-      console.log('开始获取税费设置数据...')
       const response = await taxSettingApi.getAllTaxSettings()
-      console.log('税费设置API响应:', response)
       if (response && Array.isArray(response)) {
         setRawTaxData(response)
+        setTaxList(response)
       } else {
-        console.error('API返回格式不正确:', response)
         message.error('获取税费设置列表失败')
       }
     } catch (error) {
-      console.error('加载税费设置数据失败:', error)
-      message.error('加载税费设置数据失败: ' + (error.message || error))
+      message.error('加载税费设置数据失败: ' + (error?.error || error?.message || '未知错误'))
     } finally {
       setLoading(false)
     }
@@ -72,6 +71,21 @@ const TaxSetting = () => {
 
   const handleEditTax = (record) => {
     navigate('/group-management/add-edit-tax', { state: { record } })
+  }
+
+  const handleSearch = () => {
+    const code = filters.taxCode.trim().toLowerCase()
+    const name = filters.legalName.trim().toLowerCase()
+    setTaxList(rawTaxData.filter(item => (
+      (!code || item.taxCode?.toLowerCase().includes(code))
+      && (!name || item.legalName?.toLowerCase().includes(name))
+      && (!filters.status || item.status === filters.status)
+    )))
+  }
+
+  const handleReset = () => {
+    setFilters({ taxCode: '', legalName: '', status: '' })
+    setTaxList(rawTaxData)
   }
 
   const columns = [
@@ -138,6 +152,8 @@ const TaxSetting = () => {
               placeholder="税率CODE" 
               prefix={<SearchOutlined />} 
               allowClear 
+              value={filters.taxCode}
+              onChange={(event) => setFilters(current => ({ ...current, taxCode: event.target.value }))}
               style={{ 
                 height: 32, 
                 display: 'flex', 
@@ -149,6 +165,8 @@ const TaxSetting = () => {
             <Input 
               placeholder="税率名称" 
               allowClear 
+              value={filters.legalName}
+              onChange={(event) => setFilters(current => ({ ...current, legalName: event.target.value }))}
               style={{ 
                 height: 32, 
                 display: 'flex', 
@@ -160,6 +178,9 @@ const TaxSetting = () => {
             <Select 
               placeholder="状态" 
               allowClear 
+              loading={enumLoading}
+              value={filters.status || undefined}
+              onChange={(value) => setFilters(current => ({ ...current, status: value || '' }))}
               style={{ 
                 width: '100%',
                 height: 32,
@@ -174,8 +195,8 @@ const TaxSetting = () => {
           </Col>
           <Col xs={24} sm={24} md={8} lg={6} style={{ textAlign: 'right' }}>
             <Space>
-              <Button type="default" style={{ height: 32 }}>重置</Button>
-              <Button type="primary" icon={<SearchOutlined />} style={{ height: 32 }}>搜索</Button>
+              <Button type="default" style={{ height: 32 }} onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} style={{ height: 32 }} onClick={handleSearch}>搜索</Button>
             </Space>
           </Col>
         </Row>
@@ -191,7 +212,7 @@ const TaxSetting = () => {
       {/* 税率列表表格 */}
       <Table
         columns={columns}
-        dataSource={rawTaxData}
+        dataSource={taxList}
         rowKey="id"
         loading={loading}
         pagination={{

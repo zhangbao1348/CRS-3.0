@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Typography, Form, Input, Select, Button, Table, Space, Tag, Checkbox, message, Badge } from 'antd'
-import { SearchOutlined, ReloadOutlined, ExportOutlined, DownOutlined, PhoneOutlined, CheckCircleOutlined, CloseCircleOutlined, DollarOutlined, GlobalOutlined, ShoppingOutlined, HomeOutlined } from '@ant-design/icons'
+import { useState, useEffect } from 'react'
+import { App as AntApp, Typography, Form, Input, Select, Button, Table, Tag, Badge } from 'antd'
+import { SearchOutlined, ReloadOutlined, ExportOutlined, PhoneOutlined, CheckCircleOutlined, DollarOutlined, GlobalOutlined, ShoppingOutlined, HomeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { reservationApi } from '../../utils/api'
 import { getCurrentTenantId } from '../../utils/tenantUtils'
 import { useHotelContext } from '../../contexts/HotelContext'
+import { FilterPanel, PageScaffold, TablePanel } from '../../components/ui'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 const channelIconMap = {
@@ -43,7 +44,9 @@ const ReservationList = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [orderData, setOrderData] = useState([])
+  const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 })
+  const { message } = AntApp.useApp()
   const navigate = useNavigate()
   const { selectedHotel } = useHotelContext()
 
@@ -116,11 +119,12 @@ const ReservationList = () => {
 
   const handleReset = () => {
     form.resetFields()
+    setSelectedRowKeys([])
     fetchOrders(1, pagination.pageSize)
   }
 
   const handleExport = () => {
-    message.info('导出功能开发中')
+    navigate('/reports/data-export')
   }
 
   const handleViewOrder = (record) => {
@@ -136,14 +140,18 @@ const ReservationList = () => {
   }, [selectedHotel])
 
   return (
-    <div className="fade-in">
-      <h1 className="page-title">
-        订单
-      </h1>
-      
-      <Card>
-        {/* 搜索区域 */}
-        <div style={{ marginBottom: 24 }}>
+    <PageScaffold
+      className="fade-in"
+      eyebrow="RESERVATION OPERATIONS"
+      title="订单管理"
+      description="集中查询中央预订、渠道与 PMS 订单，核对入住信息和订单状态。"
+      actions={(
+        <Button icon={<ExportOutlined />} onClick={handleExport}>
+          数据导出
+        </Button>
+      )}
+    >
+      <FilterPanel>
           <Form
             form={form}
             layout="inline"
@@ -154,11 +162,11 @@ const ReservationList = () => {
               guestName: ''
             }}
           >
-            <Form.Item name="orderNumber">
-              <Input placeholder="请输入订单号" style={{ width: 180 }} />
+            <Form.Item name="orderNumber" label="订单号">
+              <Input placeholder="渠道 / CRS / PMS 订单号" allowClear />
             </Form.Item>
-            <Form.Item name="status">
-              <Select placeholder="所有状态" style={{ width: 120 }}>
+            <Form.Item name="status" label="订单状态">
+              <Select placeholder="请选择订单状态">
                 <Option value="所有状态">所有状态</Option>
                 <Option value="已确认">已确认</Option>
                 <Option value="待确认">待确认</Option>
@@ -170,8 +178,8 @@ const ReservationList = () => {
                 <Option value="Noshow">Noshow</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="channel">
-              <Select placeholder="所有渠道" style={{ width: 120 }}>
+            <Form.Item name="channel" label="预订渠道">
+              <Select placeholder="请选择预订渠道">
                 <Option value="所有渠道">所有渠道</Option>
                 <Option value="携程">携程</Option>
                 <Option value="飞猪">飞猪</Option>
@@ -179,33 +187,31 @@ const ReservationList = () => {
                 <Option value="PMS">PMS</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="guestName">
-              <Input placeholder="请输入入住人" style={{ width: 150 }} />
+            <Form.Item name="guestName" label="入住人">
+              <Input placeholder="请输入入住人姓名" allowClear />
             </Form.Item>
-            <Form.Item>
+            <Form.Item className="ui-filter-panel__actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loading}>
-                搜索
+                查询
               </Button>
-            </Form.Item>
-            <Form.Item>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>
+              <Button className="ui-filter-panel__secondary-action" icon={<ReloadOutlined />} onClick={handleReset}>
                 重置
               </Button>
             </Form.Item>
-
-            <Form.Item>
-              <Button icon={<ExportOutlined />} onClick={handleExport} style={{ float: 'right' }}>
-                导出
-              </Button>
-            </Form.Item>
           </Form>
-          
+      </FilterPanel>
 
-        </div>
-        
-        {/* 订单列表 */}
+      <TablePanel
+        title="订单结果"
+        description={`共 ${pagination.total} 条订单${selectedRowKeys.length ? `，已选择 ${selectedRowKeys.length} 条` : ''}`}
+      >
         <Table
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            columnTitle: '选择',
+          }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,
@@ -218,17 +224,6 @@ const ReservationList = () => {
           dataSource={orderData}
           rowKey="key"
           columns={[
-            {
-              title: (
-                <Checkbox>
-                  <span style={{ marginLeft: 8 }}>全选</span>
-                </Checkbox>
-              ),
-              dataIndex: 'selected',
-              key: 'selected',
-              width: 40,
-              render: () => <Checkbox />
-            },
             {
               title: '订单号',
               key: 'orderNumber',
@@ -325,8 +320,8 @@ const ReservationList = () => {
             }
           ]}
         />
-      </Card>
-    </div>
+      </TablePanel>
+    </PageScaffold>
   )
 }
 

@@ -32,12 +32,17 @@ import com.crs.entity.Reservation;
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Integer> {
 
+        /** 在租户维度下根据主键查询订单。 */
+        Optional<Reservation> findByIdAndTenantId(Integer id, Integer tenantId);
+
         /**
          * 基于悲观写锁查询订单实体（防止并发抢占与覆盖）。
          */
         @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-        @Query("SELECT r FROM Reservation r WHERE r.id = :id")
-        Optional<Reservation> findByIdForUpdate(@Param("id") Integer id);
+        @Query("SELECT r FROM Reservation r WHERE r.id = :id AND r.tenantId = :tenantId")
+        Optional<Reservation> findByIdAndTenantIdForUpdate(
+                        @Param("id") Integer id,
+                        @Param("tenantId") Integer tenantId);
 
         /**
          * 在租户维度下基于悲观写锁查询订单实体（防止并发抢占与覆盖）。

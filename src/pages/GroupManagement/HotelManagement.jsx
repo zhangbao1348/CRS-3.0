@@ -1,275 +1,25 @@
-import React, { useState, useEffect } from 'react'
-import { Table, Button, Space, Card, Row, Col, Input, Select, DatePicker, Modal, Form, message, Spin, Tabs, InputNumber, Checkbox, Upload, Image, Radio } from 'antd'
+import { useState, useEffect, useMemo } from 'react'
+import { App as AntApp, Table, Button, Space, Card, Row, Col, Input, Select, DatePicker, Modal, Form, Spin, Tabs } from 'antd'
 import { 
   SearchOutlined, 
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined, 
   EyeOutlined,
-  ApartmentOutlined,
-  CheckCircleOutlined,
-  WarningOutlined
+  ApartmentOutlined
 } from '@ant-design/icons'
-import { Editor } from '@wangeditor/editor-for-react'
 import '@wangeditor/editor/dist/css/style.css'
 import { hotelApi } from '../../utils/api'
 import { useTenantContext } from '../../contexts/TenantContext.jsx'
-
-// 演示模式标志
-const DEMO_MODE = false
-
-// 模拟酒店数据
-const mockHotels = [
-  {
-    id: 1,
-    name: '南京站红山动物园雅斯阁酒店',
-    code: 'NJ001',
-    province: '江苏省',
-    city: '南京市',
-    address: '南京市玄武区红山路1号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-01',
-    tenantId: 1
-  },
-  {
-    id: 2,
-    name: '上海外滩华尔道夫酒店',
-    code: 'SH001',
-    province: '上海市',
-    city: '上海市',
-    address: '上海市黄浦区中山东一路2号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-02',
-    tenantId: 1
-  },
-  {
-    id: 3,
-    name: '北京国贸大酒店',
-    code: 'BJ001',
-    province: '北京市',
-    city: '北京市',
-    address: '北京市朝阳区建国门外大街1号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-03',
-    tenantId: 1
-  },
-  {
-    id: 4,
-    name: '广州塔君悦酒店',
-    code: 'GZ001',
-    province: '广东省',
-    city: '广州市',
-    address: '广州市海珠区阅江西路222号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-04',
-    tenantId: 1
-  },
-  {
-    id: 5,
-    name: '深圳湾万怡酒店',
-    code: 'SZ001',
-    province: '广东省',
-    city: '深圳市',
-    address: '深圳市南山区工业七路3号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-05',
-    tenantId: 1
-  },
-  {
-    id: 6,
-    name: '杭州西湖索菲特酒店',
-    code: 'HZ001',
-    province: '浙江省',
-    city: '杭州市',
-    address: '杭州市西湖区曙光路120号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-06',
-    tenantId: 1
-  },
-  {
-    id: 7,
-    name: '成都太古里尼依格罗酒店',
-    code: 'CD001',
-    province: '四川省',
-    city: '成都市',
-    address: '成都市锦江区红星路三段1号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-07',
-    tenantId: 1
-  },
-  {
-    id: 8,
-    name: '重庆解放碑威斯汀酒店',
-    code: 'CQ001',
-    province: '重庆市',
-    city: '重庆市',
-    address: '重庆市渝中区新华路222号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-08',
-    tenantId: 1
-  },
-  {
-    id: 9,
-    name: '武汉光谷凯悦酒店',
-    code: 'WH001',
-    province: '湖北省',
-    city: '武汉市',
-    address: '武汉市洪山区珞喻路1077号',
-    taxRate: 13,
-    status: '维护中',
-    createdAt: '2025-01-09',
-    tenantId: 1
-  },
-  {
-    id: 10,
-    name: '西安兵马俑希尔顿酒店',
-    code: 'XA001',
-    province: '陕西省',
-    city: '西安市',
-    address: '西安市临潼区秦俑馆路1号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-10',
-    tenantId: 1
-  },
-  {
-    id: 11,
-    name: '厦门鼓浪屿悦华酒店',
-    code: 'XM001',
-    province: '福建省',
-    city: '厦门市',
-    address: '厦门市思明区鼓浪屿晃岩路25号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-11',
-    tenantId: 1
-  },
-  {
-    id: 12,
-    name: '青岛海景花园大酒店',
-    code: 'QD001',
-    province: '山东省',
-    city: '青岛市',
-    address: '青岛市市南区彰化路2号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-12',
-    tenantId: 1
-  },
-  {
-    id: 13,
-    name: '大连金石滩鲁能希尔顿度假酒店',
-    code: 'DL001',
-    province: '辽宁省',
-    city: '大连市',
-    address: '大连市金州区金石滩国家旅游度假区海滨西路57号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-13',
-    tenantId: 1
-  },
-  {
-    id: 14,
-    name: '三亚亚龙湾希尔顿度假酒店',
-    code: 'SY001',
-    province: '海南省',
-    city: '三亚市',
-    address: '三亚市亚龙湾国家旅游度假区',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-14',
-    tenantId: 1
-  },
-  {
-    id: 15,
-    name: '昆明滇池洲际酒店',
-    code: 'KM001',
-    province: '云南省',
-    city: '昆明市',
-    address: '昆明市西山区怡景路5号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-15',
-    tenantId: 1
-  },
-  {
-    id: 16,
-    name: '贵阳铂尔曼大酒店',
-    code: 'GY001',
-    province: '贵州省',
-    city: '贵阳市',
-    address: '贵阳市观山湖区林城西路8号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-16',
-    tenantId: 1
-  },
-  {
-    id: 17,
-    name: '南宁南湖公园万丽酒店',
-    code: 'NN001',
-    province: '广西壮族自治区',
-    city: '南宁市',
-    address: '南宁市青秀区双拥路30号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-17',
-    tenantId: 1
-  },
-  {
-    id: 18,
-    name: '南昌滕王阁雅高美爵酒店',
-    code: 'NC001',
-    province: '江西省',
-    city: '南昌市',
-    address: '南昌市东湖区抚河北路1号',
-    taxRate: 13,
-    status: '维护中',
-    createdAt: '2025-01-18',
-    tenantId: 1
-  },
-  {
-    id: 19,
-    name: '长沙梅溪湖金茂豪华精选酒店',
-    code: 'CS001',
-    province: '湖南省',
-    city: '长沙市',
-    address: '长沙市岳麓区梅溪湖环湖路1177号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-19',
-    tenantId: 1
-  },
-  {
-    id: 20,
-    name: '郑州国际会展中心万豪酒店',
-    code: 'ZZ001',
-    province: '河南省',
-    city: '郑州市',
-    address: '郑州市金水区商务外环路5号',
-    taxRate: 13,
-    status: '正常',
-    createdAt: '2025-01-20',
-    tenantId: 1
-  }
-]
 
 const { RangePicker } = DatePicker
 const { Option } = Select
 
 const HotelManagement = () => {
+  const { message, modal } = AntApp.useApp()
   const [hotels, setHotels] = useState([])
   const [loading, setLoading] = useState(false)
   const [isViewModalVisible, setIsViewModalVisible] = useState(false)
-  const [selectedHotel, setSelectedHotel] = useState(null)
   const [form] = Form.useForm()
   const [viewForm] = Form.useForm()
   const [searchParams, setSearchParams] = useState({
@@ -281,39 +31,27 @@ const HotelManagement = () => {
   
   const { selectedTenant } = useTenantContext()
   
-  const statusOptions = [
-    { value: 'active', label: '正常' },
-    { value: 'inactive', label: '维护中' }
-  ]
-
   const fetchHotels = async () => {
     setLoading(true)
     try {
-      if (DEMO_MODE) {
-        // 演示模式下使用模拟数据
-        setHotels(mockHotels)
-      } else {
-        // 非演示模式下从后端获取数据
-        const response = await hotelApi.getAllHotels(selectedTenant)
-        if (response.success) {
-          const hotelsData = response.data.map(hotel => ({
-            id: hotel.id,
-            name: hotel.chineseName,
-            code: hotel.hotelCode,
-            province: hotel.province,
-            city: hotel.city,
-            address: hotel.address,
-            taxRate: 13,
-            status: hotel.status === 'active' ? '正常' : '维护中',
-            createdAt: hotel.createdAt ? new Date(hotel.createdAt).toISOString().split('T')[0] : '',
-            tenantId: hotel.tenantId
-          }))
-          setHotels(hotelsData)
-        }
+      const response = await hotelApi.getHotelsByTenantId(selectedTenant)
+      if (response.success) {
+        const hotelsData = response.data.map(hotel => ({
+          id: hotel.id,
+          name: hotel.chineseName,
+          code: hotel.hotelCode,
+          province: hotel.province,
+          city: hotel.city,
+          address: hotel.address,
+          taxRate: 13,
+          status: hotel.status === 'active' ? '正常' : '维护中',
+          createdAt: hotel.createdAt ? new Date(hotel.createdAt).toISOString().split('T')[0] : '',
+          tenantId: hotel.tenantId
+        }))
+        setHotels(hotelsData)
       }
     } catch (error) {
-      console.error('获取酒店列表失败:', error)
-      message.error('获取酒店列表失败')
+      message.error(error?.response?.data?.message || '获取酒店列表失败')
     } finally {
       setLoading(false)
     }
@@ -324,7 +62,7 @@ const HotelManagement = () => {
   }, [selectedTenant])
 
   const handleSearch = () => {
-    fetchHotels()
+    form.submit()
   }
 
   const handleReset = () => {
@@ -335,15 +73,23 @@ const HotelManagement = () => {
       status: ''
     })
     form.resetFields()
-    fetchHotels()
   }
+
+  const filteredHotels = useMemo(() => hotels.filter(hotel => {
+    const name = searchParams.name.trim().toLowerCase()
+    const code = searchParams.code.trim().toLowerCase()
+    if (name && !String(hotel.name || '').toLowerCase().includes(name)) return false
+    if (code && !String(hotel.code || '').toLowerCase().includes(code)) return false
+    if (searchParams.city && hotel.city !== searchParams.city) return false
+    if (searchParams.status && hotel.status !== searchParams.status) return false
+    return true
+  }), [hotels, searchParams])
 
   const handleAddHotel = () => {
     window.location.href = '/group-management/add-hotel'
   }
 
   const handleViewHotel = (record) => {
-    setSelectedHotel(record)
     viewForm.setFieldsValue({
       hotelCode: record.code,
       hotelChineseName: record.name,
@@ -359,17 +105,16 @@ const HotelManagement = () => {
   }
 
   const handleDeleteHotel = async (id) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '确定要删除这个酒店吗？',
       onOk: async () => {
         try {
           await hotelApi.deleteHotel(id)
-          message.success('删除酒店成功')
+          message.success('酒店已软删除并置为维护中')
           fetchHotels()
         } catch (error) {
-          console.error('删除酒店失败:', error)
-          message.error('删除酒店失败，请稍后重试')
+          message.error(error?.response?.data?.message || '删除酒店失败，请稍后重试')
         }
       }
     })
@@ -501,7 +246,16 @@ const HotelManagement = () => {
         <Space size="middle">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewHotel(record)}>查看</Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEditHotel(record)}>编辑</Button>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleDeleteHotel(record.id)}>删除</Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={record.status !== '正常'}
+            onClick={() => handleDeleteHotel(record.id)}
+          >
+            {record.status === '正常' ? '删除' : '已删除'}
+          </Button>
         </Space>
       )
     }
@@ -557,11 +311,9 @@ const HotelManagement = () => {
               value={searchParams.city || undefined}
               onChange={(value) => setSearchParams({...searchParams, city: value})}
             >
-              <Option value="北京">北京</Option>
-              <Option value="上海">上海</Option>
-              <Option value="广州">广州</Option>
-              <Option value="深圳">深圳</Option>
-              <Option value="杭州">杭州</Option>
+              {[...new Set(hotels.map(hotel => hotel.city).filter(Boolean))].sort().map(city => (
+                <Option key={city} value={city}>{city}</Option>
+              ))}
             </Select>
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
@@ -623,7 +375,7 @@ const HotelManagement = () => {
       <Spin spinning={loading}>
         <Table
           columns={columns}
-          dataSource={hotels}
+          dataSource={filteredHotels}
           rowKey="id"
           pagination={{
             pageSize: 10,

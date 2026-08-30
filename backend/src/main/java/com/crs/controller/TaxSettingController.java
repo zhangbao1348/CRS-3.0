@@ -53,7 +53,6 @@ public class TaxSettingController {
             List<TaxSetting> taxSettings = taxSettingService.getAllTaxSettings(tenantId);
             return ResponseEntity.ok(taxSettings);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -69,7 +68,6 @@ public class TaxSettingController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -84,10 +82,8 @@ public class TaxSettingController {
             TaxSetting created = taxSettingService.create(tenantId, taxSetting);
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -102,10 +98,8 @@ public class TaxSettingController {
             TaxSetting updated = taxSettingService.update(tenantId, id, taxSetting);
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -117,10 +111,8 @@ public class TaxSettingController {
             taxSettingService.delete(tenantId, id);
             return ResponseEntity.ok(Map.of("message", "税费设置删除成功"));
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(null);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -136,7 +128,6 @@ public class TaxSettingController {
             List<TaxSetting> createdTaxSettings = taxSettingService.batchCreateTaxSettings(tenantId, taxSettings);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdTaxSettings);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -147,7 +138,6 @@ public class TaxSettingController {
             List<TaxSetting> defaultTaxSettings = taxSettingService.initDefaultTaxSettingsForTenant(tenantId);
             return ResponseEntity.status(HttpStatus.CREATED).body(defaultTaxSettings);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -169,7 +159,6 @@ public class TaxSettingController {
             }
             return ResponseEntity.ok(taxSetting);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
@@ -191,10 +180,8 @@ public class TaxSettingController {
             TaxSetting updated = taxSettingService.update(tenantId, existing.getId(), taxSetting);
             return ResponseEntity.ok(updated);
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(null);
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }

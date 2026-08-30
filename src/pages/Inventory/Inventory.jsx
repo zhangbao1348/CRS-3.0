@@ -9,15 +9,17 @@ import ChannelLevelInventory from './ChannelLevelInventory'
 import MarketLevelInventory from './MarketLevelInventory'
 import ChannelRoomTypeInventory from './ChannelRoomTypeInventory'
 import RateCategoryLevelInventory from './RateCategoryLevelInventory'
+import { PageScaffold } from '../../components/ui'
 
 const Inventory = () => {
   return (
-    <div className="fade-in">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h1 className="page-title"><CalendarOutlined /> 房控日历</h1>
-      </div>
-
-      <Tabs defaultActiveKey="1" style={{ marginBottom: 16 }}
+    <PageScaffold
+      className="fade-in inventory-page"
+      eyebrow="INVENTORY CONTROL"
+      title={<><CalendarOutlined /> 房控日历</>}
+      description="按库存维度查看和维护可售房量；切换标签不会改变当前酒店范围。"
+    >
+      <Tabs defaultActiveKey="1" className="inventory-page__tabs" destroyOnHidden
         items={[
           { key: '1', label: '主要房控日历', children: <MainInventoryCalendar /> },
           { key: '2', label: 'PMS房控日历', children: <PMSInventoryCalendar /> },
@@ -30,7 +32,7 @@ const Inventory = () => {
           { key: '9', label: '房价大类房量控制', children: <RateCategoryLevelInventory /> },
         ]}
       />
-    </div>
+    </PageScaffold>
   )
 }
 

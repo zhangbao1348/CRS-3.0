@@ -2,11 +2,15 @@ package com.crs.controller;
 
 import com.crs.entity.Menu;
 import com.crs.entity.User;
+import com.crs.security.ResourceAuthorizationService;
 import com.crs.service.PermissionService;
 import com.crs.service.UserService;
 import com.crs.util.JwtUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +37,8 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class AuthController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
     @Autowired
     private UserService userService;
 
@@ -45,32 +51,24 @@ public class AuthController {
     @Autowired
     private PermissionService permissionService;
 
+    @Autowired
+    private ResourceAuthorizationService resourceAuthorizationService;
+
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
         try {
             String username = request.get("username");
             String password = request.get("password");
-            
-            System.out.println("[DEBUG] Login request received:");
-            System.out.println("[DEBUG] Username: " + username);
-            System.out.println("[DEBUG] Password: " + password);
-            System.out.println("[DEBUG] Request body: " + request.toString());
-
             Optional<User> userOpt = userService.getUserByUsername(username);
             if (!userOpt.isPresent()) {
-                System.out.println("[DEBUG] User not found: " + username);
                 response.put("success", false);
                 response.put("message", "用户名或密码错误");
                 return ResponseEntity.badRequest().body(response);
             }
 
             User user = userOpt.get();
-            System.out.println("[DEBUG] User found: " + user.getUsername());
-            System.out.println("[DEBUG] Stored password hash: " + user.getPassword());
-            System.out.println("[DEBUG] Attempting to match password: " + password);
             boolean passwordMatch = passwordEncoder.matches(password, user.getPassword());
-            System.out.println("[DEBUG] Password match result: " + passwordMatch);
             if (!passwordMatch) {
                 response.put("success", false);
                 response.put("message", "用户名或密码错误");
@@ -96,7 +94,6 @@ public class AuthController {
 
             // 获取用户菜单
             List<Menu> menus = permissionService.getUserMenus(user.getId(), "crs");
-            System.out.println("[DEBUG] User menus size: " + menus.size());
             
             Map<String, Object> data = new HashMap<>();
             data.put("user", userData);
@@ -110,8 +107,9 @@ public class AuthController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("登录处理失败", e);
             response.put("success", false);
-            response.put("message", "登录失败: " + e.getMessage());
+            response.put("message", "登录失败，请稍后重试");
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -134,8 +132,9 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(response);
             }
         } catch (Exception e) {
+            logger.warn("刷新令牌失败", e);
             response.put("success", false);
-            response.put("message", "刷新令牌失败: " + e.getMessage());
+            response.put("message", "刷新令牌失败");
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -166,8 +165,9 @@ public class AuthController {
             response.put("message", "注册成功");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            logger.error("用户注册失败", e);
             response.put("success", false);
-            response.put("message", "注册失败: " + e.getMessage());
+            response.put("message", "注册失败，请稍后重试");
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -178,13 +178,19 @@ public class AuthController {
             @PathVariable String systemType) {
         Map<String, Object> response = new HashMap<>();
         try {
+            resourceAuthorizationService.requireUserAccess(userId);
             List<Menu> menus = permissionService.getUserMenus(userId, systemType);
             response.put("success", true);
             response.put("data", menus);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (AccessDeniedException e) {
             response.put("success", false);
-            response.put("message", "获取菜单失败: " + e.getMessage());
+            response.put("message", "无权访问该用户菜单");
+            return ResponseEntity.status(403).body(response);
+        } catch (Exception e) {
+            logger.error("获取用户菜单失败，userId={}，systemType={}", userId, systemType, e);
+            response.put("success", false);
+            response.put("message", "获取菜单失败");
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -193,13 +199,19 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> getUserPermissions(@PathVariable Integer userId) {
         Map<String, Object> response = new HashMap<>();
         try {
+            resourceAuthorizationService.requireUserAccess(userId);
             List<String> permissions = permissionService.getUserPermissions(userId);
             response.put("success", true);
             response.put("data", permissions);
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (AccessDeniedException e) {
             response.put("success", false);
-            response.put("message", "获取权限失败: " + e.getMessage());
+            response.put("message", "无权访问该用户权限");
+            return ResponseEntity.status(403).body(response);
+        } catch (Exception e) {
+            logger.error("获取用户权限失败，userId={}", userId, e);
+            response.put("success", false);
+            response.put("message", "获取权限失败");
             return ResponseEntity.internalServerError().body(response);
         }
     }
